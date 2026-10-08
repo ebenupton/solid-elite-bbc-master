@@ -9715,7 +9715,7 @@ ENDIF
 \
 \ ******************************************************************************
 
- FONT% = HI(P%)
+ FONT% = HI(P%)         \ Set FONT% to the high byte of the font file address
 
  INCBIN "1-source-files/fonts/P.FONT.bin"
 
