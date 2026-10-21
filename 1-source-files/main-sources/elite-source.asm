@@ -42180,16 +42180,15 @@ ENDMACRO
 
 .LL40
 
- PHA                    \ Store the result of the subtraction on the stack
-
- LDA S                  \ Flip the sign of S
- EOR #%10000000
+ LDA S                  \ Flip the sign of S (C is still clear from the
+ EOR #%10000000         \ underflowed subtraction)
  STA S
 
- PLA                    \ Restore the subtraction result into A
+ LDA Q                  \ Port: C = 0, so this sets A = Q - R - 1, which is
+ SBC R                  \ >= 0 as Q > R, so C is now set
 
- EOR #%11111111         \ Negate the result in A using two's complement, i.e.
- ADC #1                 \ set A = ~A + 1
+ ADC #0                 \ A = Q - R = -(R - Q), and C ends up clear as the
+                        \ result is in 1..255
 
  RTS                    \ Return from the subroutine
 
