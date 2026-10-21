@@ -8,7 +8,8 @@ Master Elite (the Acornsoft SNG47 release), in three parts:
    and 6 and ANDY free for a filled renderer. The source stays in the
    original's order, with each routine's header naming the area it lives in
    ([memory-map.md](memory-map.md)).
-2. **The speed-ups** of the game logic, one idea per commit.
+2. **The speed-ups** of the game logic, one idea per commit
+   ([speedups.md](speedups.md)).
 3. **The filled renderer.**
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
@@ -57,3 +58,12 @@ second in the gate's run, against SNG47's 13.97. Code that moved now
 straddles page boundaries in new places, which costs about 200 cycles a
 flight iteration (143,347 against the original's 143,137). Page &0D is
 never written, and saved commander files are byte for byte the original's.
+
+## Part 2: the speed-ups
+
+24 commits, one idea each, make the game logic faster without changing what
+it computes ([speedups.md](speedups.md)). Each passes the gate with the game
+state identical to the original's and the screen, still the original's
+wireframe, identical at every iteration. At the end of part 2 the game runs
+at 17.86 flight iterations per emulated second against SNG47's 13.97 (1.278
+times): 111,970 cycles per flight iteration against 143,137.

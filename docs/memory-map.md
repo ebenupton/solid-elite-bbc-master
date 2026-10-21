@@ -131,7 +131,7 @@ through stubs. A reference to the other side's data is only ever an address
 | The main code's head | main from `CODE%` (`&1300`) to `HEAD_END%`, below `&3000` | the original's head, `TVT3` to `UP`, in its order: the palettes, the IRQ handler and the sound, `CHPR`, `ADDK`, the font and the log tables (page aligned), `UP`. Then the **low area** (`elite-low.asm`): the blocks tagged low (`stackpt`, `NEWBRK`), the far calls (`elite-far.asm`) and `DOSCLI`'s stash of the filing system's lasting bytes (`DFSST`) |
 | The run, in main RAM | from `HEAD_END%` | the rest of the main code in its order, with the stubs of the cold routines whose places are in it, to a marker before `TACTICS`, below `&4000` |
 | Main `&4000-&6FFF` | | not used by the game. `DOSCLI` borrows `&4000-&6000` during a disc command (HAZEL's stash and the command) |
-| The run, continued | main `&7000-&7FFF`, then bank 4 from `&8000` | from `TACTICS` on to `F%`, through `&8000` into bank 4. Main `&7000-&7FFF` is never on show (the dashboard is in shadow RAM), and the code there never runs with ACCCON X set |
+| The high code, then the run | main `&7000-&7FFF`, then bank 4 from `&8000` | the quarter squares `QSL` and `QSH` (`elite-hi.asm`, page aligned at `&7000`), which the port's multiplications use with bank 4 or 7 paged; then the run from `TACTICS` on to `F%`, through `&8000` into bank 4. Main `&7000-&7FFF` is never on show (the screen is in shadow RAM), and the code there never runs with ACCCON X set |
 | Bank 4, tagged blocks | after `F%` | Master's drawing (`ylookup`, `SCAN`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS`, the tables `TWOS` and the rest) and the dashboard (`DIALS` and its helpers, the bulbs, `MSBAR`) |
 | HAZEL | `&C000-` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints, `SNE`, `ACT`. `HANGHEAP` (`&DE00`) is the hangar's ship line heap (see `HAS1`). `&DF00-&DFFF` is the MOS's |
 | Bank 7, the cold area | `&8000-` | the cold blocks of `elite-source.asm` in its order, with the stubs out of the cold area at their routines' places, then the cold data: `QQ18` and the extended tokens `TKN1`, `RUPLA`, `RUGAL` and `RUTOK` |
@@ -146,7 +146,7 @@ nothing falls into or branches across. A banner before `TACTICS` saves BCODE
 and sets `ORG &7000`. `TACTICS`'s seven parts branch into one another, so it
 moves as a whole. `TACTICS` is the latest place at which the port's final
 layout still fits below `&4000`. `elite-layout.asm` saves main
-`&7000-&7FFF` as HICODE and bank 4 as BANK4.
+`&7000-&7FFF` (the high code and the run) as HICODE and bank 4 as BANK4.
 
 ## The loader
 
@@ -177,8 +177,10 @@ loader takes its address and bank from the game's symbols
 * **The low area.** `stackpt` and `NEWBRK` are at their original place in
   the source but are emitted at the end of the head. `NEWBRK` is the
   original with three lines that page bank 4 in, and a call of `DOSNMI`.
-* **Port routines next to the routine they serve.** `DOSCLI` and `DOSNMI`
-  are at the end of the cold code.
+* **Port routines next to the routine they serve.** `MALW` and `MALC`
+  (after part 6 of the main flight loop), `DVL9a` (after `DVID4`), `PLL4F`
+  and `pl4pat` (after `PLS22`), `LL51L` (after `LL51`) and `QQ18IX` (after
+  `ex`). `DOSCLI` and `DOSNMI` are at the end of the cold code.
 * **Changed for the layout.** A few short branches into a routine that is
   now in another area return through their own `RTS` instead (`DOEXP`,
   `YESNO`, `ANGRY`, `SIGHT`). `getzp` no longer pages bank 6 in. `CHPR`
