@@ -256,9 +256,15 @@
                         \ before saving (though this isn't actually used in this
                         \ version, and is left-over Commodore 64 code)
 
- commbuf = &0E7E        \ The file buffer where we load and save commander files
-                        \ (this shares a location with LSX2 and is the address
-                        \ used in the *SAVE and *LOAD OS commands)
+                        \ Port: commbuf, the file buffer where we load and save
+                        \ commander files (&0E7E in the original), is defined
+                        \ after WP, as it shares a location with LSX2 there
+
+ HANGHEAP = &DE00       \ Port: the hangar's ship line heap, which LL9 writes
+                        \ while HAS1 draws a ship in the hangar (the original's
+                        \ &0B00 is in WP in the port), in HAZEL, which the
+                        \ game does not otherwise use; a whole page, as HAS1
+                        \ sets only the heap pointer's high byte, INWK+34
 
  XX21 = &8000           \ The address of the ship blueprints lookup table, as
                         \ set in elite-data.asm
@@ -315,7 +321,6 @@ ENDIF
  OSBYTE = &FFF4         \ The address for the OSBYTE routine
 
  OSCLI = &FFF7          \ The address for the OSCLI routine
-
 \ ******************************************************************************
 \
 \       Name: ZP
@@ -1263,17 +1268,26 @@ ENDIF
 
  PRINT "K% workspace from ", ~K%, "to ", ~P%-1, "inclusive"
 
+ ASSERT P% <= &0D00     \ Port: nothing may be assembled into page &0D, which
+                        \ holds the DFS's NMI routine, the extended vectors and
+                        \ the ROM workspace table on a Master (see "Page &0D is
+                        \ off limits" in docs/master-memory.md)
 \ ******************************************************************************
 \
 \       Name: WP
 \       Type: Workspace
-\    Address: &0E41 to &12A9
+\    Address: &0841 to &0CA9
 \   Category: Workspaces
 \    Summary: Ship slots, variables
 \
 \ ******************************************************************************
 
- ORG &0E41              \ Set the assembly address to &0E41
+ ORG &0841              \ Set the assembly address to &0841 (Port: &0E41 in
+                        \ the original; WP is in main RAM below page &0D, in
+                        \ the MOS's sound, printer, RS423, cassette and speech
+                        \ buffers and &0B00-&0CFF, which the game never uses,
+                        \ with its bytes' places in their pages as in the
+                        \ original)
 
 .WP
 
@@ -2052,6 +2066,14 @@ ENDIF
 
  PRINT "WP workspace from ", ~WP, "to ", ~P%-1, "inclusive"
 
+ ASSERT P% <= &0D00     \ Port: nothing may be assembled into page &0D (see K%)
+
+ commbuf = LSX2         \ The file buffer where we load and save commander files
+                        \ (this shares a location with LSX2 and is the address
+                        \ used in the *SAVE and *LOAD OS commands; Port: the
+                        \ commands take it from here, &087E, as the file's
+                        \ catalogue entry does not depend on it: *SAVE gives
+                        \ load and execution addresses 0)
 \ ******************************************************************************
 \
 \ ELITE A FILE
@@ -17879,7 +17901,7 @@ ENDIF
                         \ are negative
 
  LDA #&0B               \ Set the ship line heap pointer in INWK(34 33) to point
- STA INWK+34            \ to &0B00
+ STA INWK+34            \ to &0B00 (Port: HANGHEAP during LL9, below)
 
  JSR DORND              \ We now perform a random number of small angle (3.6
  STA XSAV               \ degree) rotations to spin the ship on the deck while
@@ -17951,13 +17973,25 @@ ENDIF
                         \ shape due to the imprecise nature of trigonometry
                         \ in assembly language
 
- JMP LL9                \ Jump to LL9 to display the ship and return from the
-                        \ subroutine using a tail call
+ LDA #HI(HANGHEAP)      \ Port: the line heap at HANGHEAP while LL9 draws
+ STA INWK+34
+
+ JSR LL9                \ Display the ship (Port: JSR, not a tail call, so that
+                        \ the heap pointer can be put back below)
+
+ LDA #&0B               \ Port: leave INWK(34 33) = &0B00, as the original does
+ STA INWK+34
+
+ RTS                    \ Return from the subroutine
+
+                        \ Port: LL9 draws the hangar's ships and writes their
+                        \ line heaps. The original's &0B00 is in WP in the
+                        \ port, so the heap is HANGHEAP, a page of HAZEL that
+                        \ LL9 always sees and no other code uses
 
 .HA1
 
  RTS                    \ Return from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: TACTICS (Part 1 of 7)
@@ -39475,16 +39509,15 @@ ENDIF
 
 IF _SNG47
 
- EQUS "SAVE :1.E.JAMESON  E7E +100 0 0"
+ EQUS "SAVE :1.E.JAMESON  ", STR$~(commbuf), " +100 0 0"
  EQUB 13
 
 ELIF _COMPACT
 
- EQUS "SAVE JAMESON  E7E +100 0 0"
+ EQUS "SAVE JAMESON  ", STR$~(commbuf), " +100 0 0"
  EQUB 13
 
 ENDIF
-
 \ ******************************************************************************
 \
 \       Name: lodosc
@@ -39498,16 +39531,15 @@ ENDIF
 
 IF _SNG47
 
- EQUS "LOAD :1.E.JAMESON  E7E"
+ EQUS "LOAD :1.E.JAMESON  ", STR$~(commbuf)
  EQUB 13
 
 ELIF _COMPACT
 
- EQUS "LOAD JAMESON  E7E"
+ EQUS "LOAD JAMESON  ", STR$~(commbuf)
  EQUB 13
 
 ENDIF
-
 \ ******************************************************************************
 \
 \       Name: wfile
@@ -39517,8 +39549,8 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine copies a commander file into the commbuf file buffer at &0E7E,
-\ and then saves it.
+\ This routine copies a commander file into the commbuf file buffer at &087E
+\ (Port: &0E7E in the original), and then saves it.
 \
 \ ******************************************************************************
 
@@ -39646,7 +39678,6 @@ ENDIF
  JMP getzp              \ Call getzp to restore the top part of zero page from
                         \ the buffer at &3000 and return from the subroutine
                         \ using a tail call
-
 \ ******************************************************************************
 \
 \       Name: rfile
@@ -39656,9 +39687,10 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine loads a commander file into the commbuf file buffer at &0E7E, and
-\ then copies it to the TAP% staging area (though the latter is not used in this
-\ version, as it's left over from the Commodore 64 version).
+\ This routine loads a commander file into the commbuf file buffer at &087E
+\ (Port: &0E7E in the original), and then copies it to the TAP% staging area
+\ (though the latter is not used in this version, as it's left over from the
+\ Commodore 64 version).
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39783,7 +39815,6 @@ ENDIF
 
  RTS                    \ This instruction has no effect as we already returned
                         \ from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: SPS1
