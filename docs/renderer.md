@@ -233,10 +233,11 @@ the tool again after changing it:
 * `gfx-faces.asm` and `gfx-light6.asm` come from
   `python3 2-build-files/faces.py`, run after a build (it reads the build's
   `HZDATA.bin` and `symbols.txt`, the blueprints, which do not depend on the
-  tables). It parses the 33 blueprints, rebuilds each face's polygon, turns
-  detail edges into filled details, fins and lines, finds each ship's
-  symmetries, and gives the faces colours so that adjacent faces never
-  match. It prints a report per ship.
+  tables). It parses the 33 blueprints, rebuilds each face's polygon (faces
+  that share a plane are merged when one of them has no closed outline of
+  its own, as the Adder's back has), turns detail edges into filled details,
+  fins and lines, finds each ship's symmetries, and gives the faces colours
+  so that adjacent faces never match. It prints a report per ship.
 * `lightramps.py` is the lighting model that chooses the nine ramps and
   writes `gfx-light6.asm` (through `faces.py`); run alone, it renders the
   ramps (and, with `anim`, a tumbling preview of each ship) into

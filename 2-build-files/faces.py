@@ -155,6 +155,36 @@ def reconstruct(s):
     V = [_vec(v) for v in s['verts']]
     notes = []
     polys = []
+    # Faces that share a plane (an identical blueprint normal) and of which some
+    # face has no closed boundary of its own (the Adder's back: faces 6, 7 and 8,
+    # each with two of the hexagon's sides) are one polygon, on the lowest of
+    # them; the others are left empty. They share a normal, so Elite gives them
+    # the same visibility and the lighting the same level.
+    def _closes(f):
+        adj = defaultdict(set)
+        for e in s['edges']:
+            if f in (e['f1'], e['f2']) and e['f1'] != e['f2']:
+                adj[e['v1']].add(e['v2'])
+                adj[e['v2']].add(e['v1'])
+        changed = True
+        while changed:
+            changed = False
+            for v in list(adj):
+                if len(adj[v]) <= 1:
+                    for o in adj[v]:
+                        adj[o].discard(v)
+                    del adj[v]
+                    changed = True
+        return len(adj) >= 3
+    byn = defaultdict(set)
+    for f, face in enumerate(s['faces']):
+        if face['n'] != (0, 0, 0):
+            byn[tuple(face['n'])].add(f)
+    merged = {}
+    for G in byn.values():
+        if len(G) > 1 and not all(_closes(f) for f in G):
+            for f in G:
+                merged[f] = G
     for f, face in enumerate(s['faces']):
         n = face['n']
         if n == (0, 0, 0):
@@ -168,7 +198,15 @@ def reconstruct(s):
             face['n'] = n
             notes.append(f'face {f}: zero normal in the blueprint, plane of its vertices used')
         nh, u, w = _basis(n)
-        B = [e for e in s['edges'] if f in (e['f1'], e['f2']) and e['f1'] != e['f2']]
+        G = merged.get(f, {f})
+        if f in merged and f != min(G):
+            polys.append([])
+            notes.append(f'face {f}: drawn as part of face {min(G)} (same plane) -> n=0')
+            continue
+        B = [e for e in s['edges'] if (e['f1'] in G) != (e['f2'] in G)] if len(G) > 1 else \
+            [e for e in s['edges'] if f in (e['f1'], e['f2']) and e['f1'] != e['f2']]
+        if len(G) > 1:
+            notes.append(f'face {f}: faces {sorted(G)} share a plane and no face of them closes alone: one polygon, face {f}')
         adj = defaultdict(set)
         for e in B:
             adj[e['v1']].add(e['v2'])
@@ -228,7 +266,7 @@ def reconstruct(s):
         if ang > 5:
             notes.append(f'face {f}: blueprint normal is {ang:.0f} deg off the polygon\'s true normal')
         # hull sides should be blueprint edges of this face
-        eset = {frozenset((e['v1'], e['v2'])) for e in s['edges'] if f in (e['f1'], e['f2'])}
+        eset = {frozenset((e['v1'], e['v2'])) for e in s['edges'] if e['f1'] in G or e['f2'] in G}
         for i in range(len(poly)):
             a, b = poly[i], poly[(i + 1) % len(poly)]
             if frozenset((a, b)) not in eset:
@@ -935,11 +973,18 @@ def slot_vis(s):
         d['vis'] = max(best, d['fillvis'])
 
 
+# The colouring's seed, by type, where 1 is not used: the Adder's back (faces 6
+# to 8, one polygon since the back was filled) changed the search's outcome to
+# the same colouring with its two hues swapped; seed 2 finds the colouring the
+# Adder had before, with the back in gold.
+COLOUR_SEED = {20: 2}
+
+
 def prepare(ships):
     for t, s in ships:
         reconstruct(s)
         structure(s)
-        colour_ship(t, s)
+        colour_ship(t, s, seed=COLOUR_SEED.get(t, 1))
         slot_vis(s)
     return ships
 

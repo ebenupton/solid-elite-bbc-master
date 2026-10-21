@@ -456,9 +456,9 @@ FC_PLANE = &05 : FC_PLANO = &5A
  EQUB 3 + 16 * 3, 49 AND &FF, -35 AND &FF, 9 AND &FF, 8, 52, 4    \ face 3: blue
  EQUB 4 + 16 * 3, 30 AND &FF, 53 AND &FF, 0 AND &FF, 12, 8, 44, 36    \ face 4: blue
  EQUB 4 + 16 * 1, 30 AND &FF, -53 AND &FF, 0 AND &FF, 8, 12, 16, 52    \ face 5: gold
- EQUB 0 + 16 * 1, 0 AND &FF, 0 AND &FF, -61 AND &FF    \ face 6: gold
- EQUB 0 + 16 * 1, 0 AND &FF, 0 AND &FF, -61 AND &FF    \ face 7: gold
- EQUB 0 + 16 * 3, 0 AND &FF, 0 AND &FF, -61 AND &FF    \ face 8: blue
+ EQUB 6 + 16 * 1, 0 AND &FF, 0 AND &FF, -61 AND &FF, 16, 12, 36, 32, 24, 20    \ face 6: gold
+ EQUB 0 + 16 * 3, 0 AND &FF, 0 AND &FF, -61 AND &FF    \ face 7: blue
+ EQUB 0 + 16 * 1, 0 AND &FF, 0 AND &FF, -61 AND &FF    \ face 8: gold
  EQUB 4 + 16 * 3, -30 AND &FF, 53 AND &FF, 0 AND &FF, 32, 40, 28, 24    \ face 9: blue
  EQUB 4 + 16 * 1, -30 AND &FF, -53 AND &FF, 0 AND &FF, 20, 24, 28, 48    \ face 10: gold
  EQUB 3 + 16 * 1, -49 AND &FF, 35 AND &FF, 9 AND &FF, 40, 0, 28    \ face 11: gold
@@ -723,4 +723,4 @@ FC_PLANE = &05 : FC_PLANO = &5A
  EQUB &0F, &FA, &AF, &FA, &FF, &AF, &5A, &FA, &FA, &5A, &FA, &FF, &0F, &AF, &AF, &FA
  EQUB &5A, &5A
 
-\ 3288 bytes in all
+\ 3294 bytes in all
