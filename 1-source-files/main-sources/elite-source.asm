@@ -9570,7 +9570,6 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (A X) = (A P) + (S R)
-\
 \  Deep dive: Adding sign-magnitude numbers
 \
 \ ------------------------------------------------------------------------------
@@ -9581,6 +9580,11 @@ ENDIF
 \
 \ This is an exact duplicate of the ADD routine, which is also present in this
 \ source, so it isn't clear why this duplicate exists.
+\
+\ Port: it is a copy of ADD (with MU8, its tail, as MU8K) for code that runs
+\ with ACCCON X set, which hides main RAM above &3000 (the dashboard's DIALS,
+\ and PIX1), so it stays in the main code's head, below &3000; it has the
+\ port's form of ADD and MU8 (see MAD), so it gives the same results and flags.
 \
 \ ******************************************************************************
 
@@ -9594,14 +9598,11 @@ ENDIF
  EOR S                  \ EOR bit 7 of A with S. If they have different bit 7s
  BMI MU8K               \ (i.e. they have different signs) then bit 7 in the
                         \ EOR result will be 1, which means the EOR result is
-                        \ negative. So the AND, EOR and BMI together mean "jump
-                        \ to MU8K if A and S have different signs"
+                        \ negative. So the AND, EOR and BMI together mean that
+                        \ we jump to MU8K if A and S have different signs
 
-                        \ If we reach here, then A and S have the same sign, so
-                        \ we can add them and set the sign to get the result
-
- LDA R                  \ Add the least significant bytes together into X:
- CLC                    \
+ CLC                    \ Add the least significant bytes together into X:
+ LDA R                  \
  ADC P                  \   X = P + R
  TAX
 
@@ -9621,70 +9622,42 @@ ENDIF
 
 .MU8K
 
-                        \ If we reach here, then A and S have different signs,
-                        \ so we can subtract their absolute values and set the
-                        \ sign to get the result
+                        \ Port: as MU8 (the arguments have different signs)
 
- LDA S                  \ Clear the sign (bit 7) in S and store the result in
- AND #%01111111         \ U, so U now contains |S|
- STA U
-
- LDA P                  \ Subtract the least significant bytes into X:
- SEC                    \
- SBC R                  \   X = P - R
+ LDA R                  \ X = R - P
+ SEC
+ SBC P
  TAX
+ BEQ mu8kz              \ If the low byte is 0, check for |S R| = |A P|
 
- LDA T1                 \ Restore the A of the argument (A P) from T1 and
- AND #%01111111         \ clear the sign (bit 7), so A now contains |A|
+ LDA S                  \ A = S - T1 - borrow = m EOR &80, with m = |S| - |A|
+ SBC T1                 \ - borrow
+ BPL mu8kb              \ If |S R| < |A P|, jump to mu8kb
 
- SBC U                  \ Set A = |A| - |S|
+.mu8ka
 
-                        \ At this point we have |A P| - |S R| in (A X), so we
-                        \ need to check whether the subtraction above was the
-                        \ right way round (i.e. that we subtracted the smaller
-                        \ absolute value from the larger absolute value)
+ EOR T                  \ |S R| > |A P|: the result has S's sign; return with
+ CLC                    \ C = 0
+ RTS
 
- BCS MU9K               \ If |A| >= |S|, our subtraction was the right way
-                        \ round, so jump to MU9K to set the sign
+.mu8kz
 
-                        \ If we get here, then |A| < |S|, so our subtraction
-                        \ above was the wrong way round (we actually subtracted
-                        \ the larger absolute value from the smaller absolute
-                        \ value). So let's subtract the result we have in (A X)
-                        \ from zero, so that the subtraction is the right way
-                        \ round
+ LDA S                  \ X = 0: |S R| > |A P| if and only if A >= &81
+ SBC T1
+ CMP #%10000001
+ BCS mu8ka
 
- STA U                  \ Store A in U
+.mu8kb
 
- TXA                    \ Set X = 0 - X using two's complement (to negate a
- EOR #&FF               \ number in two's complement, you can invert the bits
- ADC #1                 \ and add one - and we know the C flag is clear as we
- TAX                    \ didn't take the BCS branch above, so the ADC will do
-                        \ the correct addition)
-
- LDA #0                 \ Set A = 0 - A, which we can do this time using a
- SBC U                  \ subtraction with the C flag clear
-
- ORA #%10000000         \ We now set the sign bit of A, so that the EOR on the
-                        \ next line will give the result the opposite sign to
-                        \ argument A (as T contains the sign bit of argument
-                        \ A). This is the same as giving the result the same
-                        \ sign as argument S (as A and S have different signs),
-                        \ which is what we want, as S has the larger absolute
-                        \ value
-
-.MU9K
-
- EOR T                  \ If we get here from the BCS above, then |A| >= |S|,
-                        \ so we want to give the result the same sign as
-                        \ argument A, so if argument A was negative, we flip
-                        \ the sign of the result with an EOR (to make it
-                        \ negative)
-
- RTS                    \ Return from the subroutine
-
-                        \ Port: the workspace noise that followed (77 bytes in
-                        \ SNG47, which "appear to be unused") is gone
+ LDA P                  \ |S R| <= |A P|: X = P - R, A = |A| - |S| - borrow,
+ SEC                    \ with argument A's sign, and C = 1
+ SBC R
+ TAX
+ LDA T1
+ EOR #%10000000
+ SBC S
+ EOR T
+ RTS
 \ ******************************************************************************
 \
 \       Name: FONT%
@@ -22061,12 +22034,13 @@ ENDIF
  JSR MULT12             \ Set (S R) = Q * A
                         \           = vect_x * XX15
 
- LDX INWK+2,Y           \ Set Q = the Y+2-th byte of INWK, i.e. vect_y
- STX Q
-
  LDA XX15+1             \ Set A = XX15+1
 
- JSR MAD                \ Set (A X) = Q * A + (S R)
+ LDX INWK+2,Y           \ Set Q = the Y+2-th byte of INWK, i.e. vect_y
+ STX Q                  \ (loaded after A, so X = Q and Z is set from Q, as
+                        \ MAD's LDX Q would leave them)
+
+ JSR madq               \ Set (A X) = Q * A + (S R)
                         \           = vect_y * XX15+1 + vect_x * XX15
 
  STA S                  \ Set (S R) = (A X)
@@ -22100,12 +22074,80 @@ ENDIF
 
 .MAD
 
- JSR MULT1              \ Call MULT1 to set (A P) = Q * A
+ LDX Q                  \ If |Q| = 0, i.e. Q = 0 or &80, then Q * A = 0, so
 
-                        \ Fall through into ADD to do:
+.madq                   \ (TAS3 enters here with X = Q and Z set from it)
+
+ BEQ mad2               \ skip MULT1 (whose other effects, X, T and the flags,
+ CPX #%10000000         \ ADD overwrites) and do ADD's work with (A P) = 0 at
+ BEQ mad2               \ mad2, otherwise fall through into mad1 to call MULT1
+
+.mad1
+
+ JSR MULT1              \ |Q| <> 0: set (A P) = Q * A (MULT1 has already set
+                        \ T to the sign of the result, and |A| < &80, so this
+                        \ is the head of ADD without the AND and STA T)
+
+ STA T1                 \ Store A in T1, as ADD does
+
+ EOR S                  \ If A and S have the same sign jump to add1 in ADD
+ BPL add1               \ (C is still clear from MULT1, so skip its CLC),
+                        \ otherwise fall through into MU8
+
+.MU8
+
+                        \ If we reach here, then A and S have different signs,
+                        \ so we can subtract their absolute values and set the
+                        \ sign to get the result
                         \
-                        \   (A X) = (A P) + (S R)
-                        \         = Q * A + (S R)
+                        \ Port: |S R| > |A P| is the common case, so subtract
+                        \ the other way round first, |S R| - |A P|, which needs
+                        \ no negation then (the demo port's form, its 22be6e1
+                        \ and 55e7b89). Nothing reads V after ADD, MAD or MU8
+                        \ (every BVC/BVS follows its own BIT or ADC), so V is
+                        \ left as the subtraction leaves it
+                        \
+                        \ Port: MAD, mad1, MU8 and ADD are laid out so that
+                        \ every hot branch here stays within its page
+
+ LDA R                  \ Subtract the least significant bytes into X:
+ SEC                    \
+ SBC P                  \   X = R - P
+ TAX                    \ If the low byte is 0, check for |S R| = |A P| at
+ BEQ mu8z               \ mu8z (TAX has just set Z from X)
+
+ LDA S                  \ S and T1 have opposite signs, so S - T1 - borrow is
+ SBC T1                 \ m EOR &80, where m = |S| - |A| - borrow (-128..127),
+                        \ so bit 7 of the result is set if and only if m >= 0,
+                        \ i.e. |S R| >= |A P| (X <> 0 here, so never equal)
+
+ BPL mu8b               \ If |S R| < |A P|, jump to mu8b
+
+.mu8a
+
+ EOR T                  \ |S R| > |A P|: A = &80 OR m already has the sign of
+ CLC                    \ S, the opposite of argument A's sign in T, so this
+ RTS                    \ gives the result S's sign; return with C = 0
+
+.mu8z
+
+ LDA S                  \ X = 0, so there was no borrow (C = 1) and A = S - T1
+ SBC T1                 \ = m EOR &80; |S R| > |A P| if and only if A >= &81
+ CMP #%10000001         \ (A = &80 means equal, and mu8b then gives X = 0,
+ BCS mu8a               \ A = T, C = 1, as the original does)
+
+.mu8b
+
+ LDA P                  \ |S R| <= |A P|: the original computation:
+ SEC                    \
+ SBC R                  \   X = P - R
+ TAX                    \   A = |A| - |S| - borrow, C = 1
+ LDA T1
+ EOR #%10000000
+ SBC S
+
+ EOR T                  \ Give the result the sign of argument A, and return
+ RTS                    \ with C = 1
 
 \ ******************************************************************************
 \
@@ -22139,8 +22181,12 @@ ENDIF
                         \ If we reach here, then A and S have the same sign, so
                         \ we can add them and set the sign to get the result
 
- LDA R                  \ Add the least significant bytes together into X:
- CLC                    \
+
+ CLC                    \ Add the least significant bytes together into X:
+                        \
+.add1                   \ (mad1 enters here, as MULT1 returns with C clear)
+
+ LDA R                  \
  ADC P                  \   X = P + R
  TAX
 
@@ -22158,69 +22204,21 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
-.MU8
+.mad2
 
-                        \ If we reach here, then A and S have different signs,
-                        \ so we can subtract their absolute values and set the
-                        \ sign to get the result
+ STZ P                  \ MAD with |Q| = 0: set (A P) = 0, and do ADD's work
+ STZ T1                 \ directly: with A = 0, ADD sets T1 = T = 0 and, if S
+ STZ T                  \ is positive, returns (A X) = (S R) with C = V = 0 and
+ LDX R                  \ N/Z from S; if S is negative it goes to MU8 with
+ LDA S                  \ P = T1 = T = 0
+ BPL mad3               \ (S negative: MU8 returns (A X) = (S R) with C = V = 0,
+ BIT #%01111111         \ N = 1 and Z = 0 unless (S R) = &8000, so return that
+ BEQ MU8                \ directly when |S| <> 0, as BIT #imm leaves N alone)
 
- LDA S                  \ Clear the sign (bit 7) in S and store the result in
- AND #%01111111         \ U, so U now contains |S|
- STA U
+.mad3
 
- LDA P                  \ Subtract the least significant bytes into X:
- SEC                    \
- SBC R                  \   X = P - R
- TAX
-
- LDA T1                 \ Restore the A of the argument (A P) from T1 and
- AND #%01111111         \ clear the sign (bit 7), so A now contains |A|
-
- SBC U                  \ Set A = |A| - |S|
-
-                        \ At this point we have |A P| - |S R| in (A X), so we
-                        \ need to check whether the subtraction above was the
-                        \ right way round (i.e. that we subtracted the smaller
-                        \ absolute value from the larger absolute value)
-
- BCS MU9                \ If |A| >= |S|, our subtraction was the right way
-                        \ round, so jump to MU9 to set the sign
-
-                        \ If we get here, then |A| < |S|, so our subtraction
-                        \ above was the wrong way round (we actually subtracted
-                        \ the larger absolute value from the smaller absolute
-                        \ value). So let's subtract the result we have in (A X)
-                        \ from zero, so that the subtraction is the right way
-                        \ round
-
- STA U                  \ Store A in U
-
- TXA                    \ Set X = 0 - X using two's complement (to negate a
- EOR #&FF               \ number in two's complement, you can invert the bits
- ADC #1                 \ and add one - and we know the C flag is clear as we
- TAX                    \ didn't take the BCS branch above, so the ADC will do
-                        \ the correct addition)
-
- LDA #0                 \ Set A = 0 - A, which we can do this time using a
- SBC U                  \ subtraction with the C flag clear
-
- ORA #%10000000         \ We now set the sign bit of A, so that the EOR on the
-                        \ next line will give the result the opposite sign to
-                        \ argument A (as T contains the sign bit of argument
-                        \ A). This is the same as giving the result the same
-                        \ sign as argument S (as A and S have different signs),
-                        \ which is what we want, as S has the larger absolute
-                        \ value
-
-.MU9
-
- EOR T                  \ If we get here from the BCS above, then |A| >= |S|,
-                        \ so we want to give the result the same sign as
-                        \ argument A, so if argument A was negative, we flip
-                        \ the sign of the result with an EOR (to make it
-                        \ negative)
-
- RTS                    \ Return from the subroutine
+ CLC                    \ (V is not read after MAD, see MU8)
+ RTS
 
 \ ******************************************************************************
 \
