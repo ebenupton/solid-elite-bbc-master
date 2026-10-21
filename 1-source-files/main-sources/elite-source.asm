@@ -2019,6 +2019,40 @@ ENDIF
                         \ channel 3 (the Bitstik rotation value), which gets
                         \ updated regularly by the IRQ1 interrupt handler
 
+                        \ Port: the CMYK dashboard's variables (DIALS, SCAN,
+                        \ DOT, MSBAR and their helpers, in bank 4), here as they
+                        \ run with ACCCON X set (shadow RAM at &3000-&7FFF)
+
+.DASHV
+
+.dpE    SKIP 1          \ the current colour pair (even, odd lines)
+.dpO    SKIP 1
+.dmk    SKIP 1          \ the current byte mask
+.dlo    SKIP 1          \ DSEG: byte range [dlo, dhi) of the indicator
+.dhi    SKIP 1
+.dsS    SKIP 1          \ DSEG: the segment [dsS, dsE) in pixels
+.dsE    SKIP 1
+.dl0    SKIP 1          \ DSEG: the first line and the number of lines
+.dln    SKIP 1
+.dcol   SKIP 1          \ DIL: the colour number
+.dtmp   SKIP 1
+.ddn    SKIP 1          \ ddot: lines to go
+.deq    SKIP 1          \ DSEG: the segment's end byte, pixels in it
+.der    SKIP 1
+.dsq    SKIP 1          \ DSEG: the segment's start byte, pixels from it on
+.dsr    SKIP 1
+.dme    SKIP 1          \ DSEG: the masked even-line byte, even EOR odd
+.dmx    SKIP 1
+.dsx    SKIP 1
+.dtv    SKIP 1
+.dK     SKIP 1          \ DIL: colour numbers for values >= dT and < dT
+.dK1    SKIP 1
+.dT     SKIP 1          \ DIL: the colour threshold (pixels)
+.dbank  SKIP 4          \ the energy banks' bar lengths (32 per bank)
+.dX1    SKIP 1          \ the dot's x-coordinate (SCAN, DOT)
+.dlen   SKIP 1          \ SCAN: the stick's length (signed)
+.dstab  SKIP 8          \ SCAN: the stick's byte for each line of a row
+
  PRINT "WP workspace from ", ~WP, "to ", ~P%-1, "inclusive"
 
  ASSERT P% <= &0D00     \ Port: nothing may be assembled into page &0D (see K%)
@@ -2038,94 +2072,6 @@ ENDIF
  ORG CODE%              \ Set the assembly address to CODE%
 
  LOAD_A% = LOAD%
-
-\ ******************************************************************************
-\
-\       Name: TVT3
-\       Type: Variable
-\   Category: Drawing the screen
-\    Summary: Palette data for the mode 1 part of the screen (the top part)
-\
-\ ------------------------------------------------------------------------------
-\
-\ The following table contains four different mode 1 palettes, each of which
-\ sets a four-colour palette for the top part of the screen. Mode 1 supports
-\ four colours on-screen and in Elite colour 0 is always set to black, so each
-\ of the palettes in this table defines the three other colours (1 to 3).
-\
-\ There is some consistency between the palettes:
-\
-\   * Colour 0 is always black
-\   * Colour 1 (#YELLOW) is always yellow
-\   * Colour 2 (#RED) is normally red-like (i.e. red or magenta)
-\              ... except in the title screen palette, when it is white
-\   * Colour 3 (#CYAN) is always cyan-like (i.e. white or cyan)
-\
-\ The configuration variables of #YELLOW, #RED and #CYAN are a bit misleading,
-\ but if you think of them in terms of hue rather than specific colours, they
-\ work reasonably well (outside of the title screen palette, anyway).
-\
-\ The palettes are set in the IRQ1 handler that implements the split screen
-\ mode, and can be changed by calling the SETVDU19 routine to set the offset to
-\ the new palette in this table.
-\
-\ This table must start on a page boundary (i.e. an address that ends in two
-\ zeroes in hexadecimal). In the release version of the game TVT3 is at &2C00.
-\ This is so the SETVDU19 routine can switch palettes properly, as it does this
-\ by overwriting the low byte of the palette data address with a new offset, so
-\ the low byte for first palette's address must be 0.
-\
-\ Palette data is given as a set of bytes, with each byte mapping a logical
-\ colour to a physical one. In each byte, the logical colour is given in bits
-\ 4-7 and the physical colour in bits 0-3. See page 379 of the "Advanced User
-\ Guide for the BBC Micro" by Bray, Dickens and Holmes for details of how
-\ palette mapping works, as in modes 1 and 2 we have to do multiple palette
-\ commands to change the colours correctly, and the physical colour value is
-\ EOR'd with 7, just to make things even more confusing.
-\
-\ ******************************************************************************
-
-.TVT3
-
- EQUB &00, &34          \ 1 = yellow, 2 = red, 3 = cyan (space view)
- EQUB &24, &17          \
- EQUB &74, &64          \ Set with a call to SETVDU19 with A = 0, after which:
- EQUB &57, &47          \
- EQUB &B1, &A1          \   #YELLOW = yellow
- EQUB &96, &86          \   #RED    = red
- EQUB &F1, &E1          \   #CYAN   = cyan
- EQUB &D6, &C6          \   #GREEN  = cyan/yellow stripe
-                        \   #WHITE  = cyan/red stripe
-
- EQUB &00, &34          \ 1 = yellow, 2 = red, 3 = white (chart view)
- EQUB &24, &17          \
- EQUB &74, &64          \ Set with a call to SETVDU19 with A = 16, after which:
- EQUB &57, &47          \
- EQUB &B0, &A0          \   #YELLOW = yellow
- EQUB &96, &86          \   #RED    = red
- EQUB &F0, &E0          \   #CYAN   = white
- EQUB &D6, &C6          \   #GREEN  = white/yellow stripe
-                        \   #WHITE  = white/red stripe
-
- EQUB &00, &34          \ 1 = yellow, 2 = white, 3 = cyan (title screen)
- EQUB &24, &17          \
- EQUB &74, &64          \ Set with a call to SETVDU19 with A = 32, after which:
- EQUB &57, &47          \
- EQUB &B1, &A1          \   #YELLOW = yellow
- EQUB &90, &80          \   #RED    = white
- EQUB &F1, &E1          \   #CYAN   = cyan
- EQUB &D0, &C0          \   #GREEN  = cyan/yellow stripe
-                        \   #WHITE  = cyan/white stripe
-
- EQUB &00, &34          \ 1 = yellow, 2 = magenta, 3 = white (trade view)
- EQUB &24, &17          \
- EQUB &74, &64          \ Set with a call to SETVDU19 with A = 48, after which:
- EQUB &57, &47          \
- EQUB &B0, &A0          \   #YELLOW = yellow
- EQUB &92, &82          \   #RED    = magenta
- EQUB &F0, &E0          \   #CYAN   = white
- EQUB &D2, &C2          \   #GREEN  = white/yellow stripe
-                        \   #WHITE  = white/magenta stripe
 
 \ ******************************************************************************
 \
@@ -2349,7 +2295,12 @@ ENDIF
  BNE SOUL2              \ Loop back to zero the next byte until we have done all
                         \ three from SOFLG+2 down to SOFLG
 
- SEI                    \ Disable interrupts while we update the sound chip
+ LDA #%00000010         \ Port: mask the vsync interrupt (CA1) in the System
+ STA VIA+&4E            \ VIA's IER while we update the sound chip, rather
+                        \ than disable every interrupt (SEI): only the vsync
+                        \ handler (SOINT) also drives the sound chip, and the
+                        \ timer 1 interrupt at the dashboard split must not be
+                        \ held off
 
                         \ At this point Y = 0, which we can now use as a loop
                         \ counter to loop through the 5 bytes in SOOFF and send
@@ -2368,7 +2319,8 @@ ENDIF
  CPY #5                 \ Loop back until we have sent all 5 bytes to the sound
  BNE SOUL1              \ chip
 
- CLI                    \ Enable interrupts again
+ LDA #%10000010         \ Port: unmask the vsync interrupt again
+ STA VIA+&4E
 
  RTS                    \ Return from the subroutine
 
@@ -2503,7 +2455,12 @@ ENDIF
  CMP SOPR,X             \ If SFXPR+Y < SOPR+X, return from the subroutine
  BCC SOUR1              \ (as SOUR1 contains an RTS)
 
- SEI                    \ Disable interrupts while we update the sound buffer
+ PHA                    \ Port: mask the vsync interrupt (CA1) in the System
+ LDA #%00000010         \ VIA's IER while we update the sound buffer, rather
+ STA VIA+&4E            \ than disable every interrupt (SEI): only the vsync
+ PLA                    \ handler (SOINT) reads the buffer, and the timer 1
+                        \ interrupt at the dashboard split must not be held
+                        \ off (A and C are kept)
 
                         \ If we get here then SFXPR+Y >= SOPR+X
 
@@ -2535,11 +2492,14 @@ ENDIF
  LDA #%10000000         \ Set bit 7 of SOFLG+X
  STA SOFLG,X
 
- CLI                    \ Enable interrupts again
+ LDA #%10000010         \ Port: unmask the vsync interrupt again, and return
+ STA VIA+&4E            \ with A = %10000000 as before
+ LDA #%10000000
 
  SEC                    \ Set the C flag
 
  RTS                    \ Return from the subroutine
+
 \ ******************************************************************************
 \
 \       Name: SOINT
@@ -2853,32 +2813,6 @@ ENDIF
 
 \ ******************************************************************************
 \
-\       Name: TVT1
-\       Type: Variable
-\   Category: Drawing the screen
-\    Summary: Palette data for the mode 2 part of the screen (the dashboard)
-\
-\ ------------------------------------------------------------------------------
-\
-\ This palette is applied in the IRQ1 routine. If we have an escape pod fitted,
-\ then the first byte is changed to &30, which maps logical colour 3 to actual
-\ colour 0 (black) instead of colour 4 (blue).
-\
-\ ******************************************************************************
-
-.TVT1
-
- EQUB &34, &43
- EQUB &25, &16
- EQUB &86, &70
- EQUB &61, &52
- EQUB &C3, &B4
- EQUB &A5, &96
- EQUB &07, &F0
- EQUB &E1, &D2
-
-\ ******************************************************************************
-\
 \       Name: IRQ1
 \       Type: Subroutine
 \   Category: Drawing the screen
@@ -2897,59 +2831,32 @@ ENDIF
 
  PHY                    \ Store Y on the stack
 
- LDY #15                \ Set Y as a counter for 16 bytes, to use when setting
-                        \ the dashboard palette below
+ BIT VIA+&4D            \ Port: read the 6522 System VIA interrupt flag
+ BVC LINSCN             \ register (SHEILA &4D), whose bit 6 (into V) is timer
+                        \ 1's flag, and if it is clear, this is the vertical
+                        \ sync interrupt, so jump to LINSCN (the original
+                        \ tested bit 1, vsync's flag, first; timer 1 and vsync
+                        \ are the only interrupts enabled, and code that must
+                        \ not be interrupted by the vsync handler masks only
+                        \ vsync, in IER, so a vsync flag may be set but masked
+                        \ when timer 1 interrupts)
 
- LDA #%00000010         \ Read the 6522 System VIA status byte bit 1 (SHEILA
- BIT VIA+&4D            \ &4D), which is set if vertical sync has occurred on
-                        \ the video system
+                        \ Port: this is timer 1 (the space view / dashboard
+                        \ boundary). The whole screen is now one MODE 1 screen
+                        \ in one CMYK palette, set once by the loader, so there
+                        \ is no switch to mode 2 and no dashboard palette (nor
+                        \ the escape pod's tint of it) here any more. The
+                        \ dashboard is in shadow RAM: show shadow RAM from here
+                        \ to the end of the frame (ACCCON D = 1, X as it is)
 
- BNE LINSCN             \ If we are on the vertical sync pulse, jump to LINSCN
-                        \ to set up the timers to enable us to switch the
-                        \ screen mode between the space view and dashboard
-
-\BVC jvec               \ This instruction is commented out in the original
-                        \ source
-
- LDA #%00010100         \ Set the Video ULA control register (SHEILA &20) to
- STA VIA+&20            \ %00010100, which is the same as switching to mode 2,
-                        \ (i.e. the bottom part of the screen) but with no
-                        \ cursor
-
- LDA ESCP               \ Set A = ESCP, which is &FF if we have an escape pod
-                        \ fitted, or 0 if we don't
-
- AND #4                 \ Set A = 4 if we have an escape pod fitted, or 0 if we
-                        \ don't
-
- EOR #&34               \ Set A = &30 if we have an escape pod fitted, or &34 if
-                        \ we don't
-
- STA &FE21              \ Store A in SHEILA &21 to map colour 3 (#YELLOW2) to
-                        \ white if we have an escape pod fitted, or yellow if we
-                        \ don't, so the outline colour of the dashboard changes
-                        \ from yellow to white if we have an escape pod fitted
-
-                        \ The following loop copies bytes #15 to #1 from TVT1 to
-                        \ SHEILA &21, but not byte #0, as we just did that
-                        \ colour mapping
-
-.VNT2
-
- LDA TVT1,Y             \ Copy the Y-th palette byte from TVT1 to SHEILA &21
- STA &FE21              \ to map logical to actual colours for the bottom part
-                        \ of the screen (i.e. the dashboard)
-
- DEY                    \ Decrement the palette byte counter
-
- BNE VNT2               \ Loop back to VNT2 until we have copied all the palette
-                        \ bytes bar the first one
+ LDA #1
+ TSB VIA+&34
 
 IF _COMPACT
 
  LDA MOS                \ If MOS = 0 then this is a Master Compact, so jump to
  BEQ jvec               \ jvec to skip reading the ADC channels (as the Compact
-                        \ has a digital joystick rather than an analogue one)
+                        \ doesn't have them)
 
 ENDIF
 
@@ -2959,7 +2866,7 @@ ENDIF
  TAY                    \ The BMI is commented out in the original source
 
  LDA VIA+&19            \ Fetch the high byte of the value on this ADC channel
-                        \ at SHEILA &19 to read the relevant joystick position
+                        \ (bits 8-15 of the 12-bit value)
 
  STA JOPOS,Y            \ Store this value in the appropriate JOPOS byte
 
@@ -2970,83 +2877,46 @@ ENDIF
  BCC P%+4
 
  LDA #0                 \ Set the ADC status byte at SHEILA &18 to 0 to reset
- STA VIA+&18            \ the data latch
+ STA VIA+&18            \ the data latch, ready for the next channel
 
 .jvec
 
  PLY                    \ Restore Y from the stack
 
  LDA VIA+&44            \ Read 6522 System VIA T1C-L timer 1 low-order counter
-                        \ (SHEILA &44)
+                        \ (SHEILA &44), which clears the timer 1 interrupt flag
 
  LDA &FC                \ Restore the value of A from before the call to the
-                        \ interrupt handler (the MOS stores the value of A in
-                        \ location &FC before calling the interrupt handler)
+                        \ interrupt handler (as the MOS stores it in &FC)
 
  RTI                    \ Return from interrupts, so this interrupt is not
-                        \ passed on to the next interrupt handler, but instead
-                        \ the interrupt terminates here
+                        \ passed on to the next interrupt handler
 
 .LINSCN
 
- LDA VIA+&41            \ Read 6522 System VIA input register IRA (SHEILA &41)
+ LDA VIA+&41            \ Read 6522 System VIA input register IRA (SHEILA &41),
+                        \ which clears the vertical sync interrupt
 
  LDA &FC                \ Fetch the value of A from before the call to the
-                        \ interrupt handler (the MOS stores the value of A in
-                        \ location &FC before calling the interrupt handler)
+                        \ interrupt handler (as the MOS stores it in &FC)
 
  PHA                    \ Store the original value of A on the stack
 
  LDA VSCAN+1            \ Set the line scan counter to the value of VSCAN+1
- STA DL                 \ (which contains 30 by default and doesn't change), so
+ STA DL                 \ (Port: 72, and it doesn't change), so
                         \ routines like WSCAN can set DL to 0 and then wait for
-                        \ it to change to this value to catch the vertical sync
+                        \ it to change to non-zero to catch the vertical sync
 
- STA VIA+&44            \ Set 6522 System VIA T1C-L timer 1 low-order counter
-                        \ (SHEILA &44) to 30
-
- LDA VSCAN              \ Set 6522 System VIA T1C-L timer 1 high-order counter
- STA VIA+&45            \ (SHEILA &45) to the contents of VSCAN (57) to start
-                        \ the T1 counter counting down from 14622 at a rate of
-                        \ 1 MHz
-
- LDA HFX                \ If the hyperspace effect flag in HFX is non-zero, then
- BNE j2vec              \ jump up to j2vec to pass control to the next interrupt
-                        \ handler, instead of switching the palette to mode 1.
-                        \ This will have the effect of blurring and colouring
-                        \ the top screen in a mode 2 palette, making the
-                        \ hyperspace rings turn multicoloured when we do a
-                        \ hyperspace jump. This effect is triggered by the
-                        \ parasite issuing a #DOHFX 1 command in routine LL164
-                        \ and is disabled again by a #DOHFX 0 command
-
- LDA #%00011000         \ Set the Video ULA control register (SHEILA &20) to
- STA VIA+&20            \ %00011000, which is the same as switching to mode 1
-                        \ (i.e. the top part of the screen) but with no cursor
-
-.VNT3
-
-                        \ The following instruction gets modified in-place by
-                        \ the #SETVDU19 <offset> command, which changes the
-                        \ value of TVT3+1 (i.e. the low byte of the address in
-                        \ the LDA instruction). This changes the palette block
-                        \ that gets copied to SHEILA &21, so a #SETVDU19 32
-                        \ command applies the third palette from TVT3 in this
-                        \ loop, for example
-
- LDA TVT3,Y             \ Copy the Y-th palette byte from TVT3 to SHEILA &21
- STA VIA+&21            \ to map logical to actual colours for the bottom part
-                        \ of the screen (i.e. the dashboard)
-
- DEY                    \ Decrement the palette byte counter
-
- BNE VNT3               \ Loop back to VNT3 until we have copied all the
-                        \ palette bytes
-
-\LDA svn                \ These instructions are commented out in the original
-\BMI jvecOS             \ source
-
-.j2vec
+                        \ Port: the original restarted timer 1 here (T1C-L =
+                        \ VSCAN+1, T1C-H = VSCAN: 14622 us from now), so the
+                        \ split moved with this handler's own latency (an
+                        \ interrupt held off by a SEI section came late, and
+                        \ so did the split). Timer 1 now runs freely with a
+                        \ period of exactly one frame, started in step with
+                        \ vsync once by T1SYNC, so it is left alone here (and
+                        \ HFX, the hyperspace effect's mode 2 colours, no
+                        \ longer has any effect, as no mode or palette change
+                        \ follows)
 
  PHX                    \ Call SOINT to send the current sound data to the
  JSR SOINT              \ 76489 sound chip, stashing X on the stack so it gets
@@ -3057,9 +2927,7 @@ ENDIF
  PLY                    \ Restore Y from the stack
 
  RTI                    \ Return from interrupts, so this interrupt is not
-                        \ passed on to the next interrupt handler, but instead
-                        \ the interrupt terminates here
-
+                        \ passed on to the next interrupt handler
 \ ******************************************************************************
 \
 \       Name: VSCAN
@@ -3073,9 +2941,69 @@ ENDIF
 
  EQUB 57                \ Defines the split position in the split-screen mode
 
- EQUB 30                \ The line scan counter in DL gets reset to this value
+ EQUB 72                \ The line scan counter in DL gets reset to this value
                         \ at each vertical sync, before decrementing with each
                         \ line scan
+                        \
+                        \ Port: VSCAN(0 1) = 57 * 256 + 72 = 14664 is now timer
+                        \ 1's first count, started by T1SYNC just after vsync
+                        \ (CA1), so that timer 1 fires (N + 2 us later, then
+                        \ once a frame) where IRQ1's write to ACCCON D lands in
+                        \ the middle of line 191's horizontal blanking, between
+                        \ the last fetch of the space view and the first fetch
+                        \ of the dashboard (docs/renderer.md, "Dashboard
+                        \ split timing"): T1SYNC's wait for vsync leaves the
+                        \ phase anywhere in a 9-cycle range (its loop), and
+                        \ IRQ1's write then comes 45-53 cycles after timer 1
+                        \ fires, so 72 centres that 26-cycle spread in the
+                        \ 64-cycle gap; DL only needs it to be non-zero
+
+\ ******************************************************************************
+\
+\       Name: T1SYNC
+\       Type: Subroutine
+\   Category: Drawing the screen
+\    Summary: Port: start timer 1 running freely, once a frame, in step with
+\             vsync, for the split
+\
+\ ------------------------------------------------------------------------------
+\
+\ Timer 1 runs continuously (ACR bit 6, as the MOS leaves it) and reloads from
+\ its latch at each underflow. Waiting for the vsync flag (CA1, which the MOS
+\ makes interrupt at the end of the vsync pulse) with interrupts off, then
+\ starting the count at VSCAN(0 1) and leaving 19966 in the latch, makes it
+\ fire VSCAN(0 1) + 2 us after vsync and then every 19968 us: one frame of
+\ 312 lines of 64 us, from the same crystal, so the split keeps its place in
+\ the frame whatever the interrupt latency at vsync. Called once, by BEGIN.
+\
+\ ******************************************************************************
+
+.T1SYNC
+
+ SEI                    \ Interrupts off while we wait for vsync
+
+ LDA #%00000010         \ Clear CA1's flag in the System VIA's IFR
+ STA VIA+&4D
+
+.t1sy1
+
+ BIT VIA+&4D            \ Wait for CA1's flag (A = %00000010): vsync
+ BEQ t1sy1
+
+ LDA VSCAN+1            \ Start timer 1's count at VSCAN(0 1)
+ STA VIA+&44
+ LDA VSCAN
+ STA VIA+&45
+
+ LDA #LO(19966)         \ And from its first underflow on, once a frame
+ STA VIA+&46            \ (T1L-L, T1L-H: the latch only, which also clears the
+ LDA #HI(19966)         \ timer 1 flag)
+ STA VIA+&47
+
+ CLI                    \ Interrupts back on (the vsync interrupt is still
+                        \ pending and runs now)
+
+ RTS                    \ Return from the subroutine
 \ ******************************************************************************
 \
 \       Name: DOVDU19
@@ -3106,9 +3034,15 @@ ENDIF
 \
 \ ******************************************************************************
 
+.VNT3
+
+ EQUB 0, 0              \ Port: the palette offset DOVDU19 stores (VNT3+1),
+                        \ which nothing reads any more
+
 .DOVDU19
 
- STA VNT3+1             \ Store the new colour in VNT3+1, in the IRQ1 routine,
+ STA VNT3+1             \ Store the new colour in VNT3+1 (Port: the palette is
+                        \ fixed now, so this is kept only as a variable),
                         \ which modifies which TVT3 palette block gets applied
                         \ to the mode 1 part of the screen
 
@@ -3486,328 +3420,191 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This is used both to display a ship on the scanner, and to erase it again.
+\ Port: the CMYK dashboard's (see DIALS)
 \
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   INWK                The ship's data block
+\ SCAN: draw (or erase, as it uses EOR) the current ship on the scanner: a
+\ 3 x 2 dot at (dX1, Y1 - 1 .. Y1) and a one-pixel stick at dX1 + 1 to the
+\ ship's position in the scanner's plane (Y2), as Master's SCAN plots its dash
+\ at (X1, Y1) and its stick: so it leaves COL (Master's scanner colour), X1
+\ (rounded to even), Y1 (the dot's line) and Y2 (the stick's base) as Master
+\ does, and returns as Master's: A = %00001001 (ACCCON), X = 0, and with no
+\ stick Y = Y1 AND 7 and C set, with an upward one Y = (Y2 - 1) AND 7 and C
+\ set, with a downward one Y = (Y2 + 1) AND 7 and C clear
 \
 \ ******************************************************************************
 
-.SCR1
-
- RTS                    \ Return from the subroutine
+.scr1
+ RTS
 
 .SCAN
+ LDA INWK+31            \ not if it isn't shown on the scanner
+ AND #%00010000
+ BEQ scr1
+ LDX TYPE               \ or is the planet or sun
+ BMI scr1
+ LDA scacol,X           \ COL = Master's scanner colour, as it leaves it
+ STA COL
+ LDA INWK+1             \ or is out of range
+ ORA INWK+4
+ ORA INWK+7
+ AND #%11000000
+ BNE scr1
 
- LDA INWK+31            \ Fetch the ship's scanner flag from byte #31
+ LDA INWK+1             \ dX1 = 125 + x_hi, and X1 = that rounded to even, as
+ CLC                    \ Master (the dot is drawn at dX1)
+ LDX INWK+2
+ BPL scn2
+ EOR #%11111111
+ ADC #1
+ CLC
+.scn2
+ ADC #125
+ STA dX1
+ AND #%11111110
+ STA X1
 
- AND #%00010000         \ If bit 4 is clear then the ship should not be shown
- BEQ SCR1               \ on the scanner, so return from the subroutine (as SCR1
-                        \ contains an RTS)
-
- LDX TYPE               \ Fetch the ship's type from TYPE into X
-
- BMI SCR1               \ If this is the planet or the sun, then the type will
-                        \ have bit 7 set and we don't want to display it on the
-                        \ scanner, so return from the subroutine (as SCR1
-                        \ contains an RTS)
-
- LDA scacol,X           \ Set A to the scanner colour for this ship type from
-                        \ the X-th entry in the scacol table
-
- STA COL                \ Store the scanner colour in COL so it can be used to
-                        \ draw this ship in the correct colour
-
- LDA INWK+1             \ If any of x_hi, y_hi and z_hi have a 1 in bit 6 or 7,
- ORA INWK+4             \ then the ship is too far away to be shown on the
- ORA INWK+7             \ scanner, so return from the subroutine (as SCR1
- AND #%11000000         \ contains an RTS)
- BNE SCR1
-
-                        \ If we get here, we know x_hi, y_hi and z_hi are all
-                        \ 63 (%00111111) or less
-
-                        \ Now, we convert the x_hi coordinate of the ship into
-                        \ the screen x-coordinate of the dot on the scanner,
-                        \ using the following:
-                        \
-                        \   X1 = 123 + (x_sign x_hi)
-
- LDA INWK+1             \ Set A = x_hi
-
- CLC                    \ Clear the C flag so we can do addition below
-
- LDX INWK+2             \ Set X = x_sign
-
- BPL SC2                \ If x_sign is positive, skip the following
-
- EOR #%11111111         \ x_sign is negative, so flip the bits in A and add 1
- ADC #1                 \ to make it a negative number (bit 7 will now be set
-                        \ as we confirmed above that bits 6 and 7 are clear). So
-                        \ this gives A the sign of x_sign and gives it a value
-                        \ range of -63 (%11000001) to 0
-
- CLC                    \ Clear the C flag so we can do addition below
-
-.SC2
-
- ADC #125               \ Set X1 = 125 + (x_sign x_hi)
- AND #%11111110         \
- STA X1                 \ and if the result is odd, subtract 1 to make it even
-
- TAX                    \ Set X = X1 - 2
- DEX                    \
- DEX                    \ So X contains the x-coordinate that's two pixels to
-                        \ left of the top of the stick, so we can draw the dot
-                        \ at the end of the stick by simply drawing a dot at
-                        \ x-coordinate X at the correct end of the stick
-
-                        \ Next, we convert the z_hi coordinate of the ship into
-                        \ the y-coordinate of the base of the ship's stick,
-                        \ like this:
-                        \
-                        \   SC = 220 - (z_sign z_hi) / 4
-                        \
-                        \ though the following code actually does it like this:
-                        \
-                        \   SC = 255 - (35 + z_hi / 4)
-
- LDA INWK+7             \ Set A = z_hi / 4
- LSR A                  \
- LSR A                  \ So A is in the range 0-15
-
- CLC                    \ Clear the C flag for the addition below
-
- LDY INWK+8             \ Set Y = z_sign
-
- BPL SC3                \ If z_sign is positive, skip the following
-
- EOR #%11111111         \ z_sign is negative, so flip the bits in A and set the
- SEC                    \ C flag. As above, this makes A negative, this time
-                        \ with a range of -16 (%11110000) to -1 (%11111111). And
-                        \ as we are about to do an ADC, the SEC effectively adds
-                        \ another 1 to that value, giving a range of -15 to 0
-
-.SC3
-
- ADC #35                \ Set A = 35 + A to give a number in the range 20 to 50
-
- EOR #%11111111         \ Flip all the bits and store in Y2, so Y2 is in the
- STA Y2                 \ range 205 to 235, with a higher z_hi giving a lower Y2
-
-                        \ Now for the stick height, which we calculate using the
-                        \ following:
-                        \
-                        \ A = - (y_sign y_hi) / 2
-
- LDA INWK+4             \ Set A = y_hi / 2
+ LDA INWK+7             \ Y2 = 220 - z_hi / 4: the stick's base, as Master
  LSR A
-
- CLC                    \ Clear the C flag
-
- LDY INWK+5             \ Set Y = y_sign
-
- BMI SCD6               \ If y_sign is negative, skip the following, as we
-                        \ already have a positive value in A
-
- EOR #%11111111         \ y_sign is positive, so flip the bits in A and set the
- SEC                    \ C flag. This makes A negative, and as we are about to
-                        \ do an ADC below, the SEC effectively adds another 1 to
-                        \ that value to implement two's complement negation, so
-                        \ we don't need to add another 1 here
-
-.SCD6
-
-                        \ We now have all the information we need to draw this
-                        \ ship on the scanner, namely:
-                        \
-                        \   X1 = the screen x-coordinate of the ship's dot
-                        \
-                        \   SC = the screen y-coordinate of the base of the
-                        \        stick
-                        \
-                        \   A = the screen height of the ship's stick, with the
-                        \       correct sign for adding to the base of the stick
-                        \       to get the dot's y-coordinate
-                        \
-                        \ First, though, we have to make sure the dot is inside
-                        \ the dashboard, by moving it if necessary
-
- ADC Y2                 \ Set A = Y2 + A, so A now contains the y-coordinate of
-                        \ the end of the stick, plus the length of the stick, to
-                        \ give us the screen y-coordinate of the dot
-
- BPL ld246              \ If the result has bit 0 clear, then the result has
-                        \ overflowed and is bigger than 256, so jump to ld246 to
-                        \ set A to the maximum allowed value of 246 (this
-                        \ instruction isn't required as we test both the maximum
-                        \ and minimum below, but it might save a few cycles)
-
- CMP #194               \ If A >= 194, skip the following instruction, as 194 is
- BCS P%+4               \ the minimum allowed value of A
-
- LDA #194               \ A < 194, so set A to 194, the minimum allowed value
-                        \ for the y-coordinate of our ship's dot
-
- CMP #247               \ If A < 247, skip the following instruction, as 246 is
- BCC P%+4               \ the maximum allowed value of A
-
-.ld246
-
- LDA #246               \ A >= 247, so set A to 246, the maximum allowed value
-                        \ for the y-coordinate of our ship's dot
-
- LDY #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
- JSR CPIXK              \ Call CPIXK to draw a single-height dash at the
-                        \ y-coordinate in A, to draw the ship dot, and return
-                        \ the dash's right pixel byte in R, which we use below
-
- LDA Y1                 \ Fetch the y-coordinate back into A, which was stored
-                        \ in Y1 by the call to CPIX2
-
- SEC                    \ Set A = A - Y2 to get the stick length, by reversing
- SBC Y2                 \ the ADC Y2 we did above. This clears the C flag if the
-                        \ result is negative (i.e. the stick length is negative)
-                        \ and sets it if the result is positive (i.e. the stick
-                        \ length is negative)
-
-                        \ So now we have the following:
-                        \
-                        \   X1 = the screen x-coordinate of the ship's dot,
-                        \        clipped to fit into the dashboard
-                        \
-                        \   Y1 = the screen y-coordinate of the ship's dot,
-                        \        clipped to fit into the dashboard
-                        \
-                        \   SC = the screen y-coordinate of the base of the
-                        \        stick
-                        \
-                        \   A = the screen height of the ship's stick, with the
-                        \       correct sign for adding to the base of the stick
-                        \       to get the dot's y-coordinate
-                        \
-                        \   C = 0 if A is negative, 1 if A is positive
-                        \
-                        \ and we can get on with drawing the dot and stick
-
- BEQ VLO5               \ If the stick height is zero, then there is no stick to
-                        \ draw, so return from the subroutine (as VLO5 contains
-                        \ an RTS)
-
- BCC VLO1               \ If the C flag is clear then the stick height in A is
-                        \ negative, so jump down to RTS+1
-
- TAX                    \ Copy the (positive) stick height into X
-
- INX                    \ Increment the (positive) stick height in X
-
- JMP VLO4               \ Jump into the middle of the VLOL1 loop, skipping the
-                        \ drawing of first pixel in the stick
-
-.VLOL1
-
- LDA R                  \ The call to CPIX2 above saved the dash's right pixel
-                        \ byte in R, so we load this into A (so the stick comes
-                        \ out of the right side of the dot)
-
- EOR (SC),Y             \ Draw the bottom row of the double-height dot using the
- STA (SC),Y             \ same byte as the top row, plotted using EOR logic
-
-.VLO4
-
-                        \ If we get here then the stick length is positive (so
-                        \ the dot is below the ellipse and the stick is above
-                        \ the dot, and we need to draw the stick upwards from
-                        \ the dot)
-
- DEY                    \ We want to draw the stick upwards, so decrement the
-                        \ pixel row in Y
-
- BPL VLO3               \ If Y is still positive then it correctly points at the
-                        \ line above, so jump to VLO3 to skip the following
-
- LDA SC+1               \ Subtract 2 from the high byte of the screen address to
- SBC #2                 \ move to the character block above
- STA SC+1
-
- LDY #7                 \ We just decremented Y up through the top of the
-                        \ character block, so we need to move it to the last row
-                        \ in the character above, so set Y to 7, the number of
-                        \ the last row
-
-.VLO3
-
- DEX                    \ Decrement the (positive) stick height in X
-
- BNE VLOL1              \ If we still have more stick to draw, jump up to VLOL1
-                        \ to draw the next pixel
-
-.VLO5
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine
-
-.VLO1
-
-                        \ If we get here then the stick length is negative (so
-                        \ the dot is above the ellipse and the stick is below
-                        \ the dot, and we need to draw the stick downwards from
-                        \ the dot)
-
- LDA Y2                 \ Set A = Y2 - Y1 to get the positive stick height
+ LSR A
+ CLC
+ LDY INWK+8
+ BPL scn3
+ EOR #%11111111
  SEC
- SBC Y1
+.scn3
+ ADC #35
+ EOR #%11111111
+ STA Y2
 
- TAX                    \ Copy the (positive) stick height into X
+ LDA INWK+4             \ Y1 = Y2 - y_hi / 2, clipped to 194..246, as Master
+ LSR A
+ CLC
+ LDY INWK+5
+ BMI scn4
+ EOR #%11111111
+ SEC
+.scn4
+ ADC Y2
+ BPL scn5
+ CMP #194
+ BCS P%+4
+ LDA #194
+ CMP #247
+ BCC P%+4
+.scn5
+ LDA #246
+ STA Y1
 
- INX                    \ Increment the (positive) stick height in X
+ LDA #4                 \ Shadow RAM at &3000-&7FFF (the dashboard)
+ TSB VIA+&34
 
- JMP VLO6               \ Jump into the middle of the VLOL2 loop, skipping the
-                        \ drawing of first pixel in the stick
+ LDX TYPE               \ X = the dot tables' index: 4 * class + (dX1 AND 3)
+ LDA dtcls,X
+ STA dtmp
+ LDA dX1
+ AND #3
+ ORA dtmp
+ TAX
+ STX dtmp
 
-.VLOL2
+ SEC                    \ dlen = Y1 - Y2: the stick's length, up if positive
+ LDA Y1
+ SBC Y2
+ STA dlen
 
- LDA R                  \ The call to CPIX2 above saved the dash's right pixel
-                        \ byte in R, so we load this into A (so the stick comes
-                        \ out of the right side of the dot)
+ LDA #2                 \ the dot, lines Y1 - 1 and Y1 (no higher than lines
+ STA ddn                \ 194-195, the dashboard's first two)
+ LDA Y1
+ CMP #195
+ BCS P%+4
+ LDA #195
+ JSR ddot               \ (leaves SC, Y at the dot's top line)
 
- EOR (SC),Y             \ Draw the bottom row of the double-height dot using the
- STA (SC),Y             \ same byte as the top row, plotted using EOR logic
+ LDA dlen
+ BEQ scnz
+ LDX dtmp
+ TXA                    \ the stick: the dot's middle pixel, which is in its
+ AND #3                 \ second byte if dX1 AND 3 = 3
+ CMP #3
+ BNE scs1
+ LDA SC
+ CLC
+ ADC #8
+ STA SC
+ BCC scs1
+ INC SCH
+.scs1
+ LDA dtsE,X             \ the stick's byte for each line of a character row
+ STA dstab
+ STA dstab+2
+ STA dstab+4
+ STA dstab+6
+ LDA dtsO,X
+ STA dstab+1
+ STA dstab+3
+ STA dstab+5
+ STA dstab+7
 
-.VLO6
+ LDX dlen
+ BMI scndn
+ DEX                    \ up from the line above the dot's top: lines Y2 to
+ BEQ scnu9              \ Y1 - 2 (the dot covers Y1 - 1), dlen - 1 of them
 
- INY                    \ We want to draw the stick itself, heading downwards,
-                        \ so increment the pixel row in Y
+.scnup
+ DEY
+ BPL scu1
+ LDY #7
+ DEC SCH
+ DEC SCH
+.scu1
+ LDA dstab,Y
+ EOR (SC),Y
+ STA (SC),Y
+ DEX
+ BNE scnup
+.scnu9
+ LDA Y2                 \ Y = (Y2 - 1) AND 7, C set, as Master after an upward
+ DEC A                  \ stick (its loop's last DEY)
+ BRA scnex
 
- CPY #8                 \ If the row number in Y is less than 8, then it
- BNE VLO7               \ correctly points at the next line down, so jump to
-                        \ VLO7 to skip the following
+.scnz                   \ No stick: Y = Y1 AND 7, C set, as Master
+ LDA Y1
+.scnex
+ AND #7
+ TAY
+ LDX #0
+ SEC
+ LDA #4                 \ Main RAM back at &3000-&7FFF
+ TRB VIA+&34
+ LDA #%00001001         \ (A as Master leaves it, its ACCCON value)
+ RTS
 
- LDA SC+1               \ We just incremented Y down through the bottom of the
- ADC #1                 \ character block, so increment the high byte of the
- STA SC+1               \ screen address to move to the character block above
+.scndn                  \ down from the dot's lower line, X = -(length): lines
+ INY                    \ Y1 + 1 to Y2
+ CPY #8
+ BNE scd2
+ LDY #0
+ INC SCH
+ INC SCH
+.scd2
+ LDA dstab,Y
+ EOR (SC),Y
+ STA (SC),Y
+ INX
+ BNE scndn
+ LDA Y2                 \ Y = (Y2 + 1) AND 7, C clear, as Master after a
+ INC A                  \ downward stick (its loop's last INY)
+ AND #7
+ TAY
+ LDX #0
+ CLC
+ LDA #4
+ TRB VIA+&34
+ LDA #%00001001
+ RTS
 
- LDY #0                 \ We need to move to the first row in the character
-                        \ below, so set Y to 0, the number of the first row
 
-.VLO7
-
- DEX                    \ Decrement the (positive) stick height in X
-
- BNE VLOL2              \ If we still have more stick to draw, jump up to VLOL2
-                        \ to draw the next pixel
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine
+ INCLUDE "3-assembled-output/dashtab-scan.asm"   \ (dashboard.py: dtcls, DT_FRONT, DT_BEHIND)
 
 \ ******************************************************************************
 \
@@ -3890,44 +3687,6 @@ ENDIF
  EQUB %01100110
  EQUB %00110011
  EQUB %00110011
-
-\ ******************************************************************************
-\
-\       Name: CTWOS
-\       Type: Variable
-\   Category: Drawing pixels
-\    Summary: Ready-made single-pixel character row bytes for mode 2
-\       Area: bank 4
-\
-\ ------------------------------------------------------------------------------
-\
-\ Ready-made bytes for plotting one-pixel points in mode 2 (the bottom part of
-\ the split screen).
-\
-\ In mode 2, each character row is one byte, which is two pixels. Rows 0 and 1
-\ of the table contain a character row byte with just the left pixel plotted,
-\ while rows 2 and 3 contain a character row byte with just the right pixel
-\ plotted.
-\
-\ In other words, looking up row X will return a character row byte with pixel
-\ X/2 plotted (if the pixels are numbered 0 and 1).
-\
-\ There are two extra rows to support the use of CTWOS+2,X indexing in the CPIX2
-\ routine. The extra rows are repeats of the first two rows, and save us from
-\ having to work out whether CTWOS+2+X needs to be wrapped around when drawing a
-\ two-pixel dash that crosses from one character block into another. See CPIX2
-\ for more details.
-\
-\ ******************************************************************************
-
-.CTWOS
-
- EQUB %10101010
- EQUB %10101010
- EQUB %01010101
- EQUB %01010101
- EQUB %10101010
- EQUB %10101010
 
 \ ******************************************************************************
 \
@@ -6850,175 +6609,151 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ Arguments:
+\ Port: the CMYK dashboard's (see DIALS)
 \
-\   COMX                The screen pixel x-coordinate of the dash
-\
-\   COMY                The screen pixel y-coordinate of the dash
-\
-\   COMC                The colour and thickness of the dash:
-\
-\                         * &F0 = a double-height dash in yellow/white, for when
-\                           the object in the compass is in front of us
-\
-\                         * &FF = a single-height dash in green/cyan, for when
-\                           the object in the compass is behind us
+\ DOT: draw (EOR) the compass dot at (COMX, COMY) in colour COMC: YELLOW2 (in
+\ front) a 3 x 2 dot, GREEN2 (behind) a 3 x 1 one, 0 (no dot yet) nothing.
+\ Leaves X1 = COMX, COL = COMC and Y1 = COMY (minus one for the 3 x 2 dot),
+\ and A = %00001001, as Master's DOT
 \
 \ ******************************************************************************
 
 .DOT
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
- LDA COMX               \ Set X1 = COMX, the x-coordinate of the dash
+ LDA #4                 \ Shadow RAM at &3000-&7FFF (the dashboard)
+ TSB VIA+&34
+ LDA COMX
  STA X1
-
- LDX COMC               \ Set COL = COMC, the mode 2 colour byte for the dash
- STX COL
-
- LDA COMY               \ Set Y1 = COMY, the y-coordinate of the dash
-
- CPX #YELLOW2           \ If the colour in X is yellow, then the planet/station
- BNE P%+8               \ is behind us, so skip the following three instructions
-                        \ so we only draw a single-height dash
-
- JSR CPIXK              \ Call CPIXK to draw a single-height dash, i.e. the top
-                        \ row of a double-height dash
-
- LDA Y1                 \ Fetch the y-coordinate of the row we just drew and
- DEC A                  \ decrement it, ready to draw the bottom row
-
-.DOT2
-
- JSR CPIXK              \ Call CPIXK to draw a single-height dash
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine
+ CMP #186               \ dX1 = COMX kept inside the compass ring (186..204,
+ BCS P%+4               \ so its pixels stay left of the panel divider at
+ LDA #186               \ x = 207)
+ CMP #205
+ BCC P%+4
+ LDA #204
+ STA dX1
+ AND #3
+ TAX
+ LDA COMY
+ STA Y1
+ CMP #195               \ the lower line, COMY kept to 195..213, inside the
+ BCS P%+4               \ ring and off the dashboard's first two lines
+ LDA #195
+ CMP #214
+ BCC P%+4
+ LDA #213
+ STA dtmp
+ LDA COMC
+ STA COL
+ BEQ dot9               \ COMC = 0: nothing to draw (Master EORs colour 0)
+ CMP #YELLOW2
+ BNE dot1
+ TXA                    \ In front: a double-height dot, Y1 one less
+ ORA #4 * DT_FRONT
+ TAX
+ LDA #2
+ STA ddn
+ DEC Y1
+ BRA dot2
+.dot1
+ TXA                    \ Behind: a single-height dot
+ ORA #4 * DT_BEHIND
+ TAX
+ LDA #1
+ STA ddn
+.dot2
+ LDA dtmp
+ JSR ddot
+.dot9
+ LDA #4                 \ Main RAM back at &3000-&7FFF
+ TRB VIA+&34
+ LDA #%00001001         \ (A as Master's DOT leaves it)
+ RTS
 
 \ ******************************************************************************
 \
-\       Name: CPIXK
+\       Name: ddot
 \       Type: Subroutine
 \   Category: Drawing pixels
-\    Summary: Draw a single-height dash on the dashboard
+\    Summary: Port: draw a dot on the dashboard, in place of CPIXK
 \       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
-\ Draw a single-height mode 2 dash (1 pixel high, 2 pixels wide).
+\ Port: the CMYK dashboard's (see DIALS)
 \
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   X1                  The screen pixel x-coordinate of the dash
-\
-\   A                   The screen pixel y-coordinate of the dash
-\
-\   COL                 The colour of the dash as a mode 2 character row byte
-\
-\ ------------------------------------------------------------------------------
-\
-\ Returns:
-\
-\   R                   The dash's right pixel byte
+\ ddot: EOR a 3-pixel dot at dX1..dX1 + 2 on ddn lines (1 or 2) up from screen
+\ line A, in the colour whose dot tables (dt0E etc., from dashboard.py) are
+\ indexed by X = 4 * colour class + (dX1 AND 3). Leaves SC(1 0) and Y (0-7)
+\ at its top line, X as it was
 \
 \ ******************************************************************************
 
-.CPIXK
+.ddot
+ TAY
+ LSR A
+ LSR A
+ AND #%11111110
+ ORA #&40
+ STA SCH
+ LDA dX1
+ AND #%11111100
+ ASL A
+ STA SC
+ BCC P%+4
+ INC SCH
+ TYA
+ AND #7
+ TAY
 
- STA Y1                 \ Store the y-coordinate in Y1
+.ddl
+ TYA                    \ even or odd line
+ LSR A
+ BCS ddo
+ LDA dt0E,X
+ EOR (SC),Y
+ STA (SC),Y
+ LDA dt1E,X
+ BEQ ddn2
+ STA dmk
+ TYA
+ ORA #8
+ TAY
+ LDA dmk
+ EOR (SC),Y
+ STA (SC),Y
+ TYA
+ AND #7
+ TAY
+ BRA ddn2
+.ddo
+ LDA dt0O,X
+ EOR (SC),Y
+ STA (SC),Y
+ LDA dt1O,X
+ BEQ ddn2
+ STA dmk
+ TYA
+ ORA #8
+ TAY
+ LDA dmk
+ EOR (SC),Y
+ STA (SC),Y
+ TYA
+ AND #7
+ TAY
+.ddn2
+ DEC ddn
+ BEQ ddt9
+ DEY                    \ the line above
+ BPL ddl
+ LDY #7
+ DEC SCH
+ DEC SCH
+ BNE ddl                \ (always)
+.ddt9
+ RTS
 
- TAY                    \ Store the y-coordinate in Y
 
- LDA ylookup,Y          \ Look up the page number of the character row that
- STA SC+1               \ contains the pixel with the y-coordinate in Y, and
-                        \ store it in the high byte of SC(1 0) at SC+1
-
- LDA X1                 \ Each character block contains 8 pixel rows, so to get
- AND #%11111100         \ the address of the first byte in the character block
- ASL A                  \ that we need to draw into, as an offset from the start
-                        \ of the row, we clear bits 0-1 and shift left to double
-                        \ it (as each character row contains two pages of bytes,
-                        \ or 512 bytes, which cover 256 pixels). This also
-                        \ shifts bit 7 of X1 into the C flag
-
- STA SC                 \ Store the address of the character block in the low
-                        \ byte of SC(1 0), so now SC(1 0) points to the
-                        \ character block we need to draw into
-
- BCC P%+5               \ If the C flag is clear then skip the next two
-                        \ instructions
-
- INC SC+1               \ The C flag is set, which means bit 7 of X1 was set
-                        \ before the ASL above, so the x-coordinate is in the
-                        \ right half of the screen (i.e. in the range 128-255).
-                        \ Each row takes up two pages in memory, so the right
-                        \ half is in the second page but SC+1 contains the value
-                        \ we looked up from ylookup, which is the page number of
-                        \ the first memory page for the row... so we need to
-                        \ increment SC+1 to point to the correct page
-
- CLC                    \ Clear the C flag
-
- TYA                    \ Set Y to the y-coordinate mod 8, which will be the
- AND #7                 \ number of the pixel row we need to draw within the
- TAY                    \ character block
-
- LDA X1                 \ Copy bit 1 of X1 to bit 1 of X. X will now be either
- AND #%00000010         \ 0 or 2, and will be double the pixel number in the
- TAX                    \ character row for the left pixel in the dash (so 0
-                        \ means the left pixel in the two-pixel character row,
-                        \ while 2 means the right pixel)
-
- LDA CTWOS,X            \ Fetch a mode 2 one-pixel byte with the pixel position
- AND COL                \ at X/2, and AND with the colour byte so that pixel
-                        \ takes on the colour we want to draw (i.e. A is acting
-                        \ as a mask on the colour byte)
-
- EOR (SC),Y             \ Draw the pixel on-screen using EOR logic, so we can
- STA (SC),Y             \ remove it later without ruining the background that's
-                        \ already on-screen
-
- LDA CTWOS+2,X          \ Fetch a mode 2 one-pixel byte with the pixel position
-                        \ at (X+1)/2, so we can draw the right pixel of the dash
-
- BPL CP1                \ The CTWOS table has 2 extra rows at the end of it that
-                        \ repeat the first values, %10101010, so if we have not
-                        \ fetched that value, then the right pixel of the dash
-                        \ is in the same character block as the left pixel, so
-                        \ jump to CP1 to draw it
-
- LDA SC                 \ Otherwise the left pixel we drew was at the last
- ADC #8                 \ position of four in this character block, so we add
- STA SC                 \ 8 to the screen address to move onto the next block
-                        \ along (as there are 8 bytes in a character block).
-                        \ The C flag was cleared above, so this ADC is correct
-
- BCC P%+4               \ If the addition we just did overflowed, then increment
- INC SC+1               \ the high byte of SC(1 0), as this means we just moved
-                        \ into the right half of the screen row
-
- LDA CTWOS+2,X          \ Re-fetch the mode 2 one-pixel byte, as we just
-                        \ overwrote A (the byte will still be the fifth or sixth
-                        \ byte from the table, which is correct as we want to
-                        \ draw the leftmost pixel in the next character along as
-                        \ the dash's right pixel)
-
-.CP1
-
- AND COL                \ Apply the colour mask to the pixel byte, as above
-
- STA R                  \ Store the dash's right pixel byte in R
-
- EOR (SC),Y             \ Draw the dash's right pixel according to the mask in
- STA (SC),Y             \ A, with the colour in COL, using EOR logic, just as
-                        \ above
-
- RTS                    \ Return from the subroutine
+ INCLUDE "3-assembled-output/dashtab-dot.asm"    \ (dashboard.py: the dot tables, dt0E ...)
 
 \ ******************************************************************************
 \
@@ -7029,14 +6764,19 @@ ENDIF
 \             and make the E.C.M. sound)
 \       Area: bank 4
 \
+\ ------------------------------------------------------------------------------
+\
+\ Port: the CMYK dashboard's (see DIALS)
+\
+\ ECBLB2: start up the E.C.M. (ECMA = 32), then light up its bulb. ECBLB,
+\ SPBLB: EOR the E.C.M. or space station bulb onto the dashboard. They return
+\ as Master's: A = %00001001, X preserved, Y = &FF
+\
 \ ******************************************************************************
 
 .ECBLB2
-
- LDA #32                \ Set the E.C.M. countdown timer in ECMA to 32
+ LDA #32
  STA ECMA
-
-                        \ Fall through into ECBLB to light up the E.C.M. bulb
 
 \ ******************************************************************************
 \
@@ -7046,47 +6786,27 @@ ENDIF
 \    Summary: Light up the E.C.M. indicator bulb ("E") on the dashboard
 \       Area: bank 4
 \
+\ ------------------------------------------------------------------------------
+\
+\ Port: the CMYK dashboard's (see ECBLB2)
+\
 \ ******************************************************************************
 
 .ECBLB
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
- LDA #8*14              \ The E.C.M. bulb is in character block number 14 with
- STA SC                 \ each character taking 8 bytes, so this sets the low
-                        \ byte of the screen address of the character block we
-                        \ want to draw to
-
- LDA #&7A               \ Set the high byte of SC(1 0) to &7A, as the bulbs are
- STA SC+1               \ both in the character row from &7A00 to &7BFF, and the
-                        \ E.C.M. bulb is in the left half, which is from &7A00
-                        \ to &7AFF
-
- LDY #15                \ Now to poke the bulb bitmap into screen memory, and
-                        \ there are two character blocks' worth, each with eight
-                        \ lines of one byte, so set a counter in Y for 16 bytes
-
-.BULL1
-
- LDA ECBT,Y             \ Fetch the Y-th byte of the bulb bitmap
-
- EOR (SC),Y             \ EOR the byte with the current contents of screen
-                        \ memory, so drawing the bulb when it is already
-                        \ on-screen will erase it
-
- STA (SC),Y             \ Store the Y-th byte of the bulb bitmap in screen
-                        \ memory
-
- DEY                    \ Decrement the loop counter
-
- BPL BULL1              \ Loop back to poke the next byte until we have done
-                        \ all 16 bytes across two character blocks
-
- BMI away               \ Jump to away to switch main memory back into
-                        \ &3000-&7FFF and return from the subroutine (this BMI
-                        \ is effectively a JMP as we just passed through the BPL
-                        \ above)
+ LDA #&70               \ the E.C.M. bulb's bitmap, at &7A70 (row 5, bytes
+ STA SC                 \ 14-15)
+ LDA #&7A
+ STA SC+1
+ LDY #15
+ LDA #4
+ TSB VIA+&34
+.bul1
+ LDA ECBT,Y
+ EOR (SC),Y
+ STA (SC),Y
+ DEY
+ BPL bul1
+ BMI bul3
 
 \ ******************************************************************************
 \
@@ -7098,60 +6818,29 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ Other entry points:
-\
-\   away                Switch main memory back into &3000-&7FFF and return from
-\                       the subroutine
+\ Port: the CMYK dashboard's (see ECBLB2)
 \
 \ ******************************************************************************
 
 .SPBLB
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
- LDA #16*8              \ The space station bulb is in character block number 48
- STA SC                 \ (counting from the left edge of the screen), with the
-                        \ first half of the row in one page, and the second half
-                        \ in another. We want to set the screen address to point
-                        \ to the second part of the row, as the bulb is in that
-                        \ half, so that's character block number 16 within that
-                        \ second half (as the first half takes up 32 character
-                        \ blocks, so given that each character block takes up 8
-                        \ bytes, this sets the low byte of the screen address
-                        \ of the character block we want to draw to
-
- LDA #&7B               \ Set the high byte of SC(1 0) to &7B, as the bulbs are
- STA SC+1               \ both in the character row from &7A00 to &7BFF, and the
-                        \ space station bulb is in the right half, which is from
-                        \ &7B00 to &7BFF
-
- LDY #15                \ Now to poke the bulb bitmap into screen memory, and
-                        \ there are two character blocks' worth, each with eight
-                        \ lines of one byte, so set a counter in Y for 16 bytes
-
-.BULL2
-
- LDA SPBT,Y             \ Fetch the Y-th byte of the bulb bitmap
-
- EOR (SC),Y             \ EOR the byte with the current contents of screen
-                        \ memory, so drawing the bulb when it is already
-                        \ on-screen will erase it
-
- STA (SC),Y             \ Store the Y-th byte of the bulb bitmap in screen
-                        \ memory
-
- DEY                    \ Decrement the loop counter
-
- BPL BULL2              \ Loop back to poke the next byte until we have done
-                        \ all 16 bytes across two character blocks
-
-.away
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine
+ LDA #&80               \ the space station bulb's bitmap, at &7B80 (row 5,
+ STA SC                 \ bytes 48-49)
+ LDA #&7B
+ STA SC+1
+ LDY #15
+ LDA #4
+ TSB VIA+&34
+.bul2
+ LDA SPBT,Y
+ EOR (SC),Y
+ STA (SC),Y
+ DEY
+ BPL bul2
+.bul3
+ LDA #4
+ TRB VIA+&34
+ LDA #%00001001
+ RTS
 
 \ ******************************************************************************
 \
@@ -7163,50 +6852,11 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ The bitmap definition for the space station indicator's "S" bulb that gets
-\ displayed on the dashboard.
-\
-\ The bulb is four pixels wide, so it covers two mode 2 character blocks, one
-\ containing the left half of the "S", and the other the right half, which are
-\ displayed next to each other. Each pixel is in mode 2 colour 7 (%1111), which
-\ is white.
+\ Port: the CMYK dashboard's, generated by tools/dashboard.py
 \
 \ ******************************************************************************
 
-.SPBT
-
-                        \ Left half of the "S" bulb
-                        \
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %10101010         \ x .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %00000000         \ . .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
-
-                        \ Right half of the "S" bulb
-                        \
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %00000000         \ . .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %01010101         \ . x
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
-
-                        \ Combined "S" bulb
-                        \
-                        \ x x x x
-                        \ x x x x
-                        \ x . . .
-                        \ x x x x
-                        \ x x x x
-                        \ . . . x
-                        \ x x x x
-                        \ x x x x
+ INCLUDE "3-assembled-output/dashtab-spbt.asm"
 
 \ ******************************************************************************
 \
@@ -7218,50 +6868,11 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ The character bitmap for the E.C.M. indicator's "E" bulb that gets displayed
-\ on the dashboard.
-\
-\ The bulb is four pixels wide, so it covers two mode 2 character blocks, one
-\ containing the left half of the "E", and the other the right half, which are
-\ displayed next to each other. Each pixel is in mode 2 colour 7 (%1111), which
-\ is white.
+\ Port: the CMYK dashboard's, generated by tools/dashboard.py
 \
 \ ******************************************************************************
 
-.ECBT
-
-                        \ Left half of the "E" bulb
-                        \
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %10101010         \ x .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %10101010         \ x .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
-
-                        \ Right half of the "E" bulb
-                        \
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %00000000         \ . .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
- EQUB %00000000         \ . .
- EQUB %11111111         \ x x
- EQUB %11111111         \ x x
-
-                        \ Combined "E" bulb
-                        \
-                        \ x x x x
-                        \ x x x x
-                        \ x . . .
-                        \ x x x x
-                        \ x x x x
-                        \ x . . .
-                        \ x x x x
-                        \ x x x x
+ INCLUDE "3-assembled-output/dashtab-ecbt.asm"
 
 \ ******************************************************************************
 \
@@ -7273,133 +6884,88 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ Each indicator is a rectangle that's 3 pixels wide and 5 pixels high. If the
-\ indicator is set to black, this effectively removes a missile.
+\ Port: the CMYK dashboard's (see DIALS)
 \
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   X                   The number of the missile indicator to update (counting
-\                       from right to left, so indicator NOMSL is the leftmost
-\                       indicator)
-\
-\   Y                   The colour of the missile indicator:
-\
-\                         * &00 = black (no missile)
-\
-\                         * #RED2 = red (armed and locked)
-\
-\                         * #YELLOW2 = yellow/white (armed)
-\
-\                         * #GREEN2 = green (unarmed)
-\
-\ ------------------------------------------------------------------------------
-\
-\ Returns:
-\
-\   X                   X is preserved
-\
-\   Y                   Y is set to 0
+\ MSBAR: draw missile indicator X (1-4) in colour Y (0 = none, GREEN2 =
+\ unarmed, YELLOW2 = armed, RED2 = locked) in row 6, bytes 12 - 2X and 13 -
+\ 2X. Returns as Master's: X preserved, Y = 0 (ABORT2 stores it in MSAR), T =
+\ X * 16, A = %00001001, C clear (Master's ends with SC + 8, which never
+\ carries: ABORT2's callers go on to DORND, whose result depends on C, when a
+\ ship starts exploding in the same iteration as a missile lock)
 \
 \ ******************************************************************************
 
 .MSBAR
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
- TXA                    \ Store the value of X on the stack so we can preserve
- PHA                    \ it across the call to this subroutine
-
- ASL A                  \ Set T = A * 16
- ASL A                  \
- ASL A                  \ This also clears the C flag, as A is in the range 0
- ASL A                  \ to 3
+ STY dtv                \ keep the colour argument and X
+ STX dsx
+ TXA                    \ T = X * 16, as Master
+ ASL A
+ ASL A
+ ASL A
+ ASL A
  STA T
+ STA dtmp               \ SC(1 0) = &7C60 - X * 16
+ LDA #&60
+ SEC
+ SBC dtmp
+ STA SC
+ LDA #&7C
+ STA SCH
 
- LDA #97                \ Set SC = 97 - T - (1 - C)
- SBC T                  \        = 97 - (X * 16) - 1
- STA SC                 \        = 96 - (X * 16)
+ LDX #0                 \ X = the colour number: none, unarmed, armed, locked
+ LDA dtv
+ BEQ msb3
+ INX
+ CMP #GREEN2
+ BEQ msb3
+ INX
+ CMP #YELLOW2
+ BEQ msb3
+ INX
+.msb3
+ LDA dmscolE,X
+ STA dpE
+ LDA dmscolO,X
+ STA dpO
 
-                        \ So the low byte of SC(1 0) contains the row address
-                        \ for the rightmost missile indicator, made up as
-                        \ follows:
-                        \
-                        \   * 96 (character block 14, as byte #14 * 8 = 96), the
-                        \     character block of the rightmost missile
-                        \
-                        \   * Move left two characters (16 bytes) for each count
-                        \     of X, so when X = 0 we are drawing the rightmost
-                        \     missile, for X = 1 we hop to the left by two
-                        \     characters, and so on
+ LDA #4                 \ Shadow RAM at &3000-&7FFF (the dashboard)
+ TSB VIA+&34
+ LDX #0                 \ X = the index into the shape's masks
+ LDY #1                 \ Y = the line, 1 to 5
+.msb1
+ TYA                    \ the colour for this line
+ LSR A
+ LDA dpE
+ BCC P%+5
+ LDA dpO
+ STA dmk
+ AND dmsmask,X          \ the left byte
+ STA (SC),Y
+ TYA
+ ORA #8
+ TAY
+ LDA dmk
+ AND dmsmask+1,X        \ the right byte
+ STA (SC),Y
+ TYA
+ AND #7
+ TAY
+ INX
+ INX
+ INY
+ CPY #6
+ BNE msb1
 
- LDA #&7C               \ Set the high byte of SC(1 0) to &7C, the character row
- STA SCH                \ that contains the missile indicators (i.e. the bottom
-                        \ row of the screen)
+ LDX dsx                \ X preserved, Y = 0, as Master
+ LDY #0
+ LDA #4
+ TRB VIA+&34
+ LDA #%00001001
+ CLC                    \ C clear, as Master (the CPY above left it set)
+ RTS
 
- TYA                    \ Set A to the correct colour, which is a two-pixel wide
-                        \ mode 2 character row byte in the specified colour
 
- LDY #5                 \ We now want to draw this line five times to do the
-                        \ left two pixels of the indicator, so set a counter in
-                        \ Y
-
-.MBL1
-
- STA (SC),Y             \ Draw the two-pixel row, and as we do not use EOR
-                        \ logic, this will overwrite anything that is already
-                        \ there (so drawing a black missile will delete what's
-                        \ there)
-
- DEY                    \ Decrement the counter for the next row
-
- BNE MBL1               \ Loop back to MBL1 if have more rows to draw
-
- PHA                    \ Store the value of A on the stack so we can retrieve
-                        \ it after the following addition
-
- LDA SC                 \ Set SC = SC + 8
- CLC                    \
- ADC #8                 \ so SC(1 0) now points to the next character block on
- STA SC                 \ the row (for the right half of the indicator)
-
- PLA                    \ Retrieve A from the stack
-
- AND #%10101010         \ Mask the character row to plot just the first pixel
-                        \ in the next character block, as we already did a
-                        \ two-pixel wide band in the previous character block,
-                        \ so we need to plot just one more pixel, width-wise
-
- LDY #5                 \ We now want to draw this line five times, so set a
-                        \ counter in Y
-
-.MBL2
-
- STA (SC),Y             \ Draw the one-pixel row, and as we do not use EOR
-                        \ logic, this will overwrite anything that is already
-                        \ there (so drawing a black missile will delete what's
-                        \ there)
-
- DEY                    \ Decrement the counter for the next row
-
- BNE MBL2               \ Loop back to MBL2 if have more rows to draw
-
- PLX                    \ Restore X from the stack, so that it's preserved
-
-IF _SNG47
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine
-
-ELIF _COMPACT
-
- JMP away               \ Jump to away to switch main memory back into
-                        \ &3000-&7FFF and return from the subroutine
-
-ENDIF
+ INCLUDE "3-assembled-output/dashtab-msbar.asm"  \ (dashboard.py: dmscolE, dmscolO, dmsmask)
 
 \ ******************************************************************************
 \
@@ -8871,324 +8437,282 @@ ENDIF
 
 \ ******************************************************************************
 \
-\       Name: DIALS (Part 1 of 4)
+\       Name: DIALS
 \       Type: Subroutine
 \   Category: Dashboard
-\    Summary: Update the dashboard: speed indicator
+\    Summary: Update the dashboard
 \  Deep dive: The dashboard indicators
 \       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine updates the dashboard. First we draw all the indicators in the
-\ right part of the dashboard, from top (speed) to bottom (energy banks), and
-\ then we move on to the left part, again drawing from top (forward shield) to
-\ bottom (altitude).
+\ Port (from the Demonstration Disc port's dashboard, src/elite-source.asm):
+\ the dashboard (&7000-&7DFF, 7 character rows of 64 bytes x 8 lines) is a
+\ 256 x 56 MODE 1 image in the space view's palette (black, cyan, magenta,
+\ yellow), drawn by 2-build-files/dashboard.py, which also generates the
+\ colour, dot, bulb and missile tables (build/dashtab.asm) used here. It is
+\ in shadow RAM, like Master Elite's own dashboard, so these routines set
+\ ACCCON X while they write it (and run from bank 4, outside &3000-&7FFF),
+\ with TSB and TRB, so that D (which buffer the IRQ shows) is kept.
+\ Colours are 2x2 dither cells, kept as a pair of bytes: the four pixels for
+\ even lines and for odd lines.
 \
-\ This first section starts us off with the speedometer in the top right.
+\ They replace Master Elite's DIALS, PZW, DILX, DIL, DIL2, SCAN, CPIXK,
+\ DOT, ECBLB2, ECBLB, SPBLB and MSBAR, and leave every game variable and
+\ temporary that the game reads afterwards, and the registers and flags where
+\ a caller can see them, as those did (see each routine). Only the bytes of
+\ a bar that change are drawn.
+\
+\ DIALS: update the dashboard indicators, every iteration, as Master's DIALS.
+\ The game's temporaries are left as that DIALS left them: K and K+1 (its
+\ mode 2 colour bytes), T1 (its thresholds), XX15 (the energy banks at 16 per
+\ bank), and P, R, S, T, U (the roll and pitch values are still calculated
+\ with ADDK, as Master's). The MODE 1 dashboard's own values (colour
+\ numbers dK/dK1, thresholds dT, the finer bar lengths) are its own.
+\
+\ The dashboard's variables (DASHV) are in WP, after the original's.
 \
 \ ******************************************************************************
+
+ INCLUDE "3-assembled-output/dashtab-dials.asm"  \ (dashboard.py: the colour pairs, DC_...)
+
+DCN_SAFE = 0            \ Colour numbers: shields, energy banks: safe
+DCN_SAFE2 = 1           \ speed, temperatures: safe
+DCN_FUEL = 2
+DCN_ALT = 3
+DCN_DANGER = 4
+DCN_FLASH = 5
+DCN_MARK = 6            \ roll / pitch marker
+
+.dcolE
+ EQUB DC_SAFE_E, DC_SAFE2_E, DC_FUEL_E, DC_ALT_E, DC_DANGER_E, DC_FLASH_E, DC_MARK_E
+.dcolO
+ EQUB DC_SAFE_O, DC_SAFE2_O, DC_FUEL_O, DC_ALT_O, DC_DANGER_O, DC_FLASH_O, DC_MARK_O
+
+.dlmt                   \ the left n pixels of a byte, n = 0..3
+ EQUB &00, &88, &CC, &EE
+
 
 .DIALS
+ LDA #4                 \ Shadow RAM at &3000-&7FFF (the dashboard), as Master
+ TSB VIA+&34            \ (and not Master's store to HAZEL &DDEB: HAZEL is the
+                        \ renderer's)
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #&A0               \ SC(1 0) = &71A0: the speed indicator (right panel,
+ STA SC                 \ row 0, byte 52)
+ LDA #&71
+ STA SC+1
 
- LDA #1                 \ Set location &DDEB to 1. This location is in HAZEL,
- STA &DDEB              \ which contains the filing system RAM space, though
-                        \ I'm not sure what effect this has
+ JSR PZW2               \ high values: danger colour, low values: safe (2)
+ STX K+1
+ STA K
+ STY dK
+ LDA #DCN_SAFE2
+ STA dK1
 
- LDA #&A0               \ Set SC(1 0) = &71A0, which is the screen address for
- STA SC                 \ the character block containing the left end of the
- LDA #&71               \ top indicator in the right part of the dashboard, the
- STA SC+1               \ one showing our speed
+ LDA #14                \ (T1 as Master)
+ STA T1
+ LDA #28                \ speed: 0-40, one pixel per unit, danger from 28
+ STA dT
+ LDA DELTA
+ JSR DIL
 
- JSR PZW2               \ Call PZW2 to set A to the colour for dangerous values
-                        \ and X to the colour for safe values, suitable for
-                        \ non-striped indicators
-
- STX K+1                \ Set K+1 (the colour we should show for low values) to
-                        \ X (the colour to use for safe values)
-
- STA K                  \ Set K (the colour we should show for high values) to
-                        \ A (the colour to use for dangerous values)
-
-                        \ The above sets the following indicators to show red
-                        \ for high values and yellow/white for low values
-
- LDA #14                \ Set T1 to 14, the threshold at which we change the
- STA T1                 \ indicator's colour
-
- LDA DELTA              \ Fetch our ship's speed into A, in the range 0-40
-
-\LSR A                  \ Draw the speed indicator using a range of 0-31, and
- JSR DIL-1              \ increment SC to point to the next indicator (the roll
-                        \ indicator). The LSR is commented out as it isn't
-                        \ required with a call to DIL-1, so perhaps this was
-                        \ originally a call to DIL that got optimised
-
-\ ******************************************************************************
-\
-\       Name: DIALS (Part 2 of 4)
-\       Type: Subroutine
-\   Category: Dashboard
-\    Summary: Update the dashboard: pitch and roll indicators
-\  Deep dive: The dashboard indicators
-\       Area: bank 4
-\
-\ ******************************************************************************
-
- STZ R                  \ Set R = P = 0 for the low bytes in the call to the ADD
- STZ P                  \ routine below
-
- LDA #8                 \ Set S = 8, which is the value of the centre of the
- STA S                  \ roll indicator
-
- LDA ALP1               \ Fetch the roll angle alpha as a value between 0 and
- LSR A                  \ 31, and divide by 4 to get a value of 0 to 7
+ STZ R                  \ Roll and pitch, calculated as Master (ADDK), for
+ STZ P                  \ the side effects on P, R, S, T, T1, U
+ LDA #8
+ STA S
+ LDA ALP1
  LSR A
+ LSR A
+ ORA ALP2
+ EOR #%10000000
+ JSR ADDK
 
- ORA ALP2               \ Apply the roll sign to the value, and flip the sign,
- EOR #%10000000         \ so it's now in the range -7 to +7, with a positive
-                        \ roll angle alpha giving a negative value in A
+                        \ The roll marker: at 15 -/+ ALP1 / 2 (0..30), on the
+                        \ side Master's ADD put it
 
- JSR ADDK               \ We now add A to S to give us a value in the range 1 to
-                        \ 15, which we can pass to DIL2 to draw the vertical
-                        \ bar on the indicator at this position. We use the ADD
-                        \ routine like this:
-                        \
-                        \ (A X) = (A 0) + (S 0)
-                        \
-                        \ and just take the high byte of the result. We use ADD
-                        \ rather than a normal ADC because ADD separates out the
-                        \ sign bit and does the arithmetic using absolute values
-                        \ and separate sign bits, which we want here rather than
-                        \ the two's complement that ADC uses
+ LDA ALP1
+ LSR A
+ STA dtv
+ LDA ALP2
+ BMI drl1               \ (ALP2 positive gives the smaller value)
+ LDA #15
+ SEC
+ SBC dtv
+ BRA drl2
+.drl1
+ LDA #15
+ CLC
+ ADC dtv
+.drl2
+ JSR DIL2               \ (returns C set, as Master's DIL2)
 
- JSR DIL2               \ Draw a vertical bar on the roll indicator at offset A
-                        \ and increment SC to point to the next indicator (the
-                        \ pitch indicator)
+ LDA BETA               \ The pitch, as Master
+ LDX BET1
+ BEQ P%+4
+ SBC #1
+ JSR ADDK
 
- LDA BETA               \ Fetch the pitch angle beta as a value between -8 and
-                        \ +8
+                        \ The pitch marker: at 15 +/- (2 * BET1 - 1), with
+                        \ BETA's sign (sign-magnitude), 15 when BET1 = 0
 
- LDX BET1               \ Fetch the magnitude of the pitch angle beta, and if it
- BEQ P%+4               \ is 0 (i.e. we are not pitching), skip the next
-                        \ instruction
+ LDA BET1
+ BEQ dpt1
+ ASL A
+ SEC
+ SBC #1
+.dpt1
+ STA dtv
+ LDA BETA
+ BMI dpt2
+ LDA #15
+ CLC
+ ADC dtv
+ BRA dpt3
+.dpt2
+ LDA #15
+ SEC
+ SBC dtv
+.dpt3
+ JSR DIL2
 
- SBC #1                 \ The pitch angle beta is non-zero, so set A = A - 1
-                        \ (the C flag is set by the call to DIL2 above, so we
-                        \ don't need to do a SEC). This gives us a value of A
-                        \ from -7 to +7 because these are magnitude-based
-                        \ numbers with sign bits, rather than two's complement
-                        \ numbers
+                        \ The four energy banks, first as Master (XX15, 16 per
+                        \ bank, from ENERGY / 4), then for the bars (dbank, 32
+                        \ per bank, from ENERGY / 2), each filling from the
+                        \ bottom bank up
 
- JSR ADDK               \ We now add A to S to give us a value in the range 1 to
-                        \ 15, which we can pass to DIL2 to draw the vertical
-                        \ bar on the indicator at this position (see the JSR ADD
-                        \ above for more on this)
+ JSR PZW                \ high values: safe colour, low values: danger
+ STX K
+ STA K+1
+ STY dK1
+ LDY #0
+ LDA #DCN_SAFE
+ STA dK
+ LDX #3
+ STX T1
+ LDA #6                 \ danger below 6 pixels (Master's 3 of 16)
+ STA dT
 
- JSR DIL2               \ Draw a vertical bar on the pitch indicator at offset A
-                        \ and increment SC to point to the next indicator (the
-                        \ four energy banks)
+.dll23
+ STY XX15,X
+ STZ dbank,X
+ DEX
+ BPL dll23
+ LDX #3
+ LDA ENERGY
+ LSR A
+ LSR A
+ STA Q
+.dll24
+ SEC
+ SBC #16
+ BCC dll26
+ STA Q
+ LDA #16
+ STA XX15,X
+ LDA Q
+ DEX
+ BPL dll24
+ BMI dll27
+.dll26
+ LDA Q
+ STA XX15,X
+.dll27
+ LDX #3
+ LDA ENERGY
+ LSR A
+ STA dtv
+.dll28
+ SEC
+ SBC #32
+ BCC dll29
+ STA dtv
+ LDA #32
+ STA dbank,X
+ LDA dtv
+ DEX
+ BPL dll28
+ BMI dll9a
+.dll29
+ LDA dtv
+ STA dbank,X
+.dll9a
+ LDY #0
+.dll9
+ LDA dbank,Y
+ STY P
+ JSR DIL
+ LDY P
+ INY
+ CPY #4
+ BNE dll9
 
-\ ******************************************************************************
-\
-\       Name: DIALS (Part 3 of 4)
-\       Type: Subroutine
-\   Category: Dashboard
-\    Summary: Update the dashboard: four energy banks
-\  Deep dive: The dashboard indicators
-\       Area: bank 4
-\
-\ ******************************************************************************
+ LDA #&70               \ SC(1 0) = &7020: forward shield (left panel, row 0,
+ STA SC+1               \ byte 4)
+ LDA #&20
+ STA SC
 
- LDY #0                 \ Set Y = 0, for use in various places below
+ LDA FSH                \ shields: 0-255 -> 0-31 (danger below 6, as above)
+ LSR A
+ LSR A
+ LSR A
+ JSR DIL
+ LDA ASH
+ LSR A
+ LSR A
+ LSR A
+ JSR DIL
 
- JSR PZW                \ Call PZW to set A to the colour for dangerous values
-                        \ and X to the colour for safe values
+ LDA #YELLOW2           \ fuel: 0-70 -> 0-35 (clipped at 32)
+ STA K
+ STA K+1
+ LDA #DCN_FUEL
+ STA dK
+ STA dK1
+ LDA QQ14
+ LSR A
+ JSR DIL
 
- STX K                  \ Set K (the colour we should show for high values) to X
-                        \ (the colour to use for safe values)
+ JSR PZW2               \ temperatures: high values danger, low safe (2)
+ STX K+1
+ STA K
+ STY dK
+ LDA #DCN_SAFE2
+ STA dK1
+ LDX #11
+ STX T1
+ LDA #22                \ danger from 22 pixels (Master's 11 of 16)
+ STA dT
+ LDA CABTMP
+ LSR A
+ LSR A
+ LSR A
+ JSR DIL
+ LDA GNTMP
+ LSR A
+ LSR A
+ LSR A
+ JSR DIL
 
- STA K+1                \ Set K+1 (the colour we should show for low values) to
-                        \ A (the colour to use for dangerous values)
+ LDA #240               \ altitude: 0-255 -> 0-31, one colour
+ STA T1
+ STA dT
+ LDA #YELLOW2
+ STA K
+ STA K+1
+ LDA #DCN_ALT
+ STA dK
+ STA dK1
+ LDA ALTIT
+ LSR A
+ LSR A
+ LSR A
+ JSR DIL
 
-                        \ The above sets the following indicators to show red
-                        \ for low values and yellow/white for high values, which
-                        \ we use not only for the energy banks, but also for the
-                        \ shield levels and current fuel
+ LDA #4                 \ Main RAM back at &3000-&7FFF
+ TRB VIA+&34
 
- LDX #3                 \ Set up a counter in X so we can zero the four bytes at
-                        \ XX15, so we can then calculate each of the four energy
-                        \ banks' values before drawing them later
-
- STX T1                 \ Set T1 to 3, the threshold at which we change the
-                        \ indicator's colour
-
-.DLL23
-
- STY XX15,X             \ Set the X-th byte of XX15 to 0
-
- DEX                    \ Decrement the counter
-
- BPL DLL23              \ Loop back for the next byte until the four bytes at
-                        \ XX12 are all zeroed
-
- LDX #3                 \ Set up a counter in X to loop through the 4 energy
-                        \ bank indicators, so we can calculate each of the four
-                        \ energy banks' values and store them in XX12
-
- LDA ENERGY             \ Set A = Q = ENERGY / 4, so they are both now in the
- LSR A                  \ range 0-63 (so that's a maximum of 16 in each of the
- LSR A                  \ banks, and a maximum of 15 in the top bank)
-
- STA Q                  \ Set Q to A, so we can use Q to hold the remaining
-                        \ energy as we work our way through each bank, from the
-                        \ full ones at the bottom to the empty ones at the top
-
-.DLL24
-
- SEC                    \ Set A = A - 16 to reduce the energy count by a full
- SBC #16                \ bank
-
- BCC DLL26              \ If the C flag is clear then A < 16, so this bank is
-                        \ not full to the brim, and is therefore the last one
-                        \ with any energy in it, so jump to DLL26
-
- STA Q                  \ This bank is full, so update Q with the energy of the
-                        \ remaining banks
-
- LDA #16                \ Store this bank's level in XX15 as 16, as it is full,
- STA XX15,X             \ with XX15+3 for the bottom bank and XX15+0 for the top
-
- LDA Q                  \ Set A to the remaining energy level again
-
- DEX                    \ Decrement X to point to the next bank, i.e. the one
-                        \ above the bank we just processed
-
- BPL DLL24              \ Loop back to DLL24 until we have either processed all
-                        \ four banks, or jumped out early to DLL26 if the top
-                        \ banks have no charge
-
- BMI DLL9               \ Jump to DLL9 as we have processed all four banks (this
-                        \ BMI is effectively a JMP as A will never be positive)
-
-.DLL26
-
- LDA Q                  \ If we get here then the bank we just checked is not
- STA XX15,X             \ fully charged, so store its value in XX15 (using Q,
-                        \ which contains the energy of the remaining banks -
-                        \ i.e. this one)
-
-                        \ Now that we have the four energy bank values in XX12,
-                        \ we can draw them, starting with the top bank in XX12
-                        \ and looping down to the bottom bank in XX12+3, using Y
-                        \ as a loop counter, which was set to 0 above
-
-.DLL9
-
- LDA XX15,Y             \ Fetch the value of the Y-th indicator, starting from
-                        \ the top
-
- STY P                  \ Store the indicator number in P for retrieval later
-
- JSR DIL                \ Draw the energy bank using a range of 0-15, and
-                        \ increment SC to point to the next indicator (the
-                        \ next energy bank down)
-
- LDY P                  \ Restore the indicator number into Y
-
- INY                    \ Increment the indicator number
-
- CPY #4                 \ Check to see if we have drawn the last energy bank
-
- BNE DLL9               \ Loop back to DLL9 if we have more banks to draw,
-                        \ otherwise we are done
-
-\ ******************************************************************************
-\
-\       Name: DIALS (Part 4 of 4)
-\       Type: Subroutine
-\   Category: Dashboard
-\    Summary: Update the dashboard: shields, fuel, laser & cabin temp, altitude
-\  Deep dive: The dashboard indicators
-\       Area: bank 4
-\
-\ ******************************************************************************
-
- LDA #&70               \ Set SC(1 0) = &7020, which is the screen address for
- STA SC+1               \ the character block containing the left end of the
- LDA #&20               \ top indicator in the left part of the dashboard, the
- STA SC                 \ one showing the forward shield
-
- LDA FSH                \ Draw the forward shield indicator using a range of
- JSR DILX               \ 0-255, and increment SC to point to the next indicator
-                        \ (the aft shield)
-
- LDA ASH                \ Draw the aft shield indicator using a range of 0-255,
- JSR DILX               \ and increment SC to point to the next indicator (the
-                        \ fuel level)
-
- LDA #YELLOW2           \ Set K (the colour we should show for high values) to
- STA K                  \ yellow
-
- STA K+1                \ Set K+1 (the colour we should show for low values) to
-                        \ yellow, so the fuel indicator always shows in this
-                        \ colour
-
- LDA QQ14               \ Draw the fuel level indicator using a range of 0-63,
- JSR DILX+2             \ and increment SC to point to the next indicator (the
-                        \ cabin temperature)
-
- JSR PZW2               \ Call PZW2 to set A to the colour for dangerous values
-                        \ and X to the colour for safe values, suitable for
-                        \ non-striped indicators
-
- STX K+1                \ Set K+1 (the colour we should show for low values) to
-                        \ X (the colour to use for safe values)
-
- STA K                  \ Set K (the colour we should show for high values) to
-                        \ A (the colour to use for dangerous values)
-
-                        \ The above sets the following indicators to show red
-                        \ for high values and yellow/white for low values, which
-                        \ we use for the cabin and laser temperature bars
-
- LDX #11                \ Set T1 to 11, the threshold at which we change the
- STX T1                 \ cabin and laser temperature indicators' colours
-
- LDA CABTMP             \ Draw the cabin temperature indicator using a range of
- JSR DILX               \ 0-255, and increment SC to point to the next indicator
-                        \ (the laser temperature)
-
- LDA GNTMP              \ Draw the laser temperature indicator using a range of
- JSR DILX               \ 0-255, and increment SC to point to the next indicator
-                        \ (the altitude)
-
- LDA #240               \ Set T1 to 240, the threshold at which we change the
- STA T1                 \ altitude indicator's colour. As the altitude has a
-                        \ range of 0-255, pixel 16 will not be filled in, and
-                        \ 240 would change the colour when moving between pixels
-                        \ 15 and 16, so this effectively switches off the colour
-                        \ change for the altitude indicator
-
- LDA #YELLOW2           \ Set K (the colour we should show for high values) to
- STA K                  \ yellow
-
- STA K+1                \ Set K+1 (the colour we should show for low values) to
-                        \ 240, or &F0 (dashboard colour 2, yellow/white), so the
-                        \ altitude indicator always shows in this colour
-
- LDA ALTIT              \ Draw the altitude indicator using a range of 0-255
- JSR DILX
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- JMP COMPAS             \ We have now drawn all the indicators, so jump to
-                        \ COMPAS to draw the compass, returning from the
-                        \ subroutine using a tail call
+ JMP COMPAS             \ and the compass, returning from there
 
 \ ******************************************************************************
 \
@@ -9199,20 +8723,19 @@ ENDIF
 \             support flashing
 \       Area: bank 4
 \
+\ ------------------------------------------------------------------------------
+\
+\ Port: the CMYK dashboard's (see DIALS)
+\
+\ PZW: X = the safe colour byte, A = the danger colour byte, as Master's (red,
+\ or green on every other 8 iterations if flashing is enabled), and Y = the
+\ danger colour number. PZW2: the same with the second safe colour
+\
 \ ******************************************************************************
 
 .PZW2
-
- LDX #WHITE2            \ Set X to white, so we can return that as the safe
-                        \ colour in PZW below
-
- EQUB &2C               \ Skip the next instruction by turning it into
-                        \ &2C &A9 &23, or BIT &23A9, which does nothing apart
-                        \ from affect the flags
-
-                        \ Fall through into PZW to fetch the current dashboard
-                        \ colours, returning white for safe colours rather than
-                        \ stripes
+ LDX #WHITE2
+ EQUB &2C               \ skip the next instruction (BIT abs)
 
 \ ******************************************************************************
 \
@@ -9224,50 +8747,23 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ Set A and X to the colours we should use for indicators showing dangerous and
-\ safe values respectively. This enables us to implement flashing indicators,
-\ which is one of the game's configurable options.
-\
-\ If flashing is enabled, the colour returned in A (dangerous values) will be
-\ red for 8 iterations of the main loop, and green for the next 8, before
-\ going back to red. If we always use PZW to decide which colours we should use
-\ when updating indicators, flashing colours will be automatically taken care of
-\ for us.
-\
-\ The values returned are #GREEN2 for green and #RED2 for red. These are mode 2
-\ bytes that contain 2 pixels, with the colour of each pixel given in four bits.
-\
-\ ------------------------------------------------------------------------------
-\
-\ Returns:
-\
-\   A                   The colour to use for indicators with dangerous values
-\
-\   X                   The colour to use for indicators with safe values
+\ Port: the CMYK dashboard's (see PZW2)
 \
 \ ******************************************************************************
 
 .PZW
-
- LDX #STRIPE            \ Set X to the dashboard stripe colour, which is stripe
-                        \ 5-1 (magenta/red)
-
- LDA MCNT               \ A will be non-zero for 8 out of every 16 main loop
- AND #%00001000         \ counts, when bit 4 is set, so this is what we use to
-                        \ flash the "danger" colour
-
- AND FLH                \ A will be zeroed if flashing colours are disabled
-
- BEQ P%+5               \ If A is zero, skip the next two instructions
-
- LDA #GREEN2            \ Otherwise flashing colours are enabled and it's the
- RTS                    \ main loop iteration where we flash them, so set A to
-                        \ dashboard colour 2 (green) and return from the
-                        \ subroutine
-
- LDA #RED2              \ Set A to dashboard colour 1 (red)
-
- RTS                    \ Return from the subroutine
+ LDX #STRIPE
+ LDA MCNT
+ AND #%00001000
+ AND FLH
+ BEQ pzw1
+ LDY #DCN_FLASH
+ LDA #GREEN2
+ RTS
+.pzw1
+ LDY #DCN_DANGER
+ LDA #RED2
+ RTS
 
 \ ******************************************************************************
 \
@@ -9280,195 +8776,76 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ The range of values shown on the indicator depends on which entry point is
-\ called. For the default entry point of DILX, the range is 0-255 (as the value
-\ passed in A is one byte). The other entry points are shown below.
+\ Port: the CMYK dashboard's (see DIALS): only the entry point DIL
 \
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   A                   The value to be shown on the indicator (so the larger
-\                       the value, the longer the bar)
-\
-\   T1                  The threshold at which we change the indicator's colour
-\                       from the low value colour to the high value colour. The
-\                       threshold is in pixels, so it should have a value from
-\                       0-16, as each bar indicator is 16 pixels wide
-\
-\   K                   The colour to use when A is a high value, as a two-pixel
-\                       mode 2 character row byte
-\
-\   K+1                 The colour to use when A is a low value, as a two-pixel
-\                       mode 2 character row byte
-\
-\   SC(1 0)             The screen address of the first character block in the
-\                       indicator
-\
-\ ------------------------------------------------------------------------------
-\
-\ Other entry points:
-\
-\   DILX+2              The range of the indicator is 0-64 (for the fuel
-\                       indicator)
-\
-\   DIL-1               The range of the indicator is 0-32 (for the speed
-\                       indicator)
-\
-\   DIL                 The range of the indicator is 0-16 (for the energy
-\                       banks)
+\ DIL: draw a bar of A pixels (clipped to 32) at SC(1 0) in colour dK if A >= dT,
+\ else dK1, on lines 2-4 of the character row, then move SC down a row. Only
+\ the bytes that differ from what is on screen are drawn (DILQ/DILC remember
+\ each bar's length and colour). Returns C clear, as Master's DIL
 \
 \ ******************************************************************************
 
-.DILX
-
- LSR A                  \ If we call DILX, we set A = A / 16, so A is 0-15
- LSR A
-
- LSR A                  \ If we call DILX+2, we set A = A / 4, so A is 0-15
-
- LSR A                  \ If we call DIL-1, we set A = A / 2, so A is 0-15
-
 .DIL
-
-                        \ If we call DIL, we leave A alone, so A is 0-15
-
- STA Q                  \ Store the indicator value in Q, now reduced to 0-15,
-                        \ which is the length of the indicator to draw in pixels
-
- LDX #&FF               \ Set R = &FF, to use as a mask for drawing each row of
- STX R                  \ each character block of the bar, starting with a full
-                        \ character's width of 4 pixels
-
- CMP T1                 \ If A >= T1 then we have passed the threshold where we
- BCS DL30               \ change bar colour, so jump to DL30 to set A to the
-                        \ "high value" colour
-
- LDA K+1                \ Set A to K+1, the "low value" colour to use
-
- BNE DL31               \ Jump down to DL31 (this BNE is effectively a JMP as A
-                        \ will never be zero)
-
-.DL30
-
- LDA K                  \ Set A to K, the "high value" colour to use
-
-.DL31
-
- STA COL                \ Store the colour of the indicator in COL
-
- LDY #2                 \ We want to start drawing the indicator on the third
-                        \ line in this character row, so set Y to point to that
-                        \ row's offset
-
- LDX #7                 \ Set up a counter in X for the width of the indicator,
-                        \ which is 8 characters (each of which is 2 pixels wide,
-                        \ to give a total width of 16 pixels)
-
-.DL1
-
- LDA Q                  \ Fetch the indicator value (0-15) from Q into A
-
- CMP #2                 \ If Q < 2, then we need to draw the end cap of the
- BCC DL2                \ indicator, which is less than a full character's
-                        \ width, so jump down to DL2 to do this
-
- SBC #2                 \ Otherwise we can draw a two-pixel wide block, so
- STA Q                  \ subtract 2 from Q so it contains the amount of the
-                        \ indicator that's left to draw after this character
-
- LDA R                  \ Fetch the shape of the indicator row that we need to
-                        \ display from R, so we can use it as a mask when
-                        \ painting the indicator. It will be &FF at this point
-                        \ (i.e. a full four-pixel row)
-
-.DL5
-
- AND COL                \ Fetch the two-pixel mode 2 colour byte from COL, and
-                        \ only keep pixels that have their equivalent bits set
-                        \ in the mask byte in A
-
- STA (SC),Y             \ Draw the shape of the mask on pixel row Y of the
-                        \ character block we are processing
-
- INY                    \ Draw the next pixel row, incrementing Y
- STA (SC),Y
-
- INY                    \ And draw the third pixel row, incrementing Y
- STA (SC),Y
-
- TYA                    \ Add 6 to Y, so Y is now 8 more than when we started
- CLC                    \ this loop iteration, so Y now points to the address
- ADC #6                 \ of the first line of the indicator bar in the next
- TAY                    \ character block (as each character is 8 bytes of
-                        \ screen memory)
-
- DEX                    \ Decrement the loop counter for the next character
-                        \ block along in the indicator
-
- BMI DL6                \ If we just drew the last character block then we are
-                        \ done drawing, so jump down to DL6 to finish off
-
- BPL DL1                \ Loop back to DL1 to draw the next character block of
-                        \ the indicator (this BPL is effectively a JMP as A will
-                        \ never be negative following the previous BMI)
-
-.DL2
-
- EOR #1                 \ If we get here then we are drawing the indicator's
- STA Q                  \ end cap, so Q is < 2, and this EOR flips the bits, so
-                        \ instead of containing the number of indicator columns
-                        \ we need to fill in on the left side of the cap's
-                        \ character block, Q now contains the number of blank
-                        \ columns there should be on the right side of the cap's
-                        \ character block
-
- LDA R                  \ Fetch the current mask from R, which will be &FF at
-                        \ this point, so we need to turn Q of the columns on the
-                        \ right side of the mask to black to get the correct end
-                        \ cap shape for the indicator
-
-.DL3
-
- ASL A                  \ Shift the mask left and clear bits 0, 2, 4 and 8,
- AND #%10101010         \ which has the effect of shifting zeroes from the left
-                        \ into each two-bit segment (i.e. xx xx xx xx becomes
-                        \ x0 x0 x0 x0, which blanks out the last column in the
-                        \ two-pixel mode 2 character block)
-
- DEC Q                  \ Decrement the counter for the number of columns to
-                        \ blank out
-
- BPL DL3                \ If we still have columns to blank out in the mask,
-                        \ loop back to DL3 until the mask is correct for the
-                        \ end cap
-
- PHA                    \ Store the mask byte on the stack while we use the
-                        \ accumulator for a bit
-
- STZ R                  \ Change the mask so no bits are set, so the characters
-                        \ after the one we're about to draw will be all blank
-
- LDA #99                \ Set Q to a high number (99, why not) so we will keep
- STA Q                  \ drawing blank characters until we reach the end of
-                        \ the indicator row
-
- PLA                    \ Restore the mask byte from the stack so we can use it
-                        \ to draw the end cap of the indicator
-
- JMP DL5                \ Jump back up to DL5 to draw the mask byte on-screen
-
-.DL6
-
- INC SC+1               \ Increment the high byte of SC to point to the next
- INC SC+1               \ character row on-screen (as each row takes up exactly
-                        \ two pages of 256 bytes) - so this sets up SC to point
-                        \ to the next indicator, i.e. the one below the one we
-                        \ just drew
-
-.DL9
-
- RTS                    \ Return from the subroutine
+ CMP #33
+ BCC P%+4
+ LDA #32
+ STA dsE
+ LDA SC+1               \ X = the cache index, as DILI
+ AND #%00001110
+ LSR A
+ BIT SC
+ BPL P%+4
+ ORA #8
+ TAX
+ LDA dsE
+ CMP dT
+ LDA dK
+ BCS P%+5
+ LDA dK1
+ CMP DILC,X
+ BNE dil3               \ new colour: redraw all of it
+ LDA dsE
+ CMP DILQ,X
+ BEQ dil9               \ unchanged
+ BCC dil1
+ LDY DILQ,X             \ longer: bytes old DIV 4 to (new + 3) DIV 4
+ STA dhi
+ TYA
+ BRA dil2
+.dil1
+ LDY DILQ,X             \ shorter: bytes new DIV 4 to (old + 3) DIV 4
+ STY dhi
+.dil2
+ LSR A
+ LSR A
+ STA dlo
+ LDA dhi
+ CLC
+ ADC #3
+ LSR A
+ LSR A
+ STA dhi
+ BRA dil4
+.dil3
+ STA DILC,X
+ STZ dlo
+ LDA #8
+ STA dhi
+.dil4
+ LDA dsE
+ STA DILQ,X
+ STZ dsS
+ LDA #2                 \ lines 2-4
+ STA dl0
+ LDA #3
+ STA dln
+ LDY DILC,X             \ the colour number
+ JSR DSEG
+.dil9
+ INC SC+1               \ the next character row down
+ INC SC+1
+ CLC
+ RTS
 
 \ ******************************************************************************
 \
@@ -9481,125 +8858,195 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ The indicator can show a vertical bar in 16 positions, with a value of 8
-\ showing the bar in the middle of the indicator.
+\ Port: the CMYK dashboard's (see DIALS)
 \
-\ In practice this routine is only ever called with A in the range 1 to 15, so
-\ the vertical bar never appears in the leftmost position (though it does appear
-\ in the rightmost).
-\
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   A                   The offset of the vertical bar to show in the indicator,
-\                       from 0 at the far left, to 8 in the middle, and 15 at
-\                       the far right
-\
-\ ------------------------------------------------------------------------------
-\
-\ Returns:
-\
-\   C flag              The C flag is set
+\ DIL2: draw the roll / pitch marker at pixels A, A + 1 (A = 0..30) of the
+\ indicator at SC(1 0), on lines 1-5, then move SC down a row. Returns C set,
+\ as Master's DIL2 (DIALS' pitch calculation takes it in)
 \
 \ ******************************************************************************
 
 .DIL2
+ CMP #31
+ BCC P%+4
+ LDA #30
+ STA dsS
+ CLC
+ ADC #2
+ STA dsE
+ JSR DILI
+ LDA DILQ,X
+ CMP #&FF
+ BEQ dl23               \ nothing drawn yet: all of it
+ CMP dsS
+ BEQ dl29               \ unchanged
+ BCC dl21
+ LDY dsS                \ old > new: bytes new DIV 4 to (old + 2) DIV 4
+ BRA dl22
+.dl21
+ TAY                    \ old < new: bytes old DIV 4 to (new + 2) DIV 4
+ LDA dsS
+.dl22
+ CLC
+ ADC #5
+ LSR A
+ LSR A
+ STA dhi
+ TYA
+ LSR A
+ LSR A
+ STA dlo
+ BRA dl24
+.dl23
+ STZ dlo
+ LDA #8
+ STA dhi
+.dl24
+ LDA dsS
+ STA DILQ,X
+ LDY #DCN_MARK
+ LDA #1                 \ lines 1-5
+ STA dl0
+ LDA #5
+ STA dln
+ JSR DSEG
+.dl29
+ INC SC+1
+ INC SC+1
+ SEC
+ RTS
 
- LDY #1                 \ We want to start drawing the vertical indicator bar on
-                        \ the second line in the indicator's character block, so
-                        \ set Y to point to that row's offset
+\ ******************************************************************************
+\
+\       Name: DILI
+\       Type: Subroutine
+\   Category: Dashboard
+\    Summary: Port: the cache index of a dashboard indicator, and the caches
+\       Area: bank 4
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: the CMYK dashboard's (see DIALS)
+\
+\ DILI: X = the cache index of the indicator at SC(1 0): its character row,
+\ plus 8 for the right panel
+\
+\ ******************************************************************************
 
- STA Q                  \ Store the offset of the vertical bar to draw in Q
+.DILI
+ LDA SC+1
+ AND #%00001110
+ LSR A
+ BIT SC
+ BPL P%+4
+ ORA #8
+ TAX
+ RTS
 
-                        \ We are now going to work our way along the indicator
-                        \ on the dashboard, from left to right, working our way
-                        \ along one character block at a time. Y will be used as
-                        \ a pixel row counter to work our way through the
-                        \ character blocks, so each time we draw a character
-                        \ block, we will increment Y by 8 to move on to the next
-                        \ block (as each character block contains 8 rows)
+.DILQ                   \ the length (bars) or position (markers) on screen
+ FOR I%, 0, 15
+  EQUB &FF
+ NEXT
 
-.DLL10
+.DILC                   \ the colour number of the bars on screen
+ FOR I%, 0, 15
+  EQUB &FF
+ NEXT
 
- SEC                    \ Set A = Q - 2, so that A contains the offset of the
- LDA Q                  \ vertical bar from the start of this character block
- SBC #2
+\ ******************************************************************************
+\
+\       Name: DSEG
+\       Type: Subroutine
+\   Category: Dashboard
+\    Summary: Port: draw a segment of a dashboard indicator
+\       Area: bank 4
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: the CMYK dashboard's (see DIALS)
+\
+\ DSEG: draw bytes dlo..dhi-1 of an indicator at SC(1 0): the pixels of the
+\ segment [dsS, dsE) in colour number Y, the rest black, on dln lines from dl0
+\
+\ ******************************************************************************
 
- BCS DLL11              \ If Q >= 2 then the character block we are drawing does
-                        \ not contain the vertical indicator bar, so jump to
-                        \ DLL11 to draw a blank character block
+.DSEG
+ LDA dcolE,Y
+ STA dpE
+ LDA dcolO,Y
+ STA dpO
+ LDA dsE                \ the segment's end: byte deq, pixels der in it
+ LSR A
+ LSR A
+ STA deq
+ LDA dsE
+ AND #3
+ TAX
+ LDA dlmt,X
+ STA der
+ LDA dsS                \ and its start: byte dsq, pixels dsr from it on
+ LSR A
+ LSR A
+ STA dsq
+ LDA dsS
+ AND #3
+ TAX
+ LDA dlmt,X
+ EOR #&FF
+ STA dsr
+ LDX dlo
 
- LDA #&FF               \ Set A to a high number (and &FF is as high as they go)
-
- LDX Q                  \ Set X to the offset of the vertical bar, which we know
-                        \ is within this character block
-
- STA Q                  \ Set Q to a high number (&FF, why not) so we will keep
-                        \ drawing blank characters after this one until we reach
-                        \ the end of the indicator row
-
- LDA CTWOS,X            \ CTWOS is a table of ready-made one-pixel mode 2 bytes,
-                        \ just like the TWOS and TWOS2 tables for mode 1 (see
-                        \ the PIXEL routine for details of how they work). This
-                        \ fetches a mode 2 one-pixel byte with the pixel
-                        \ position at X, so the pixel is at the offset that we
-                        \ want for our vertical bar
-
- AND #WHITE2            \ The two-pixel mode 2 byte in #WHITE2 represents two
-                        \ pixels of colour %0111 (7), which is white in both
-                        \ dashboard palettes. We AND this with A so that we only
-                        \ keep the pixel that matches the position of the
-                        \ vertical bar (i.e. A is acting as a mask on the
-                        \ two-pixel colour byte)
-
- BNE DLL12              \ Jump to DLL12 to skip the code for drawing a blank,
-                        \ and move on to drawing the indicator (this BNE is
-                        \ effectively a JMP as A is always non-zero)
-
-.DLL11
-
-                        \ If we get here then we want to draw a blank for this
-                        \ character block
-
- STA Q                  \ Update Q with the new offset of the vertical bar, so
-                        \ it becomes the offset after the character block we
-                        \ are about to draw
-
- LDA #0                 \ Change the mask so no bits are set, so all of the
-                        \ character blocks we display from now on will be blank
-.DLL12
-
- STA (SC),Y             \ Draw the shape of the mask on pixel row Y of the
-                        \ character block we are processing
-
- INY                    \ Draw the next pixel row, incrementing Y
+.dsg1
+ CPX dhi
+ BCS dsg9
+ LDA #&FF               \ the mask: before the end byte all, at it der, after
+ CPX deq                \ it none
+ BCC dsg3
+ BNE dsg2
+ LDA der
+ BRA dsg3
+.dsg2
+ LDA #0
+.dsg3
+ CPX dsq                \ and before the start byte none, at it only from
+ BCC dsg4               \ pixel dsS AND 3 on (dsr)
+ BNE dsg5
+ AND dsr
+ BRA dsg5
+.dsg4
+ LDA #0
+.dsg5
+ STA dmk
+ AND dpE                \ dme = the even-line byte, dmx = even EOR odd
+ STA dme
+ LDA dmk
+ AND dpO
+ EOR dme
+ STA dmx
+ TXA                    \ Y = 8 * byte + first line
+ ASL A
+ ASL A
+ ASL A
+ ORA dl0
+ TAY
+ STX dsx
+ LDA dl0                \ the first line's byte
+ LSR A
+ LDA dme
+ BCC P%+5
+ EOR dmx
+ LDX dln
+.dsg7
  STA (SC),Y
-
- INY                    \ And draw the third pixel row, incrementing Y
- STA (SC),Y
-
- INY                    \ And draw the fourth pixel row, incrementing Y
- STA (SC),Y
-
- TYA                    \ Add 5 to Y, so Y is now 8 more than when we started
- CLC                    \ this loop iteration, so Y now points to the address
- ADC #5                 \ of the first line of the indicator bar in the next
- TAY                    \ character block (as each character is 8 bytes of
-                        \ screen memory)
-
- CPY #60                \ If Y < 60 then we still have some more character
- BCC DLL10              \ blocks to draw, so loop back to DLL10 to display the
-                        \ next one along
-
- INC SC+1               \ Increment the high byte of SC to point to the next
- INC SC+1               \ character row on-screen (as each row takes up exactly
-                        \ two pages of 256 bytes) - so this sets up SC to point
-                        \ to the next indicator, i.e. the one below the one we
-                        \ just drew
-
- RTS                    \ Return from the subroutine
-
+ EOR dmx                \ the next line's
+ INY
+ DEX
+ BNE dsg7
+ LDX dsx
+ INX
+ BNE dsg1
+.dsg9
+ RTS
 \ ******************************************************************************
 \
 \       Name: ADDK
@@ -16754,9 +16201,8 @@ ENDIF
 
  CLD
  STZ fkn
- LDY #%00000011         \ Stop the auto scan (interrupts off throughout)
- SEI
- STY VIA+&40
+ LDY #%00000011         \ Stop the auto scan (vsync masked throughout, by
+ STY VIA+&40            \ FILLKL)
  LDA #%01111111         \ DDRA: bits 0-6 out to the keyboard
  STA VIA+&43
  LDX #0                 \ Column X = 0 to 12
@@ -16784,8 +16230,10 @@ ENDIF
 
  LDY #%00001011         \ Restart the auto scan
  STY VIA+&40
- CLI
  RTS
+
+
+
 \ ******************************************************************************
 \
 \       Name: TENS
@@ -38725,6 +38173,8 @@ ENDIF
 
 .BEGIN
 
+ JSR T1SYNC             \ Port: start timer 1 in step with vsync for the split
+
  LDX #(DISK-COMC)       \ We start by zeroing all the configuration variables
                         \ between COMC and DISK, to set them to their default
                         \ values, so set a counter in X for DISK - COMC bytes
@@ -48810,6 +48260,16 @@ ENDMACRO
                         \ the keys in those columns: the same keys in the same
                         \ order as before, as no other key can be pressed
 
+ LDA #%00000010         \ Port: mask the vsync interrupt (CA1) in the System
+ STA VIA+&4E            \ VIA's IER until the scan is done at Rd7, rather than
+                        \ disable every interrupt (SEI) in fkdet and Rd1: the
+                        \ vsync handler drives the sound chip through port A
+                        \ and DDRA and reads IRA, which clears CA2's flag, so
+                        \ it must not run during the scan, but the timer 1
+                        \ interrupt at the dashboard split touches none of
+                        \ them and may (a SEI here held it off for up to 540
+                        \ cycles, and the split came late)
+
  JSR fkdet              \ Set fkl(0..fkn-1) = the columns with a key pressed,
                         \ in increasing order (and clear D)
 
@@ -48834,10 +48294,10 @@ ENDMACRO
 .Rd1
 
  LDY #%00000011         \ Set Y to %00000011, so it's ready to send to SHEILA
-                        \ once interrupts have been disabled
 
- SEI                    \ Disable interrupts so we can scan the keyboard
-                        \ without being hijacked
+                        \ Port: no SEI here, as FILLKL masks the vsync
+                        \ interrupt for the whole scan, so we can scan the
+                        \ keyboard without being hijacked
 
  STY VIA+&40            \ Set 6522 System VIA output register ORB (SHEILA &40)
                         \ to %00000011 to stop auto scan of keyboard
@@ -48859,8 +48319,6 @@ ENDMACRO
                         \ to %00001011 to restart auto scan of keyboard (this
                         \ doesn't affect the N flag)
 
- CLI                    \ Allow interrupts again
-
  BMI Rd2                \ If the key was pressed then N is set, so jump to Rd2
 
 .Rd3
@@ -48879,6 +48337,9 @@ ENDMACRO
 .Rd7
 
                         \ If we get here then we have scanned every key
+
+ LDA #%10000010         \ Port: unmask the vsync interrupt again (a vsync
+ STA VIA+&4E            \ that came during the scan is taken now)
 
  CLD                    \ Clear the D flag to return to binary mode (for cases
                         \ where this routine is called in BCD mode)
@@ -48966,6 +48427,7 @@ ENDMACRO
  BCC Rd3                \ Jump back to Rd3 to continue scanning for more keys
                         \ (this BCC is effectively a JMP as the C flag is clear
                         \ on both paths here)
+
 \ ******************************************************************************
 \
 \       Name: CTRL

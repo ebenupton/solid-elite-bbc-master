@@ -27,16 +27,15 @@
 # a build whose drawing code differs from the original's. "screen" also
 # compares the screen (shadow RAM &4000-&7DFF) at every iteration, for a build
 # that draws exactly as the original does. The default is the port's current
-# state ("loose screen": the port's arithmetic leaves some temporaries that
-# the drawing code shares differently, U for one, though nothing reads them
-# before writing them again; the screen is still the original's);
+# state ("loose": the CMYK dashboard draws differently from Master's, so the
+# drawing temporaries and the screen are no longer the original's);
 # MODE="..." in the environment overrides it.
 #
 # Prints PASS/FAIL per step, then "VERIFY PASS <ref it/s> <cand it/s> <ratio>
 # <cycles>" or "VERIFY FAIL <step>"; exit status 0 only on PASS. Logs go to
 # 6-harness/work/verify/. 10000 iterations take about 5 minutes (the
 # reference run is cached after the first).
-MODE=${MODE:-loose screen}
+MODE=${MODE:-loose}
 set -u
 cd "$(dirname "$0")/.." || exit 1
 ITERS=${1:-10000}

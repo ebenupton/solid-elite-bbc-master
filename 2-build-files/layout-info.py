@@ -11,12 +11,15 @@
 #
 #   * 3-assembled-output/banks.txt: each label of code in sideways RAM, with
 #     the ROMSEL value of its bank in hex (4: Elite's home bank, 7: the cold
-#     area), for the harness (6-harness/mlib.mjs) and bankcheck.py
+#     area; with the filled renderer, 5: the rasteriser, 85: its polygon
+#     window in ANDY, 6: the frame layer), for the harness
+#     (6-harness/mlib.mjs) and bankcheck.py
 #
 #   * 3-assembled-output/game-addresses.asm: the addresses and lengths that
 #     the loader (elite-loader.asm) needs from the game: the entry point S%
 #     and its bank, where BCODE loads, the HAZEL image, DFSST and the cold
-#     area's length
+#     area's length (and with the renderer, the lengths of its images and
+#     G_INIT)
 #
 #   * 3-assembled-output/images.txt: where the loader puts each image, for
 #     the harness (6-harness/mboot.mjs): file, ROMSEL (hex) or main, shadow
@@ -44,7 +47,13 @@ def labels(path):
 # and the main code's run where it continues into bank 4 (its labels at
 # &8000-&BFFF)
 
-BANKED = [(OUT + "elite-source-bank4.asm", "4"), (OUT + "elite-source-cold.asm", "7")]
+BANKED = [(OUT + "elite-source-bank4.asm", "4"), (OUT + "elite-source-cold.asm", "7"),
+          (OUT + "dashtab-scan.asm", "4"), (OUT + "dashtab-dot.asm", "4"), (OUT + "dashtab-spbt.asm", "4"),
+          (OUT + "dashtab-ecbt.asm", "4"), (OUT + "dashtab-msbar.asm", "4"),
+          (SRC + "gfx-raster.asm", "5"), (SRC + "gfx-raster_disc.asm", "5"), (SRC + "gfx-raster_poly.asm", "85"),
+          (SRC + "gfx-raster_line.asm", "85"), (SRC + "gfx-raster_lcold.asm", "5"),
+          (SRC + "gfx-flare.asm", "5"), (SRC + "gfx-frame.asm", "6"), (SRC + "gfx-flare6.asm", "6"),
+          (SRC + "gfx-hangar.asm", "6"), (SRC + "gfx-faces.asm", "6"), (SRC + "gfx-frame_cold.asm", "6")]
 
 with open(OUT + "banks.txt", "w") as f:
     for path, bank in BANKED:
@@ -74,11 +83,21 @@ with open(OUT + "game-addresses.asm", "w") as f:
     f.write(" DFSST = &%04X\n" % sy["DFSST"])
     f.write(" C7LEN = &%04X\n" % (sy["COLD_END%"] - 0x8000))
     f.write(" HILEN = &1000\n")
+    if "B5_END" in sy:
+        f.write(" B5LEN = &%04X\n" % (sy["B5_END"] - 0x8000))
+        f.write(" RALEN = &%04X\n" % (sy["RA_END"] - 0x8000))
+    if "B6_END" in sy:
+        f.write(" B6LEN = &%04X\n" % (sy["B6_END"] - 0x8000))
+        f.write(" GINIT = &%04X\n" % sy["G_INIT"])
 
 # The images the loader installs
 
 with open(OUT + "images.txt", "w") as f:
-    for img, rs, at, v in (("BANK4.bin", "4", 0x8000, "v"), ("COLD7.bin", "7", 0x8000, ""),
-                           ("HAZEL.bin", "hazel", sy["HZ_START"], "v"),
-                           ("HICODE.bin", "main", 0x7000, "v")):
+    images = [("BANK4.bin", "4", 0x8000, "v"), ("COLD7.bin", "7", 0x8000, "")]
+    if "B5_END" in sy:
+        images += [("BANK5.bin", "5", 0x8000, "v"), ("RASTA.bin", "85", 0x8000, "v")]
+    if "B6_END" in sy:
+        images += [("BANK6.bin", "6", 0x8000, "v")]
+    images += [("HAZEL.bin", "hazel", sy["HZ_START"], "v"), ("HICODE.bin", "main", 0x7000, "v")]
+    for img, rs, at, v in images:
         f.write("%s %s %04X %s\n" % (img, rs, at, v))

@@ -51,6 +51,10 @@ PYTHON?=python
 #
 # The build (docs/memory-map.md):
 #
+#   * 2-build-files/dashboard.py draws the CMYK dashboard image (DIALS1.bin,
+#     which elite-data.asm includes as BDATA) and writes the tables that the
+#     dashboard's routines include (dashtab-*.asm), into 3-assembled-output
+#
 #   * 2-build-files/streams.py writes a copy of elite-source.asm for each of
 #     the port's areas (the run, the low area, bank 4, the cold area) and of
 #     elite-data.asm (the hot data, the cold data, the dashboard image), each
@@ -84,6 +88,7 @@ all:
 	echo _REMOVE_CHECKSUMS=TRUE >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MATCH_ORIGINAL_BINARIES=$(match-original-binaries) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
+	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
 	$(PYTHON) 2-build-files/streams.py > 3-assembled-output/compile.txt
 	$(BEEBASM) -i 3-assembled-output/elite-data-bdata.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -v >> 3-assembled-output/compile.txt

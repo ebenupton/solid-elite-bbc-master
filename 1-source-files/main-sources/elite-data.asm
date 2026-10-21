@@ -89,7 +89,10 @@
 
 .DIALS
 
- INCBIN "1-source-files/images/P.DIALS2P.bin"
+ INCBIN "3-assembled-output/DIALS1.bin"      \ Port: the MODE 1 CMYK dashboard image (3584
+                                \ bytes, 2-build-files/dashboard.py), in place
+                                \ of Master's mode 2 P.DIALS2P.bin (the same
+                                \ size)
 
  SKIP 256               \ These bytes appear to be unused, but they get moved to
                         \ &7E00-&7EFF along with the dashboard

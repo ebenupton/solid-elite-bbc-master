@@ -54,7 +54,7 @@
 
  LOAD% = &0E00          \ The address where the code will be loaded
 
- N% = 67                \ N% is set to the number of bytes in the VDU table, so
+ N% = 67 + 18           \ N% is set to the number of bytes in the VDU table, so
                         \ we can loop through them below
 
  INCLUDE "3-assembled-output/game-addresses.asm"     \ Port: S%, the main entry point in
@@ -191,6 +191,10 @@ ENDIF
 
  EQUB 22, 129           \ Switch to screen mode 129
 
+ EQUB 19, 1, 6, 0, 0, 0 \ Port: the CMYK palette, for the whole screen (the IRQ
+ EQUB 19, 2, 5, 0, 0, 0 \ no longer changes the mode or the palette): logical
+ EQUB 19, 3, 3, 0, 0, 0 \ colours 1, 2, 3 = cyan, magenta, yellow (0 = black)
+
  EQUB 28                \ Define a text window as follows:
  EQUB 2, 17, 15, 16     \
                         \   * Left = 2
@@ -293,8 +297,8 @@ ENDIF
 
 .ENTRY
 
- ASSERT ENTRY = &0E43   \ Port: the execution address that elite-disc.asm gives
-                        \ M128Elt
+ ASSERT ENTRY = &0E55   \ Port: the execution address that elite-disc.asm gives
+                        \ M128Elt (the CMYK palette made B% 18 bytes longer)
 
  JSR CHKRAM             \ Port: first of all, check that sideways RAM banks 4
                         \ to 7, which the port's memory map uses, are all
@@ -749,7 +753,8 @@ ENDIF
 
 .FTAB
 
- EQUW MESS1             \ BDATA: the dashboard image, to shadow RAM &7000-&7DFF
+ EQUW MESS1             \ BDATA: the dashboard image (Port: the MODE 1 CMYK one),
+                        \ to shadow RAM &7000-&7DFF
  EQUB HOMEBANK, %00001111
  EQUW &7000, &0E00
 

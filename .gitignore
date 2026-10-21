@@ -30,3 +30,6 @@ run.bat
 3-assembled-output/game-addresses.asm
 3-assembled-output/banks.txt
 3-assembled-output/images.txt
+2-build-files/__pycache__/
+3-assembled-output/dashtab-*.asm
+3-assembled-output/*.png
