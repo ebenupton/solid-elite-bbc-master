@@ -14384,76 +14384,68 @@ ENDIF
 
 .BLINE
 
- TXA                    \ Set K6(3 2) = (T X) + K4(1 0)
- ADC K4                 \             = y-coord of centre + y-coord of new point
- STA K6+2               \
- LDA K4+1               \ so K6(3 2) now contains the y-coordinate of the new
- ADC T                  \ point on the circle but as a screen coordinate, to go
- STA K6+3               \ along with the screen x-coordinate in K6(1 0)
+                        \ Port: the demo port's BLINE (e9770fa w_0047, bebd95c,
+                        \ f50a805 w_0045): the new point's y goes straight
+                        \ into K5(3 2) (for the next call) and XX12, after the
+                        \ previous point's y is copied to XX15(3 2) for LL145;
+                        \ the new
+                        \ point's x is copied K6 -> K5 and XX15(5 4) in one
+                        \ go, so BL7 no longer copies K6 to K5 (K6(3 2) is no
+                        \ longer written: nothing else reads it)
 
- LDA FLAG               \ If FLAG = 0, jump down to BL1
- BEQ BL1
+ LDA K5+2               \ Set XX15(3 2) = K5(3 2) = y of the previous point
+ STA XX15+2             \ (the LDAs and STAs leave C for the ADC below)
+ LDA K5+3
+ STA XX15+3
+
+ TXA                    \ Set K5(3 2) = XX12(1 0) = (T X) + K4(1 0)
+ ADC K4                 \   = y-coord of centre + y-coord of new point
+ STA XX12               \ (XX12 for LL145, as recording the point keeps it)
+ STA K5+2
+ LDA K4+1
+ ADC T
+ STA XX12+1
+ STA K5+3
+
+ LDA K5                 \ Set XX15(1 0) = K5(1 0) = x of the previous point
+ STA XX15
+ LDA K5+1
+ STA XX15+1
+
+ LDA K6                 \ Set K5(1 0) = XX15(5 4) = K6(1 0) = x of the new
+ STA K5                 \ point, leaving x_hi in A for CLIP2
+ STA XX15+4
+ LDA K6+1
+ STA K5+1
+ STA XX15+5
+
+ BIT FLAG               \ If FLAG = 0, jump down to BL1 (FLAG is only ever 0
+ BPL BL1                \ or &FF; BIT keeps A = x_hi)
 
  INC FLAG               \ Flag is &FF so this is the first call to BLINE, so
-                        \ increment FLAG to set it to 0, as then the next time
-                        \ we call BLINE it can draw the first line, from this
-                        \ point to the next
+                        \ increment it to set it to 0
 
 .BL5
 
-                        \ The following inserts a &FF marker into the LSY2 line
-                        \ heap to indicate that the next call to BLINE should
-                        \ store both the (X1, Y1) and (X2, Y2) points. We do
-                        \ this on the very first call to BLINE (when FLAG is
-                        \ &FF), and on subsequent calls if the segment does not
-                        \ fit on-screen, in which case we don't draw or store
-                        \ that segment, and we start a new segment with the next
-                        \ call to BLINE that does fit on-screen
-
  LDY LSP                \ If byte LSP-1 of LSY2 = &FF, jump to BL7 to tidy up
- LDA #&FF               \ and return from the subroutine, as the point that has
- CMP LSY2-1,Y           \ been passed to BLINE is the start of a segment, so all
- BEQ BL7                \ we need to do is save the coordinate in K5, without
-                        \ moving the pointer in LSP
+ LDA #&FF               \ and return from the subroutine
+ CMP LSY2-1,Y
+ CLC                    \ Port: clear C for the CNT addition at BL7 (keeps Z)
+ BEQ BL7
 
- STA LSY2,Y             \ Otherwise we just tried to plot a segment but it
-                        \ didn't fit on-screen, so put the &FF marker into the
-                        \ heap for this point, so the next call to BLINE starts
-                        \ a new segment
+ STA LSY2,Y             \ Otherwise put a &FF marker at the end of the heap
 
  INC LSP                \ Increment LSP to point to the next point in the heap
 
  BNE BL7                \ Jump to BL7 to tidy up and return from the subroutine
-                        \ (this BNE is effectively a JMP, as LSP will never be
-                        \ zero)
+                        \ (this BNE is effectively a JMP, as LSP never wraps)
 
 .BL1
 
- LDA K5                 \ Set XX15 = K5 = x_lo of previous point
- STA XX15
+ STZ SWAP               \ Set SWAP = 0 and enter at CLIP2 with A = x2_hi, which
+                        \ is what LL145 does itself (LDA #0, STA SWAP, LDA XX15+5)
 
- LDA K5+1               \ Set XX15+1 = K5+1 = x_hi of previous point
- STA XX15+1
-
- LDA K5+2               \ Set XX15+2 = K5+2 = y_lo of previous point
- STA XX15+2
-
- LDA K5+3               \ Set XX15+3 = K5+3 = y_hi of previous point
- STA XX15+3
-
- LDA K6                 \ Set XX15+4 = x_lo of new point
- STA XX15+4
-
- LDA K6+1               \ Set XX15+5 = x_hi of new point
- STA XX15+5
-
- LDA K6+2               \ Set XX12 = y_lo of new point
- STA XX12
-
- LDA K6+3               \ Set XX12+1 = y_hi of new point
- STA XX12+1
-
- JSR LL145              \ Call LL145 to see if the new line segment needs to be
+ JSR CLIP2              \ Call LL145 to see if the new line segment needs to be
                         \ clipped to fit on-screen, returning the clipped line's
                         \ end-points in (X1, Y1) and (X2, Y2)
 
@@ -14462,24 +14454,18 @@ ENDIF
                         \ storing this line
 
  LDA SWAP               \ If SWAP = 0, then we didn't have to swap the line
- BEQ BL9                \ coordinates around during the clipping process, so
-                        \ jump to BL9 to skip the following swap
-
- LDA X1                 \ Otherwise the coordinates were swapped by the call to
- LDY X2                 \ LL145 above, so we swap (X1, Y1) and (X2, Y2) back
- STA X2                 \ again
- STY X1
- LDA Y1
- LDY Y2
- STA Y2
- STY Y1
+ BNE BL12               \ coordinates around during the clipping process, so
+                        \ fall through to BL9; otherwise jump to BL12 to swap
+                        \ them back (Port: the rare swap is out of line, so the
+                        \ common case is an untaken branch)
 
 .BL9
 
  LDY LSP                \ Set Y = LSP
 
  LDA LSY2-1,Y           \ If byte LSP-1 of LSY2 is not &FF, jump down to BL8
- CMP #&FF               \ to skip the following (X1, Y1) code
+ INC A                  \ to skip the following (X1, Y1) code (Port: INC A,
+                        \ which keeps C clear from CLIP2 for BL7)
  BNE BL8
 
                         \ Byte LSP-1 of LSY2 is &FF, which indicates that we
@@ -14507,6 +14493,8 @@ ENDIF
 
  JSR LOIN               \ Draw a line from (X1, Y1) to (X2, Y2)
 
+ CLC                    \ Port: clear C for BL7
+
  LDA XX13               \ If XX13 is non-zero, jump up to BL5 to add a &FF
  BNE BL5                \ marker to the end of the line heap. XX13 is non-zero
                         \ after the call to the clipping routine LL145 above if
@@ -14517,22 +14505,24 @@ ENDIF
 
 .BL7
 
- LDA K6                 \ Copy the data for this step point from K6(3 2 1 0)
- STA K5                 \ into K5(3 2 1 0), for use in the next call to BLINE:
- LDA K6+1               \
- STA K5+1               \   * K5(1 0) = screen x-coordinate of this point
- LDA K6+2               \
- STA K5+2               \   * K5(3 2) = screen y-coordinate of this point
- LDA K6+3               \
- STA K5+3               \ They now become the "previous point" in the next call
-
- LDA CNT                \ Set CNT = CNT + STP
- CLC
- ADC STP
+ LDA CNT                \ Set CNT = CNT + STP (Port: C is clear on every path
+ ADC STP                \ here, and K5 already holds this point)
  STA CNT
 
  RTS                    \ Return from the subroutine
 
+.BL12
+
+ LDA X1                 \ The coordinates were swapped by the call to
+ LDY X2                 \ LL145 above, so we swap (X1, Y1) and (X2, Y2) back
+ STA X2                 \ again
+ STY X1
+ LDA Y1
+ LDY Y2
+ STA Y2
+ STY Y1
+
+ BRA BL9                \ Rejoin the main path at BL9
 \ ******************************************************************************
 \
 \       Name: FLIP
