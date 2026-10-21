@@ -21168,99 +21168,72 @@ ENDIF
 
 .MULTS
 
- TAX                    \ Set X = A, so now we can calculate P * X instead of
-                        \ P * A to get our result, and we can use the algorithm
-                        \ from MU11 to do that, just unrolled (as MU11 returns
-                        \ P * X)
+                        \ Port: the product by quarter squares (the tables QSL
+                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ results: (A P) = |A| * (P AND 31) with A's sign (the
+                        \ shift-and-add only used bits 0-4 of P), Y kept (T,
+                        \ T1, X, C, N, Z and V are left differently, but every
+                        \ caller goes on to ADD, MULT1 or MAD, which rewrite
+                        \ T and T1 before reading them, and none reads X or
+                        \ the flags)
 
- AND #%10000000         \ Set T to the sign bit of A
- STA T
+ STA T                  \ Set T = A, so bit 7 of T is the sign of A
 
- TXA                    \ Set A = |A|
- AND #%01111111
+ AND #%01111111         \ Set A = |A|
 
  BEQ MU6                \ If A = 0, jump to MU6 to set P(1 0) = 0 and return
-                        \ from the subroutine using a tail call
 
- TAX                    \ Set T1 = X - 1
- DEX                    \
- STX T1                 \ We subtract 1 as the C flag will be set when we want
-                        \ to do an addition in the loop below
+ PHY                    \ Keep Y
 
- LDA #0                 \ Set A = 0 so we can start building the answer in A
+ TAY                    \ Set Y = |A| (Y is free, as it is saved on the stack)
 
- LSR P                  \ Set P = P >> 1
-                        \ and C flag = bit 0 of P
+ TXA                    \ Set P = b = X AND 31 (X holds the multiplier on
+                        \ entry, so P is never read before this store, and
+                        \ STL1 calls MULTS directly with X = BET1)
+ AND #31
+ STA P
 
-                        \ We are now going to work our way through the bits of
-                        \ P, and do a shift-add for any bits that are set,
-                        \ keeping the running total in A, but instead of using a
-                        \ loop like MU11, we just unroll it, starting with bit 0
+ TYA                    \ Set X = |A| + b (< 256, so C ends up clear), so
+ CLC                    \ QSL,X is QS(b + |A|)
+ ADC P
+ TAX
 
- BCC P%+4               \ If C (i.e. the next bit from P) is set, do the
- ADC T1                 \ addition for this bit of P:
-                        \
-                        \   A = A + T1 + C
-                        \     = A + X - 1 + 1
-                        \     = A + X
+ TYA                    \ Set A = |A| - b - 1 (C clear), with C set if
+ SBC P                  \ |A| >= b + 1
+ BCC mlt4               \ If |A| < b + 1 (rare), jump to mlt4
 
- ROR A                  \ Shift A right to catch the next digit of our result,
-                        \ which the next ROR sticks into the left end of P while
-                        \ also extracting the next bit of P
+.mlt1
 
- ROR P                  \ Add the overspill from shifting A to the right onto
-                        \ the start of P, and shift P right to fetch the next
-                        \ bit for the calculation into the C flag
+ TAY                    \ Y = |A| - b - 1, so QSL+1,Y is QS(|A| - b)
 
- BCC P%+4               \ Repeat the shift-and-add loop for bit 1
- ADC T1
- ROR A
- ROR P
+ LDA QSL,X              \ Set (A P) = (b + |A|)^2 / 4 - (b - |A|)^2 / 4
+ SBC QSL+1,Y            \           = b * |A|  (C is set on both entries)
+ STA P
+ LDA QSH,X
+ SBC QSH+1,Y
 
- BCC P%+4               \ Repeat the shift-and-add loop for bit 2
- ADC T1
- ROR A
- ROR P
+.mlt5
 
- BCC P%+4               \ Repeat the shift-and-add loop for bit 3
- ADC T1
- ROR A
- ROR P
+ PLY                    \ Restore Y
 
- BCC P%+4               \ Repeat the shift-and-add loop for bit 4
- ADC T1
- ROR A
- ROR P
+ BIT T                  \ Give A the sign bit of the original argument A that
+ BPL mlt6               \ we stored in T (the high byte is < 16, so bit 7 is
+ ORA #%10000000         \ clear before this)
 
- LSR A                  \ Just do the "shift" part for bit 5
- ROR P
-
- LSR A                  \ Just do the "shift" part for bit 6
- ROR P
-
- LSR A                  \ Just do the "shift" part for bit 7
- ROR P
-
- ORA T                  \ Give A the sign bit of the original argument A that
-                        \ we put into T above
+.mlt6
 
  RTS                    \ Return from the subroutine
 
-\ ******************************************************************************
-\
-\       Name: MU6
-\       Type: Subroutine
-\   Category: Maths (Arithmetic)
-\    Summary: Set P(1 0) = (A A)
-\
-\ ------------------------------------------------------------------------------
-\
-\ In practice this is only called via a BEQ following an AND instruction, in
-\ which case A = 0, so this routine effectively does this:
-\
-\   P(1 0) = 0
-\
-\ ******************************************************************************
+.mlt4
+
+ EOR #&FF               \ A = |A| - b - 1 (-32..-1) so this is b - |A|, and
+ SBC #0                 \ with C clear A = b - |A| - 1; if b >= |A| + 1 this is
+ BPL mlt1               \ >= 0 with C set, the QSL+1,Y index of QS(b - |A|)
+
+ LDA QSL,X              \ b = |A|, so QS(b - |A|) = 0 and
+ STA P                  \ (A P) = QS(b + |A|)
+ LDA QSH,X
+ BRA mlt5
 
 .MU6
 
