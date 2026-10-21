@@ -22550,6 +22550,54 @@ ENDIF
 
 \ ******************************************************************************
 \
+\       Name: DVL9a
+\       Type: Subroutine
+\   Category: Maths (Arithmetic)
+\    Summary: Port: DVID3B2's rare paths, out of line (DVL9a, DVL9b, DV14z)
+\
+\ ******************************************************************************
+
+.DVL9a
+
+                        \ Here A = 0 and Y = 0 (&F9 with the -7 bias). If
+                        \ P+1 < 128, the DVL9 loop would shift exactly eight
+                        \ times (A stays below 64 until the eighth shift), so
+                        \ do it as a byte move, (A P+1 P) = (P+1 P 0) with
+                        \ Y = 8 (1 with the bias), and carry on
+
+ LDY P+1                \ If bit 7 of P+1 is set, jump to DVL9b to run the
+ BMI DVL9b              \ bitwise loop from A = 0
+
+ LDA P                  \ Set (A P+1) = (P+1 P OR 1), making sure the
+ ORA #1                 \ numerator is at least 1 (grind: only this path can
+ STA P+1                \ shift bits of P into A, so the OR is done here rather
+ TYA                    \ than on every call)
+
+ LDY #1                 \ Count the eight shifts in Y (grind: Y is biased by -7
+                        \ throughout, see DVID3B)
+
+ BRA DVL9               \ Carry on shifting bit by bit
+
+.DVL9b
+
+ LDY #&F9               \ Set A = 0 and Y = 0 - 7 (biased) and run the bitwise
+ LDA #0                 \ loop (A < 64, so skip the test at DVL9)
+ BRA DVL9l
+
+.DV14z
+
+                        \ Port: if we get here then |S| = 0 and R >= 128, so the
+                        \ loop below would shift (A R Q) left exactly 8 times,
+                        \ leaving A = R (which it already is), so we just need
+                        \ to decrement the scale factor in Y by 8
+
+ DEY                    \ Grind: Y already carries -7 from the bias set at
+                        \ DVID3B, so one more DEY makes -8
+
+ BRA DV9
+
+\ ******************************************************************************
+\
 \       Name: DVID3B2
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
@@ -22587,11 +22635,12 @@ ENDIF
 
 .DVID3B2
 
- STA P+2                \ Set P+2 = A
+ TAY                    \ Set Y = A, the sign and top byte of the numerator
+                        \ (Y is reset to 0 below)
 
- LDA INWK+6             \ Set Q = z_lo, making sure Q is at least 1
- ORA #1
- STA Q
+ EOR INWK+8             \ Set T to the sign of A * z_sign (i.e. the sign of the
+ AND #%10000000         \ result) and store it in T
+ STA T
 
  LDA INWK+7             \ Set R = z_hi
  STA R
@@ -22604,24 +22653,18 @@ ENDIF
                         \ Given the above assignments, we now want to calculate
                         \ the following to get the result we want:
                         \
-                        \   K(3 2 1 0) = P(2 1 0) / (S R Q)
-
- LDA P                  \ Make sure P(2 1 0) is at least 1
- ORA #1
- STA P
-
- LDA P+2                \ Set T to the sign of P+2 * S (i.e. the sign of the
- EOR S                  \ result) and store it in T
- AND #%10000000
- STA T
-
- LDY #0                 \ Set Y = 0 to store the scale factor
-
- LDA P+2                \ Clear the sign bit of P+2, so the division can be done
- AND #%01111111         \ with positive numbers and we'll set the correct sign
-                        \ below, once all the maths is done
+                        \   K(3 2 1 0) = (Y P+1 P) / (S R Q)
                         \
-                        \ This also leaves A = P+2, which we use below
+                        \ (grind: Q = z_lo OR 1 is only set below, on the one
+                        \ path that reads it before DV9 overwrites it)
+
+ TYA                    \ Set A = |Y|, clearing the sign bit so the division
+ LDY #&F9               \ can be done with positive numbers, and set Y = -7 to
+ AND #%01111111         \ store the scale factor (grind: biased by -7, which
+                        \ pays for DVL6a's -7 and seven of DV14z's eight DEYs,
+                        \ as every path to DV9 passes through one of them)
+
+ BEQ DVL9a              \ If A = 0, jump to DVL9a to try a whole-byte shift
 
 .DVL9
 
@@ -22635,14 +22678,16 @@ ENDIF
  CMP #64                \ If A >= 64, jump down to DV14
  BCS DV14
 
- ASL P                  \ Shift (A P+1 P) to the left
- ROL P+1
- ROL A
+.DVL9l
+
+ ASL P+1                \ Shift (A P+1) to the left (grind: at most 7 shifts
+ ROL A                  \ here, or up to 14 after DVL9a's byte move, so no bit
+                        \ of P can reach A, and P(1 0) is not used afterwards)
 
  INY                    \ Increment the scale factor in Y
 
- BNE DVL9               \ Loop up to DVL9 (this BNE is effectively a JMP, as Y
-                        \ will never be zero)
+ CMP #64                \ Loop back to DVL9l until A >= 64, then fall through
+ BCC DVL9l              \ into DV14 with the C flag set
 
 .DV14
 
@@ -22656,7 +22701,19 @@ ENDIF
  LDA S                  \ Set A = |S|
  AND #%01111111
 
-\BMI DV9                \ This label is commented out in the original source
+ BNE DVL6a              \ Port: if |S| <> 0 then at most 7 shifts are needed,
+                        \ and in that many shifts no bit of Q can reach A (and
+                        \ R and Q are overwritten at DV9), so jump to DVL6a to
+                        \ shift just (A R)
+
+ ORA R                  \ |S| = 0, so set A = R, and if R >= 128 jump to DV14z
+ BMI DV14z              \ to do the 8 shifts in one go
+
+ LDA INWK+6             \ Set Q = z_lo, making sure Q is at least 1 (grind:
+ ORA #1                 \ only this full shift reads Q before DV9 sets it, so
+ STA Q                  \ it is set here rather than on every call)
+
+ LDA #0                 \ Otherwise restore A = |S| = 0 for the full shift
 
 .DVL6
 
@@ -22677,8 +22734,40 @@ ENDIF
  ROL R
  ROL A
 
- BPL DVL6               \ Loop up to DVL6 to do another shift, until bit 7 of A
-                        \ is set and we can't shift left any further
+ BEQ DVL6               \ Port: loop while A is still zero (grind: ROL A of 0
+                        \ gives 0 or 1, so A is now 1 and bit 7 is never set)
+
+                        \ Otherwise A is now 1-127, so at most 7 more shifts are
+                        \ needed and the bits of R already hold everything that
+                        \ can reach A, so fall into DVL6a to shift just (A R)
+
+.DVL6a
+
+                        \ Port: A = 1-127 has k significant bits (k = 1-7), so
+                        \ shifting (A R) left until bit 7 of A is set takes
+                        \ 8-k shifts and leaves A = the low byte of (A R) >> k;
+                        \ k is small here (usually 1 or 2), so we shift (A R)
+                        \ right k times instead, doing Y = Y - (8 - k) as
+                        \ Y - 7 and then k - 1 increments
+                        \
+                        \ (grind: the -7 is already in Y from the bias set at
+                        \ DVID3B)
+
+ LSR A                  \ Shift (A R) right, stopping when A becomes zero (with
+ BEQ DVL6c              \ C = 1, as A was 1) before shifting R
+
+.DVL6b
+
+ ROR R
+ INY
+ LSR A
+ BNE DVL6b
+
+.DVL6c
+
+ LDA R                  \ Finish the last shift with A = R >> 1, setting bit 7
+ ROR A                  \ from the C flag (which is 1); R and Q are overwritten
+                        \ at DV9
 
 .DV9
 
@@ -22695,34 +22784,34 @@ ENDIF
 
  LDA P+2                \ Set A to the highest byte of the numerator
 
-.LL31new
+ ASL A                  \ Grind: P+2 is 64-127, so the first shift never
+                        \ sets C and we can go straight to the compare
 
- ASL A                  \ This contains the code from the LL31 routine, so
- BCS LL29new            \ this section is exactly equivalent to a JSR LL31
- CMP Q                  \ call, but is slightly faster as it's been inlined,
- BCC P%+4               \ so it calculates:
- SBC Q                  \
- ROL R                  \   R = 256 * A / Q
- BCS LL31new            \     = 256 * numerator / denominator
- JMP LL312new
+.LL31b
 
-.LL29new
+ CMP Q                  \ This contains the code from the LL31 routine, so
+ BCC P%+4               \ this section is exactly equivalent to a JSR LL31
+ SBC Q                  \ call, but is faster as it's been inlined, so it
+ ROL R                  \ calculates:
+ BCC LL312new           \
+                        \   R = 256 * A / Q
+.LL31new                \     = 256 * numerator / denominator
+
+ ASL A                  \ Shift the next bit and loop back to the compare if
+ BCC LL31b              \ no bit fell out of A
 
  SBC Q                  \ This is also part of the inline LL31 routine
  SEC
  ROL R
  BCS LL31new
- LDA R
 
 .LL312new
 
                         \ The result of our division is now in R, so we just
                         \ need to shift it back by the scale factor in Y
 
- LDA #0                 \ Set K(3 2 1) = 0 to hold the result (we populate K
- STA K+1                \ next)
- STA K+2
- STA K+3
+ STZ K+1                \ Set K(2 1) = 0 to hold the result (we populate K
+ STZ K+2                \ next; K+3 is set by every path below)
 
  TYA                    \ If Y is positive, jump to DV12
  BPL DV12
@@ -22730,6 +22819,8 @@ ENDIF
                         \ If we get here then Y is negative, so we need to shift
                         \ the result R to the left by Y places, and then set the
                         \ correct sign for the result
+
+ STZ K+3                \ Set K+3 = 0 for the shift below
 
  LDA R                  \ Set A = R
 
