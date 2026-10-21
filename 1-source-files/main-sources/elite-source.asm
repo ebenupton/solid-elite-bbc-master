@@ -21835,129 +21835,58 @@ ENDIF
 
 .MULT1
 
+                        \ Port: the product by quarter squares (the tables QSL
+                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ results: (A P) = |A| * |Q| with the sign of A EOR Q,
+                        \ T = the sign, Y kept; |Q| = 0: A = P = 0, X = the
+                        \ argument A, C = its bit 0, Z set; else X = 0, T1 =
+                        \ |Q| - 1, C clear, N and Z from A
+
  TAX                    \ Store A in X
 
- AND #%01111111         \ Set P = |A| >> 1
- LSR A                  \ and C flag = bit 0 of A
- STA P
-
- TXA                    \ Restore argument A
-
- EOR Q                  \ Set bit 7 of A and T if Q and A have different signs,
- AND #%10000000         \ clear bit 7 if they have the same signs, 0 all other
- STA T                  \ bits, i.e. T contains the sign bit of Q * A
+ EOR Q                  \ Set T to the sign bit of Q * A
+ AND #%10000000
+ STA T
 
  LDA Q                  \ Set A = |Q|
  AND #%01111111
 
- BEQ mu10               \ If |Q| = 0 jump to mu10 (with A set to 0)
+ BEQ mu10               \ If |Q| = 0 jump to mu10
 
- TAX                    \ Set T1 = |Q| - 1
- DEX                    \
- STX T1                 \ We subtract 1 as the C flag will be set when we want
-                        \ to do an addition in the loop below
+ PHY                    \ Keep Y
 
-                        \ We are now going to work our way through the bits of
-                        \ P, and do a shift-add for any bits that are set,
-                        \ keeping the running total in A. We already set up
-                        \ the first shift at the start of this routine, as
-                        \ P = |A| >> 1 and C = bit 0 of A, so we now need to set
-                        \ up a loop to sift through the other 7 bits in P
+ DEC A                  \ Set T1 = |Q| - 1
+ STA T1
 
- LDA #0                 \ Set A = 0 so we can start building the answer in A
+ TXA                    \ Set Y = |A| (Y is free, as it is saved on the stack)
+ AND #%01111111
+ TAY
 
- TAX                    \ Copy A into X. There is a comment in the original
-                        \ source here that says "just in case", which refers to
-                        \ the MULT1 routine in the BBC Micro cassette and disc
-                        \ versions, which set X to 0 (as they use X as a loop
-                        \ counter)
-                        \
-                        \ The version here doesn't use a loop, but this
-                        \ instruction makes sure the unrolled version returns
-                        \ the same results as the loop versions, just in case
-                        \ something out there relies on MULT1 returning X = 0
-
-\.MUL4                  \ These instructions are commented out in the original
-\                       \ source. They contain the original loop version of the
-\BCC P%+4               \ code that's used in the BBC Micro cassette and disc
-\ADC T1                 \ versions
-\
-\ROR A
-\ROR P
-\
-\DEX
-\
-\BNE MUL4
-\
-\LSR A
-\ROR P
-\
-\ORA T
-\
-\RTS
-\
-\.mu10
-\
-\STA P
-\
-\RTS
-
-                        \ We now repeat the following four instruction block
-                        \ seven times, one for each remaining bit in P. In the
-                        \ BBC Micro cassette and disc versions of Elite the
-                        \ following is done with a loop, but it is marginally
-                        \ faster to unroll the loop and have seven copies of
-                        \ the code, though it does take up a bit more memory
-
- BCC P%+4               \ If C (i.e. the next bit from P) is set, do the
- ADC T1                 \ addition for this bit of P:
-                        \
-                        \   A = A + T1 + C
-                        \     = A + |Q| - 1 + 1
-                        \     = A + |Q|
-
- ROR A                  \ As mentioned above, this ROR shifts A right and
-                        \ catches bit 0 in C - giving another digit for our
-                        \ result - and the next ROR sticks that bit into the
-                        \ left end of P while also extracting the next bit of P
-                        \ for the next addition
-
- ROR P                  \ Add the overspill from shifting A to the right onto
-                        \ the start of P, and shift P right to fetch the next
-                        \ bit for the calculation
-
- BCC P%+4               \ Repeat for the second time
+ SEC                    \ Set X = |A| + |Q| (< 256)
  ADC T1
- ROR A
- ROR P
+ TAX
 
- BCC P%+4               \ Repeat for the third time
- ADC T1
- ROR A
- ROR P
+ TYA                    \ Set Y = ||A| - |Q|| (C is already clear, as
+ SBC T1                 \ |A| + |Q| <= 254 in the ADC above)
+ BCS mlt2               \ C set on both paths into mlt2 for the SBC below
+ EOR #&FF
+ INC A
+ SEC
 
- BCC P%+4               \ Repeat for the fourth time
- ADC T1
- ROR A
- ROR P
+.mlt2
 
- BCC P%+4               \ Repeat for the fifth time
- ADC T1
- ROR A
- ROR P
+ TAY
 
- BCC P%+4               \ Repeat for the sixth time
- ADC T1
- ROR A
- ROR P
+ LDA QSL,X              \ Set (A P) = (|A| + |Q|)^2 / 4 - (|A| - |Q|)^2 / 4
+ SBC QSL,Y              \           = |A| * |Q|
+ STA P
+ LDA QSH,X
+ SBC QSH,Y
 
- BCC P%+4               \ Repeat for the seventh time
- ADC T1
- ROR A
- ROR P
+ PLY                    \ Restore Y
 
- LSR A                  \ Rotate (A P) once more to get the final result, as
- ROR P                  \ we only pushed 7 bits through the above process
+ LDX #0                 \ X = 0 and C clear, as the original leaves them
+ CLC
 
  ORA T                  \ Set the sign bit of the result that we stored in T
 
@@ -21965,10 +21894,13 @@ ENDIF
 
 .mu10
 
- STA P                  \ If we get here, the result is 0 and A = 0, so set
-                        \ P = 0 so (A P) = 0
+ TXA                    \ The result is 0: as the original, C = bit 0 of the
+ LSR A                  \ argument A (still in X), A = P = 0 and Z set
+ LDA #0
+ STA P
 
  RTS                    \ Return from the subroutine
+
 
 \ ******************************************************************************
 \
