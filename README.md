@@ -12,6 +12,8 @@ What's new:
 * **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. Even with all the extra drawing, the game runs about 23% faster in flight than the original (17.24 against 13.97 main-loop iterations a second); the same speed-ups with the original wireframe graphics run 28% faster.
 * **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's.
 
+**To play it**, download [solid-elite-bbc-master.ssd](solid-elite-bbc-master.ssd) and run it on a BBC Master 128, or in an emulator set to a Master 128 (for example [jsbeeb](https://bbc.xania.org/?model=Master) or [b2](https://github.com/tom-seddon/b2)): load the disc and press SHIFT-BREAK. It is the current build of this branch, rebuilt with every change (`make` writes it).
+
 To make room, the game is reorganised across all of the Master's memory: main RAM, shadow RAM, the sideways RAM banks, and the 8K and 4K paged areas (HAZEL and ANDY), with frequently-run code kept in main memory and the rest moved out of the way.
 
 <p align="center">

@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refuses a commit whose solid-elite-bbc-master.ssd (the disc in the root,
+# for downloading) is not the build's disc, 5-compiled-game-discs/
+# elite-master-sng47.ssd, as staged. `make` copies one to the other; stage
+# both. Install with: git config core.hooksPath 2-build-files/hooks
+a=$(git rev-parse -q --verify :solid-elite-bbc-master.ssd)
+b=$(git rev-parse -q --verify :5-compiled-game-discs/elite-master-sng47.ssd)
+if [ "$a" != "$b" ]; then
+    echo "pre-commit: solid-elite-bbc-master.ssd is not the staged build's disc;" >&2
+    echo "  run make, then git add solid-elite-bbc-master.ssd 5-compiled-game-discs" >&2
+    exit 1
+fi

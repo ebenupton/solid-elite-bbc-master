@@ -15,3 +15,8 @@ It also contains the `make.exe` executable for Windows, plus the required DLL fi
 Right on, Commanders!
 
 _Mark Moxon_
+## Added for Solid Elite
+
+* [faces.py](faces.py), [lightramps.py](lightramps.py), [lightcheck.py](lightcheck.py), [hangarcols.py](hangarcols.py), [hangarinks.py](hangarinks.py) and [flare.py](flare.py) generate and check the renderer's tables (see [docs/renderer.md](../docs/renderer.md)); [dashboard.py](dashboard.py), [streams.py](streams.py), [layout-info.py](layout-info.py) and [bankcheck.py](bankcheck.py) run in the build.
+
+* [hooks/pre-commit](hooks/pre-commit) refuses a commit whose `solid-elite-bbc-master.ssd` (the disc in the repository's root, which `make` copies from `5-compiled-game-discs`) is not the build's disc. Install it with `git config core.hooksPath 2-build-files/hooks`.

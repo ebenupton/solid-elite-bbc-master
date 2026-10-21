@@ -99,6 +99,7 @@ all:
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt
 	$(PYTHON) 2-build-files/elite-checksum.py -u -rel1 -c 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-disc.asm -boot M128Elt -do 5-compiled-game-discs/elite-master-sng47.ssd -title "E L I T E"
+	cp 5-compiled-game-discs/elite-master-sng47.ssd solid-elite-bbc-master.ssd
 ifneq ($(verify), no)
 	@$(PYTHON) 2-build-files/crc32.py 4-reference-binaries/sng47 3-assembled-output
 endif
