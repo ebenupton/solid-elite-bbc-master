@@ -822,6 +822,10 @@ ENDIF
                         \ we are drawing in LL9, i.e. the number of lines in the
                         \ old ship that is currently shown on-screen and which
                         \ we need to erase
+                        \
+                        \ Port: LSNUM and LSNUM2 are no longer used, as nothing
+                        \ draws a ship directly (LL9 records every ship); they
+                        \ keep their places, so zero page is the original's
 
 .RAT
 
@@ -5904,6 +5908,9 @@ ENDIF
 
 .HLOIN
 
+ JSR H_HLOIN            \ Port: in record mode the renderer fills the sun, so
+                        \ return at once (gfx-hooks.asm)
+
  LDA Y1                 \ Set A = Y1, the pixel y-coordinate of the line
 
  AND #3                 \ Set A to the correct order of red/yellow pixels to
@@ -6259,6 +6266,60 @@ ENDIF
 
 \ ******************************************************************************
 \
+\       Name: pxpatd
+\       Type: Subroutine
+\   Category: Stardust
+\    Summary: Set COL for the stardust, then pxpat
+\
+\ ******************************************************************************
+
+.pxpatd
+
+ LDA #DUST              \ Switch to stripe 3-2-3-2, as nWq and FLIP did
+ STA COL
+
+\ ******************************************************************************
+\
+\       Name: pxpat
+\       Type: Subroutine
+\   Category: Stardust
+\    Summary: Patch PIX1's, H_STAR's and H_STAROFF's record-mode tests for a
+\             pass over the stardust (Port: the demo port's per-frame patching
+\             of the QQ11 OR GFORCE test, transfer item B12)
+\
+\ ------------------------------------------------------------------------------
+\
+\ Called at the start of each pass that draws stardust (STARS1, STARS2,
+\ STARS6, nWq, FLIP), during which QQ11 and GFORCE do not change. Corrupts A
+\ only.
+\
+\ ******************************************************************************
+
+.pxpat
+
+ LDA QQ11               \ Record mode if QQ11 OR GFORCE is zero
+ ORA GFORCE
+ BEQ pxp1
+
+ LDA #&EA               \ Outside record mode: PIX1 falls into PIXEL2 (NOP),
+ STA pxr                \ H_STAR and H_STAROFF branch (BRA)
+ LDA #&80
+ BNE pxp2
+
+.pxp1
+
+ LDA #&60               \ Record mode: PIX1 returns (RTS), H_STAR and
+ STA pxr                \ H_STAROFF fall through (BIT #imm)
+ LDA #&89
+
+.pxp2
+
+ STA hstp
+ STA hsop
+ RTS
+
+\ ******************************************************************************
+\
 \       Name: PIX1
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
@@ -6336,8 +6397,19 @@ ENDIF
  TXA                    \ Set SYL+Y to X, the low byte of the result
  STA SYL,Y
 
+.pxr
+
+ RTS                    \ Port: in record mode PIX1's drawing only erases the
+                        \ particle's old position, which the renderer has no
+                        \ need of (the particle's new position is recorded by
+                        \ the PIXEL2 call that follows for it), so return
+                        \ (patched by pxpat once per star pass: RTS in record
+                        \ mode, NOP outside it, falling into PIXEL2; this was
+                        \ LDA QQ11 : ORA GFORCE : BNE PIXEL2 : RTS)
+
                         \ Fall through into PIXEL2 to draw the stardust particle
                         \ at (X1,Y1)
+
 \ ******************************************************************************
 \
 \       Name: PIXEL2
@@ -6398,8 +6470,9 @@ ENDIF
  AND #%01111111         \ Clear the sign bit, so A = |Y1|
 
  CMP #Y                 \ If |Y1| >= #Y then it's off the screen (as #Y is half
- BCS PXR1               \ the screen height), so return from the subroutine (as
-                        \ PXR1 contains an RTS)
+ BCS PXOFF              \ the screen height), so return from the subroutine (Port:
+                        \ via H_STAROFF, gfx-hooks.asm, as the renderer records
+                        \ that it is off screen)
 
  EOR #%11111111         \ The y-coordinate offset is negative, so negate |Y1|
  ADC #1                 \ (C is clear) to convert A from a sign-magnitude number
@@ -6412,7 +6485,7 @@ ENDIF
 .PX23
 
  CMP #Y                 \ If Y1 >= #Y then it's off the screen, so return from
- BCS PXR1               \ the subroutine (as PXR1 contains an RTS)
+ BCS PXOFF              \ the subroutine via H_STAROFF with A = |Y1|
 
 .PX22
 
@@ -6426,6 +6499,11 @@ ENDIF
 
                         \ Fall through into PIXEL to draw the stardust at the
                         \ screen coordinates in (X, A)
+
+ JMP H_STAR             \ Port: in record mode, record star Y's position for the
+                        \ renderer and return from PIXEL2 (gfx-hooks.asm),
+                        \ otherwise jump back to PIXEL to draw it
+
 \ ******************************************************************************
 \
 \       Name: PIXEL
@@ -6473,6 +6551,9 @@ ENDIF
 \ ******************************************************************************
 
 .PIXEL
+
+ JSR H_DOT              \ Port: in record mode, record the dot (an explosion
+                        \ particle) for the renderer and return (gfx-hooks.asm)
 
  STY T1                 \ Store Y in T1 so we can restore it at the end of the
                         \ subroutine
@@ -6580,6 +6661,10 @@ ENDIF
  LDY T1                 \ Restore Y from T1, so Y is preserved by the routine
 
  RTS                    \ Return from the subroutine
+
+.PXOFF
+
+ JMP H_STAROFF          \ Port: PIXEL2's star Y is off screen (gfx-hooks.asm)
 
 \ ******************************************************************************
 \
@@ -6987,6 +7072,8 @@ ENDIF
 \       Type: Variable
 \   Category: Ship hangar
 \    Summary: The number of ships being displayed in the ship hangar
+\             (Port: HALL still sets it, but nothing reads it: HANGER, which
+\             did, is removed, as the renderer draws the hangar)
 \
 \ ******************************************************************************
 
@@ -7000,7 +7087,6 @@ ENDIF
 \       Type: Subroutine
 \   Category: Ship hangar
 \    Summary: Display the ship hangar
-\             (Port: in the cold area, called through the stub HANGER)
 \       Area: cold
 \
 \ ------------------------------------------------------------------------------
@@ -7034,253 +7120,11 @@ ENDIF
 \
 \ ******************************************************************************
 
-.HANGER
+                        \ Port: removed (the hangar is drawn by the renderer:
+                        \ HALL ends with G_HANGAR, whose f_hback draws the
+                        \ floor's and the wall's lines at the places HANGER
+                        \ computed, under the ships, gfx-hangar.asm)
 
-                        \ We start by drawing the floor
-
- LDX #2                 \ We start with a loop using a counter in T that goes
-                        \ from 2 to 12, one for each of the 11 horizontal lines
-                        \ in the floor, so set the initial value in X
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
-.HAL1
-
- STX T                  \ Store the loop counter in T
-
- LDA #130               \ Set A = 130
-
- STX Q                  \ Set Q to the value of the loop counter
-
- JSR DVID4K             \ Calculate the following:
-                        \
-                        \   (P R) = 256 * A / Q
-                        \         = 256 * 130 / Q
-                        \
-                        \ so P = 130 / Q, and as the counter Q goes from 2 to
-                        \ 12, P goes 65, 43, 32 ... 13, 11, 10, with the
-                        \ difference between two consecutive numbers getting
-                        \ smaller as P gets smaller
-                        \
-                        \ We can use this value as a y-coordinate to draw a set
-                        \ of horizontal lines, spaced out near the bottom of the
-                        \ screen (high value of P, high y-coordinate, lower down
-                        \ the screen) and bunching up towards the horizon (low
-                        \ value of P, low y-coordinate, higher up the screen)
-
- LDA P                  \ Set Y = #Y + P
- CLC                    \
- ADC #Y                 \ where #Y is the y-coordinate of the centre of the
- TAY                    \ screen, so Y is now the horizontal pixel row of the
-                        \ line we want to draw to display the hangar floor
-
- TYA                    \ Port (in the cold area, away from bank 4's ylookup):
- LSR A                  \ A = ylookup(Y) = &40 + (Y DIV 8) * 2, the page number
- LSR A                  \ of the character row that contains the pixel with
- AND #%11111110         \ the y-coordinate in Y (at most &3E before the ORA)
- ORA #&40               \
- STA SC+1               \ contains the pixel with the y-coordinate in Y, and
-                        \ store it in the high byte of SC(1 0) at SC+1
-
- STA R                  \ Also store the page number in R
-
- LDA P                  \ Set the low byte of SC(1 0) to the y-coordinate mod 8,
- AND #7                 \ which determines the pixel row in the character block
- STA SC                 \ we need to draw in (as each character row is 8 pixels
-                        \ high), so SC(1 0) now points to the address of the
-                        \ start of the horizontal line we want to draw
-
- LDY #0                 \ Set Y = 0 so the call to HAS2 starts drawing the line
-                        \ in the first byte of the screen row, at the left edge
-                        \ of the screen
-
- JSR HAS2               \ Draw a horizontal line from the left edge of the
-                        \ screen, going right until we bump into something
-                        \ already on-screen, at which point stop drawing
-
- LDY R                  \ Fetch the page number of the line from R, increment it
- INY                    \ so it points to the right half of the character row
- STY SC+1               \ (as each row takes up 2 pages), and store it in the
-                        \ high byte of SC(1 0) at SC+1
-
- LDA #%01000000         \ Now to draw the same line but from the right edge of
-                        \ the screen, so set a pixel mask in A to check the
-                        \ second pixel of the last byte, so we skip the
-                        \ two-pixel screen border at the right edge of the
-                        \ screen
-
- LDY #248               \ Set Y = 248 so the call to HAS3 starts drawing the
-                        \ line in the last byte of the screen row, at the right
-                        \ edge of the screen
-
- JSR HAS3               \ Draw a horizontal line from the right edge of the
-                        \ screen, going left until we bump into something
-                        \ already on-screen, at which point stop drawing
-
- LDY HANGFLAG           \ Fetch the value of HANGFLAG, which gets set to 0 in
-                        \ the HALL routine above if there is only one ship
-
- BEQ HA2                \ If HANGFLAG is zero, jump to HA2 to skip the following
-                        \ as there is only one ship in the hangar
-
-                        \ If we get here then there are multiple ships in the
-                        \ hangar, so we also need to draw the horizontal line in
-                        \ the gap between the ships
-
- LDY #0                 \ First we draw the line from the centre of the screen
-                        \ to the right. SC(1 0) points to the start address of
-                        \ the second half of the screen row, so we set Y to 0 so
-                        \ the call to HAL3 starts drawing from the first
-                        \ character in that second half
-
- LDA #%10001000         \ We want to start drawing from the first pixel, so we
-                        \ set a mask in A to the first pixel in the four-pixel
-                        \ byte
-
- JSR HAL3               \ Call HAL3, which draws a line from the halfway point
-                        \ across the right half of the screen, going right until
-                        \ we bump into something already on-screen, at which
-                        \ point it stops drawing
-
- DEC SC+1               \ Decrement the high byte of SC(1 0) in SC+1 to point to
-                        \ the previous page (i.e. the left half of this screen
-                        \ row)
-
- LDY #248               \ We now draw the line from the centre of the screen
-                        \ to the left. SC(1 0) points to the start address of
-                        \ the first half of the screen row, so we set Y to 248
-                        \ so the call to HAS3 starts drawing from the last
-                        \ character in that first half
-
- LDA #%00010000         \ We want to start drawing from the last pixel, so we
-                        \ set a mask in A to the last pixel in the four-pixel
-                        \ byte
-
- JSR HAS3               \ Call HAS3, which draws a line from the halfway point
-                        \ across the left half of the screen, going left until
-                        \ we bump into something already on-screen, at which
-                        \ point it stops drawing
-
-.HA2
-
-                        \ We have finished threading our horizontal line behind
-                        \ the ships already on-screen, so now for the next line
-
- LDX T                  \ Fetch the loop counter from T and increment it
- INX
-
- CPX #13                \ If the loop counter is less than 13 (i.e. 2 to 12)
- BCC HAL1               \ then loop back to HAL1 to draw the next line
-
-                        \ The floor is done, so now we move on to the back wall
-
- LDA #60                \ Set S = 60, so we run the following 60 times (though I
- STA S                  \ have no idea why it's 60 times, when it should be 15,
-                        \ as this has the effect of drawing each vertical line
-                        \ four times, each time starting one character row lower
-                        \ on-screen)
-
- LDA #16                \ We want to draw 15 vertical lines, one every 16 pixels
-                        \ across the screen, with the first at x-coordinate 16,
-                        \ so set this in A to act as the x-coordinate of each
-                        \ line as we work our way through them from left to
-                        \ right, incrementing by 16 for each new line
-
- LDX #&40               \ Set X = &40, the high byte of the start of screen
- STX R                  \ memory (the screen starts at location &4000) and the
-                        \ page number of the first screen row
-
-.HAL6
-
- LDX R                  \ Set the high byte of SC(1 0) to R
- STX SC+1
-
- STA T                  \ Store A in T so we can retrieve it later
-
- AND #%11111100         \ A contains the x-coordinate of the line to draw, and
- STA SC                 \ each character block is 4 pixels wide, so setting the
-                        \ low byte of SC(1 0) to A mod 4 points SC(1 0) to the
-                        \ correct character block on the top screen row for this
-                        \ x-coordinate
-
- LDX #%10001000         \ Set a mask in X to the first pixel in the four-pixel
-                        \ byte
-
- LDY #1                 \ We are going to start drawing the line from the second
-                        \ pixel from the top (to avoid drawing on the one-pixel
-                        \ border), so set Y to 1 to point to the second row in
-                        \ the first character block
-
-.HAL7
-
- TXA                    \ Copy the pixel mask to A
-
- AND (SC),Y             \ If the pixel we want to draw is non-zero (using A as a
- BNE HA6                \ mask), then this means it already contains something,
-                        \ so jump to HA6 to stop drawing this line
-
- TXA                    \ Copy the pixel mask to A again
-
- AND #RED               \ Apply the pixel mask in A to a four-pixel block of
-                        \ red pixels, so we now know which bits to set in screen
-                        \ memory
-
- ORA (SC),Y             \ OR the byte with the current contents of screen
-                        \ memory, so the pixel we want is set to red (because
-                        \ we know the bits are already 0 from the above test)
-
- STA (SC),Y             \ Store the updated pixel in screen memory
-
- INY                    \ Increment Y to point to the next row in the character
-                        \ block, i.e. the next pixel down
-
- CPY #8                 \ Loop back to HAL7 to draw this next pixel until we
- BNE HAL7               \ have drawn all 8 in the character block
-
- INC SC+1               \ There are two pages of memory for each character row,
- INC SC+1               \ so we increment the high byte of SC(1 0) twice to
-                        \ point to the same character but in the next row down
-
- LDY #0                 \ Set Y = 0 to point to the first row in this character
-                        \ block
-
- BEQ HAL7               \ Loop back up to HAL7 to keep drawing the line (this
-                        \ BEQ is effectively a JMP as Y is always zero)
-
-.HA6
-
- LDA T                  \ Fetch the x-coordinate of the line we just drew from T
- CLC                    \ into A, and add 16 so that A contains the x-coordinate
- ADC #16                \ of the next line to draw
-
- BCC P%+4               \ If the addition overflowed, increment the page number
- INC R                  \ in R to point to the second half of the screen row
-
- DEC S                  \ Decrement the loop counter in S
-
- BNE HAL6               \ Loop back to HAL6 until we have run through the loop
-                        \ 60 times, by which point we are most definitely done
-
-IF _SNG47
-
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
-
- RTS                    \ Return from the subroutine (this instruction is not
-                        \ needed as we could just fall through into the RTS at
-                        \ HA3 below)
-
-ELIF _COMPACT
-
- JMP away               \ Jump to away to switch main memory back into
-                        \ &3000-&7FFF and return from the subroutine
-
-ENDIF
-
-.HA3
-
- RTS                    \ Return from the subroutine
 \ ******************************************************************************
 \
 \       Name: HAS2
@@ -7301,62 +7145,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.HAS2
-
- LDA #%00100010         \ Set A to the pixel pattern for a mode 1 character row
-                        \ byte with the third pixel set, so we start drawing the
-                        \ horizontal line just to the right of the two-pixel
-                        \ border along the edge of the screen
-
-.HAL2
-
- TAX                    \ Store A in X so we can retrieve it after the following
-                        \ check and again after updating screen memory
-
- AND (SC),Y             \ If the pixel we want to draw is non-zero (using A as a
- BNE HA3                \ mask), then this means it already contains something,
-                        \ so we stop drawing because we have run into something
-                        \ that's already on-screen, and return from the
-                        \ subroutine (as HA3 contains an RTS)
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- AND #RED               \ Apply the pixel mask in A to a four-pixel block of
-                        \ red pixels, so we now know which bits to set in screen
-                        \ memory
-
- ORA (SC),Y             \ OR the byte with the current contents of screen
-                        \ memory, so the pixel we want is set to red (because
-                        \ we know the bits are already 0 from the above test)
-
- STA (SC),Y             \ Store the updated pixel in screen memory
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- LSR A                  \ Shift A to the right to move on to the next pixel
-
- BCC HAL2               \ If bit 0 before the shift was clear (i.e. we didn't
-                        \ just do the fourth pixel in this block), loop back to
-                        \ HAL2 to check and draw the next pixel
-
- TYA                    \ Set Y = Y + 8 (as we know the C flag is set) to point
- ADC #7                 \ to the next character block along
- TAY
-
- LDA #%10001000         \ Reset the pixel mask in A to the first pixel in the
-                        \ new four-pixel character block
-
- BCC HAL2               \ If the above addition didn't overflow, jump back to
-                        \ HAL2 to keep drawing the line in the next character
-                        \ block
-
- INC SC+1               \ The addition overflowed, so we have reached the last
-                        \ character block in this page of memory, so increment
-                        \ the high byte of SC(1 0) in SC+1 to point to the next
-                        \ page (i.e. the right half of this screen row) and fall
-                        \ into HAL3 to repeat the performance
+                        \ Port: removed (the hangar is drawn by the renderer,
+                        \ see HANGER)
 
 \ ******************************************************************************
 \
@@ -7369,53 +7159,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.HAL3
-
- TAX                    \ Store A in X so we can retrieve it after the following
-                        \ check and again after updating screen memory
-
- AND (SC),Y             \ If the pixel we want to draw is non-zero (using A as a
- BNE HA3                \ mask), then this means it already contains something,
-                        \ so we stop drawing because we have run into something
-                        \ that's already on-screen, and return from the
-                        \ subroutine (as HA3 contains an RTS)
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- AND #RED               \ Apply the pixel mask in A to a four-pixel block of
-                        \ red pixels, so we now know which bits to set in screen
-                        \ memory
-
- ORA (SC),Y             \ OR the byte with the current contents of screen
-                        \ memory, so the pixel we want is set to red (because
-                        \ we know the bits are already 0 from the above test)
-
- STA (SC),Y             \ Store the updated pixel in screen memory
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- LSR A                  \ Shift A to the right to move on to the next pixel
-
- BCC HAL3               \ If bit 0 before the shift was clear (i.e. we didn't
-                        \ just do the fourth pixel in this block), loop back to
-                        \ HAL3 to check and draw the next pixel
-
- TYA                    \ Set Y = Y + 8 (as we know the C flag is set) to point
- ADC #7                 \ to the next character block along
- TAY
-
- LDA #%10001000         \ Reset the pixel mask in A to the first pixel in the
-                        \ new four-pixel character block
-
- BCC HAL3               \ If the above addition didn't overflow, jump back to
-                        \ HAL3 to keep drawing the line in the next character
-                        \ block
-
- RTS                    \ The addition overflowed, so we have reached the last
-                        \ character block in this page of memory, which is the
-                        \ end of the line, so we return from the subroutine
+                        \ Port: removed (the hangar is drawn by the renderer,
+                        \ see HANGER)
 
 \ ******************************************************************************
 \
@@ -7433,48 +7178,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.HAS3
-
- TAX                    \ Store A in X so we can retrieve it after the following
-                        \ check and again after updating screen memory
-
- AND (SC),Y             \ If the pixel we want to draw is non-zero (using A as a
- BNE HA3                \ mask), then this means it already contains something,
-                        \ so we stop drawing because we have run into something
-                        \ that's already on-screen, and return from the
-                        \ subroutine (as HA3 contains an RTS)
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- ORA (SC),Y             \ OR the byte with the current contents of screen
-                        \ memory, so the pixel we want is set to red (because
-                        \ we know the bits are already 0 from the above test)
-
- STA (SC),Y             \ Store the updated pixel in screen memory
-
- TXA                    \ Retrieve the value of A we stored above, so A now
-                        \ contains the pixel mask again
-
- ASL A                  \ Shift A to the left to move to the next pixel to the
-                        \ left
-
- BCC HAS3               \ If bit 7 before the shift was clear (i.e. we didn't
-                        \ just do the first pixel in this block), loop back to
-                        \ HAS3 to check and draw the next pixel to the left
-
- TYA                    \ Set Y = Y - 8 (as we know the C flag is set) to point
- SBC #8                 \ to the next character block to the left
- TAY
-
- LDA #%00010000         \ Set a mask in A to the last pixel in the four-pixel
-                        \ byte
-
- BCS HAS3               \ If the above subtraction didn't underflow, jump back
-                        \ to HAS3 to keep drawing the line in the next character
-                        \ block to the left
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (the hangar is drawn by the renderer,
+                        \ see HANGER)
 
 \ ******************************************************************************
 \
@@ -7508,44 +7213,9 @@ ENDIF
 \
 \ ******************************************************************************
 
-.DVID4K
-
-                        \ This is an exact duplicate of the DVID4 routine, which
-                        \ is also present in this source, so it isn't clear why
-                        \ this duplicate exists (especially as the other version
-                        \ is slightly faster, as it unrolls the loop)
-
- LDX #8                 \ Set a counter in X to count the 8 bits in A
-
- ASL A                  \ Shift A left and store in P (we will build the result
- STA P                  \ in P)
-
- LDA #0                 \ Set A = 0 for us to build a remainder
-
-.DVL4K
-
- ROL A                  \ Shift A to the left
-
- BCS DV8K               \ If the C flag is set (i.e. bit 7 of A was set) then
-                        \ skip straight to the subtraction
-
- CMP Q                  \ If A < Q skip the following subtraction
- BCC DV5K
-
-.DV8K
-
- SBC Q                  \ A >= Q, so set A = A - Q
-
-.DV5K
-
- ROL P                  \ Shift P to the left, pulling the C flag into bit 0
-
- DEX                    \ Decrement the loop counter
-
- BNE DVL4K              \ Loop back for the next bit until we have done all 8
-                        \ bits of P
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (unreachable: its only caller was
+                        \ HANGER, removed as the renderer draws the hangar; the
+                        \ floor's rows are a table, HFY, gfx-hangar-hz.asm)
 
 \ ******************************************************************************
 \
@@ -7675,10 +7345,14 @@ IF _COMPACT
 
 ENDIF
 
- LDY #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
  TAY                    \ Set Y = the character to be printed
+
+ LDA #4                 \ Set bit 2 (X) of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+                        \ (Port: keeping D, which buffer the IRQ shows)
+
+ TYA                    \ (A and the flags from the character, as the TAY left
+                        \ them)
 
 IF _SNG47
 
@@ -7888,6 +7562,9 @@ ENDIF
                         \ we're just updating the cursor so it's in the right
                         \ position following the deletion
 
+ JSR H_DEL              \ Port: keep the renderer's text map, and in record mode
+                        \ return through RR4 instead of blanking (gfx-hooks.asm)
+
  ASL A                  \ A contains YC (from above), so this sets A = YC * 2
 
  ASL SC                 \ Double the low byte of SC(1 0), catching bit 7 in the
@@ -7957,8 +7634,9 @@ IF _SNG47
  JSR TTX66M             \ Otherwise we are off the bottom of the screen, so
                         \ clear the screen and draw a border box
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #4                 \ Set bit 2 (X) of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+                        \ (Port: keeping D)
 
 ELIF _COMPACT
 
@@ -7993,6 +7671,9 @@ ELIF _COMPACT
 ENDIF
 
 .RR3
+
+ JSR H_CHAR             \ Port: keep the renderer's text map, and in record mode
+                        \ return through RR4 instead of drawing (gfx-hooks.asm)
 
                         \ A contains the value of YC - the screen row where we
                         \ want to print this character - so now we need to
@@ -8115,8 +7796,9 @@ ENDIF
 
 .RR4
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #4                 \ Clear bit 2 (X) of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+                        \ (Port: keeping D)
 
  PLX                    \ We're done printing, so restore the values of the
  PLY                    \ A, X and Y registers that we saved above and clear the
@@ -8131,6 +7813,7 @@ ENDIF
 
  JMP RR4                \ Jump to RR4 to restore the registers and return from
                         \ the subroutine using a tail call
+
 \ ******************************************************************************
 \
 \       Name: TTX66
@@ -8153,6 +7836,19 @@ ENDIF
 \ ******************************************************************************
 
 .TTX66
+
+ LDA #4                 \ Port: clear bit 2 (X) of the Access Control Register,
+ TRB VIA+&34            \ so main RAM is at &3000-&7FFF for G_DIRECT's stub
+                        \ there. CHPR calls TTX66 (through TTX66M) with X set,
+                        \ to clear the screen when the text runs off the bottom
+                        \ (a long disc catalogue, or a prompt printed past row
+                        \ 23) or for control code 11: the CPU then fetched
+                        \ G_DIRECT from shadow RAM and crashed. The original's
+                        \ TTX66 is below &3000, so X did not matter there; this
+                        \ TTX66 sets the whole register itself below
+
+ JSR G_DIRECT           \ Port: the renderer stops recording until the first
+                        \ frame after the screen is cleared (gfx-frame.asm)
 
  LDX #%00001111         \ Set bits 1 and 2 of the Access Control Register at
  STX VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
@@ -8370,6 +8066,10 @@ ENDIF
  STA YC                 \ the screen
 
  JSR TT67K              \ Print a newline
+
+ JSR H_CLYNS            \ Port: clear the renderer's text map rows 21-23, and in
+                        \ record mode return instead of clearing the screen
+                        \ (gfx-hooks.asm)
 
  LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
  STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
@@ -9581,7 +9281,8 @@ ENDIF
                         \ the IRQ and sound code, CHPR and its font, the log
                         \ tables (LOINQ), HANGFLAG (HANGER), ADDK (DIALS, PIX1),
                         \ UP (CATF, FLH, COMC) and the low area (NEWBRK, the far
-                        \ calls)
+                        \ calls, the renderer's glue)
+
 \ ******************************************************************************
 \
 \       Name: TGINT
@@ -11929,6 +11630,8 @@ ENDIF
  BNE BOMBR1             \ view), return from the subroutine (as BOMBR1 contains
                         \ an RTS)
 
+ JSR H_BOMB             \ Port: a new bolt for the renderer (gfx-hooks.asm)
+
  LDY #1                 \ We now want to loop through the 10 (BOMBTBX, BOMBTBY)
                         \ coordinates, drawing a total of 9 lines between them
                         \ to make the lightning effect, so set an index in Y
@@ -11968,7 +11671,8 @@ ENDIF
                         \ line will be the end point of this line, making the
                         \ zig-zag lines all join up like a lightning bolt
 
- JSR LOIN               \ Draw a line from (X1, Y1) to (X2, Y2)
+ JSR H_LLINE            \ Draw a line from (X1, Y1) to (X2, Y2) (Port: recorded
+                        \ for the renderer in record mode, gfx-hooks.asm)
 
  INY                    \ Increment the loop counter
 
@@ -13883,9 +13587,9 @@ ENDIF
 
                         \ Port: the demo port's BLINE (e9770fa w_0047, bebd95c,
                         \ f50a805 w_0045): the new point's y goes straight
-                        \ into K5(3 2) (for the next call) and XX12, after the
-                        \ previous point's y is copied to XX15(3 2) for LL145;
-                        \ the new
+                        \ into K5(3 2) (for the next call and for F_PPOINT,
+                        \ which reads it there) and XX12, after the previous
+                        \ point's y is copied to XX15(3 2) for LL145; the new
                         \ point's x is copied K6 -> K5 and XX15(5 4) in one
                         \ go, so BL7 no longer copies K6 to K5 (K6(3 2) is no
                         \ longer written: nothing else reads it)
@@ -13903,6 +13607,11 @@ ENDIF
  ADC T
  STA XX12+1
  STA K5+3
+
+ LDA QQ11               \ Port: in record mode, record the point (F_PPOINT
+ ORA GFORCE             \ reads its y from K5(3 2); this was the H_BPT hook,
+ BNE P%+5               \ inlined)
+ JSR G_PPOINT
 
  LDA K5                 \ Set XX15(1 0) = K5(1 0) = x of the previous point
  STA XX15
@@ -13988,9 +13697,12 @@ ENDIF
 
  STY LSP                \ Update LSP to point to the same as Y
 
- JSR LOIN               \ Draw a line from (X1, Y1) to (X2, Y2)
+ LDA QQ11               \ Draw a line from (X1, Y1) to (X2, Y2), but only when
+ ORA GFORCE             \ not in record mode (Port: in record mode the frame
+ BNE BL10               \ layer fills the planet's detail from BLINE's points;
+                        \ the LOIN call is out of line below)
 
- CLC                    \ Port: clear C for BL7
+.BL11
 
  LDA XX13               \ If XX13 is non-zero, jump up to BL5 to add a &FF
  BNE BL5                \ marker to the end of the line heap. XX13 is non-zero
@@ -14008,6 +13720,12 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
+.BL10
+
+ JSR LOIN               \ Not in record mode: draw the line, then rejoin above
+ CLC                    \ (with C clear for BL7)
+ BRA BL11
+
 .BL12
 
  LDA X1                 \ The coordinates were swapped by the call to
@@ -14020,6 +13738,7 @@ ENDIF
  STY Y1
 
  BRA BL9                \ Rejoin the main path at BL9
+
 \ ******************************************************************************
 \
 \       Name: FLIP
@@ -14045,8 +13764,8 @@ ENDIF
 
 .FLIP
 
- LDA #DUST              \ Switch to stripe 3-2-3-2, which is cyan/red in the
- STA COL                \ space view
+ JSR pxpatd             \ Switch to stripe 3-2-3-2, which is cyan/red in the
+                        \ space view (Port: and patch the record-mode tests)
 
  LDY NOSTM              \ Set Y to the current number of stardust particles, so
                         \ we can use it as a counter through all the stardust
@@ -14195,6 +13914,8 @@ ENDIF
  RTS
 
 .STARS1
+
+ JSR pxpat              \ Port: patch the record-mode tests for this pass
 
  LDA ALP1               \ Port: patch the roll magnitude into MLSA and the
  LDX #MLSA-MLSB         \ pitch magnitude into MLSB (the multipliers of the
@@ -14816,6 +14537,8 @@ ENDIF
 .fkrb
 
  EQUB 0                 \ FILLKL: the row's first key number (16, 32, ... 112)
+
+
 \ ******************************************************************************
 \
 \       Name: STARS6
@@ -14853,6 +14576,8 @@ ENDIF
 \ ******************************************************************************
 
 .STARS6
+
+ JSR pxpat              \ Port: patch the record-mode tests for this pass
 
  LDY NOSTM              \ Set Y to the current number of stardust particles, so
                         \ we can use it as a counter through all the stardust
@@ -17377,7 +17102,8 @@ ENDIF
  ORA VIEW               \ not the front space view), skip the following
  BNE P%+5               \ instruction
 
- JSR LL9                \ Call LL9 to draw the Cobra on-screen
+ JSR LL9F               \ Call LL9 to draw the Cobra on-screen, then render
+                        \ the frame (Port: LL9F)
 
  DEC INWK+32            \ Decrement the counter in byte #32
 
@@ -17612,6 +17338,21 @@ ENDIF
 \ The ship's y-coordinate is calculated in the has1 routine from the size of
 \ its targetable area. Ships of type 0 are not shown.
 \
+\ Port: the hangar is drawn by the renderer, filled and lit, on a tan wall
+\ and floor (gfx-hangar.asm), and two of the ships HALL can choose blend into
+\ it: the Sidewinder and the Mamba, whose faces are dithered from yellow,
+\ magenta and black alone (yellow 48% and 60% of their pixels, no cyan), the
+\ inks of the wall's tan (2Y+M+K) and half the floor's (2Y+M+C). Measured on
+\ the rendered hangar (every type, 12 placements each), they are the only
+\ ones HALL can choose with no cyan in their faces; the others have 20% (the
+\ Krait) to 64% (the Viper) (2-build-files/hangarinks.py). HAS1 draws them as the nearest ships of their
+\ size (HAS1 places a ship by its targetable area) that stand out: the
+\ Sidewinder (area 4225) as an Asp Mk II (3600), the Mamba (4900) as a Viper
+\ (5625). Only the blueprint that LL9 draws changes (G_HLL9, gfx-gstubs.asm,
+\ with its table HSUB): HALL and HAS1 run as before, with the same random
+\ numbers, and place the ship by its own type's size, and this table is
+\ unchanged (none of its ships blends)
+\
 \ ******************************************************************************
 
 .HATB
@@ -17707,6 +17448,11 @@ ENDIF
  LDA #0                 \ Clear the top part of the screen, draw a border box,
  JSR TT66               \ and set the current view type in QQ11 to 0 (space
                         \ view)
+
+ JSR G_HANG0            \ Port: the hangar is one frame of the renderer
+                        \ (gfx-hangar.asm): the ships are recorded (and lit by
+                        \ the hangar's light), the view's name goes into the
+                        \ text map, and G_HANGAR draws the frame below
 
  JSR DORND              \ Set A and X to random numbers
 
@@ -17827,8 +17573,9 @@ ENDIF
  STY HANGFLAG           \ Store Y in HANGFLAG to specify whether there are
                         \ multiple ships in the hangar
 
- JMP HANGER             \ Call HANGER to draw the hangar background and return
-                        \ from the subroutine using a tail call
+ JMP G_HANGAR           \ Port: draw the frame, with the hangar's background
+                        \ under the ships (gfx-hangar.asm), in place of HANGER,
+                        \ and return from the subroutine using a tail call
 
 \ ******************************************************************************
 \
@@ -17895,7 +17642,7 @@ ENDIF
                         \ are negative
 
  LDA #&0B               \ Set the ship line heap pointer in INWK(34 33) to point
- STA INWK+34            \ to &0B00 (Port: HANGHEAP during LL9, below)
+ STA INWK+34            \ to &0B00
 
  JSR DORND              \ We now perform a random number of small angle (3.6
  STA XSAV               \ degree) rotations to spin the ship on the deck while
@@ -17967,39 +17714,30 @@ ENDIF
                         \ shape due to the imprecise nature of trigonometry
                         \ in assembly language
 
- LDA #HI(HANGHEAP)      \ Port: the line heap at HANGHEAP while LL9 draws
- STA INWK+34
-
- JSR LL9                \ Display the ship (Port: JSR, not a tail call, so that
-                        \ the heap pointer can be put back below)
-
- LDA #&0B               \ Port: leave INWK(34 33) = &0B00, as the original does
- STA INWK+34
-
- RTS                    \ Return from the subroutine
-
-                        \ Port: LL9 draws the hangar's ships and writes their
-                        \ line heaps. The original's &0B00 is in WP in the
-                        \ port, so the heap is HANGHEAP, a page of HAZEL that
-                        \ LL9 always sees and no other code uses
+ JMP G_HLL9             \ Jump to LL9 to display the ship and return from the
+                        \ subroutine using a tail call (Port: through G_HLL9,
+                        \ gfx-gstubs.asm, which sets TYPE for the renderer's
+                        \ faces; LL9 records the ship and writes no ship line
+                        \ heap, so INWK(34 33) = &0B00, the original's, though
+                        \ that is in WP in the port, is never used)
 
 .HA1
 
  RTS                    \ Return from the subroutine
+
 \ ******************************************************************************
 \
 \ Port: the main code continues in main RAM at &7000 from here, after the high
 \ code (elite-hi.asm), and runs on through &8000 into bank 4
 \ (docs/memory-map.md), at a routine that nothing falls into. The part from
-\ CODE%, below &4000, is saved as BCODE; the part from &7000 as HICODE and
-\ the rest, in bank 4, with the blocks tagged bank 4 after it, as BANK4
-\ (elite-layout.asm). Main RAM &4000-&6FFF is left for the filled renderer's
-\ second screen buffer
+\ CODE%, below screen buffer 0 (main RAM &4000-&6FFF), is saved as BCODE; the
+\ part from &7000 as HICODE and the rest, in bank 4, with the blocks tagged
+\ bank 4 after it, as BANK4 (elite-layout.asm)
 \
 \ ******************************************************************************
 
  PRINT "Main code: ", ~CODE%, "-", ~P%-1, " free ", &4000 - P%
- ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is left free)
+ ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is screen buffer 0)
  PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
  SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
 
@@ -18009,6 +17747,7 @@ ENDIF
  INCLUDE "1-source-files/main-sources/elite-hi.asm"             \ the quarter squares
 
 .HI_RUN%
+
 \ ******************************************************************************
 \
 \       Name: TACTICS (Part 1 of 7)
@@ -20625,6 +20364,9 @@ ENDIF
 
 .HFS1
 
+ LDX #&FF               \ Port: the rings are drawn directly, even in record
+ STX GFORCE             \ mode (GFORCE, gfx-gvars.asm)
+
  LDX #X                 \ Set K3 = #X (the x-coordinate of the centre of the
  STX K3                 \ screen)
 
@@ -20650,6 +20392,8 @@ ENDIF
 
  CPX #8                 \ If we haven't drawn 8 sets of rings yet, loop back to
  BNE HFL5               \ HFL5 to draw the next ring
+
+ STZ GFORCE             \ Port: back to recording (flags kept)
 
  RTS                    \ Return from the subroutine
 
@@ -20724,6 +20468,8 @@ ENDIF
 \ ******************************************************************************
 
 .STARS2
+
+ JSR pxpat              \ Port: patch the record-mode tests for this pass
 
  LDA #0                 \ Set A to 0 so we can use it to capture a sign bit
 
@@ -23395,7 +23141,13 @@ ENDIF
 
  JSR DENGY              \ Call DENGY to deplete our energy banks by 1
 
+ JSR H_LAS1             \ Port: in record mode, show the beams in the frame
+                        \ and return from LASLI (gfx-hooks.asm)
+
 .LASLI2
+
+ JSR H_LAS2             \ Port: in record mode there are no beams to draw or
+                        \ remove here (gfx-hooks.asm)
 
  LDA QQ11               \ If this is not a space view (i.e. QQ11 is non-zero)
  BNE ARSR1              \ then jump to MA9 to return from the main flight loop
@@ -23859,7 +23611,8 @@ ENDIF
  STX INWK+30            \ Set the ship's pitch counter to a positive pitch that
                         \ doesn't dampen (a diving pitch)
 
- JSR LL9                \ Draw the ship on screen
+ JSR LL9B               \ Draw the ship on screen (Port: one frame of the
+                        \ renderer, LL9B)
 
  JSR MVEIT              \ Call MVEIT to rotate the ship in space
 
@@ -23899,7 +23652,8 @@ ENDIF
                         \ so the ship moves up the screen (as space coordinates
                         \ have the y-axis going up)
 
- JSR LL9                \ Draw the ship on screen
+ JSR LL9B               \ Draw the ship on screen (Port: one frame of the
+                        \ renderer, LL9B)
 
  JSR MVEIT              \ Call MVEIT to move and rotate the ship in space
 
@@ -23984,7 +23738,8 @@ ENDIF
  LDA #1                 \ Clear the top part of the screen, draw a border box,
  JSR TT66               \ and set the current view type in QQ11 to 1
 
- JSR LL9                \ Draw the ship on screen to redisplay it
+ JSR LL9B               \ Draw the ship on screen to redisplay it (Port: one
+                        \ frame of the renderer, LL9B)
 
                         \ Fall through into MT23 to move to row 10, switch to
                         \ white text, and switch to lower case when printing
@@ -24070,7 +23825,8 @@ ENDIF
  LDA #2                 \ Set z_hi = 1, so (z_hi z_lo) = 256
  STA INWK+7
 
- JSR LL9                \ Draw the ship on screen
+ JSR LL9B               \ Draw the ship on screen (Port: one frame of the
+                        \ renderer, LL9B)
 
  JSR MVEIT              \ Call MVEIT to move and rotate the ship in space
 
@@ -31029,7 +30785,9 @@ ENDIF
  BEQ P%+5               \ explosion cloud to remove, so skip the following
                         \ instruction
 
- JSR PTCLS              \ Call PTCLS to remove the existing cloud by drawing it
+ JSR H_PTCLSE           \ Call PTCLS to remove the existing cloud by drawing it
+                        \ (Port: with the renderer's recording off,
+                        \ gfx-hooks.asm)
                         \ again
 
  LDA INWK+6             \ Set T = z_lo
@@ -31442,6 +31200,7 @@ ENDIF
  SBC #0
 
  RTS                    \ Return from the subroutine
+
 \ ******************************************************************************
 \
 \       Name: exlook
@@ -31641,8 +31400,9 @@ ENDIF
 
 .nWq
 
- LDA #DUST              \ Switch to stripe 3-2-3-2, which is cyan/red in the
- STA COL                \ space view
+ JSR pxpatd             \ Switch to stripe 3-2-3-2, which is cyan/red in the
+ NOP                    \ space view (Port: and patch the record-mode tests,
+                        \ pxpatd; the NOP keeps the size)
 
  LDY NOSTM              \ Set Y to the current number of stardust particles, so
                         \ we can use it as a counter through all the stardust
@@ -33450,8 +33210,9 @@ ENDIF
 
 .PLS22
 
- JSR pl4pat             \ Port: pick this loop or PLL4F for the new curve
-                        \ (pl4pat)
+ JSR pl4pat             \ Port: a new curve of the planet's detail, for the
+                        \ renderer (pl4pat in bank 4 calls H_PCURVE in
+                        \ gfx-hooks.asm, and picks this loop or PLL4F)
 
  LDX #0                 \ Set CNT = 0
  STX CNT
@@ -33729,6 +33490,7 @@ ENDIF
 .PL40
 
  RTS                    \ Return from the subroutine
+
 \ ******************************************************************************
 \
 \       Name: PLL4F
@@ -33853,7 +33615,7 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ Called by PLS22 at the start of each curve. K2 to K2+3 are fixed for the
+\ Called by PLS22 in place of its JSR H_PCURVE. K2 to K2+3 are fixed for the
 \ curve, so when none of them is 0, PLL4F replaces the four FMLTU calls of
 \ PLL4 by inline sums of log(q) and the patched-in log(K2+n), with exactly
 \ FMLTU's results (the antilog of the 16-bit log sum, or 0 with C clear when
@@ -33865,6 +33627,8 @@ ENDIF
 \ ******************************************************************************
 
 .pl4pat
+
+ JSR H_PCURVE           \ The renderer's new curve, as PLS22 did
 
  LDA K2+0               \ Patch logL(K2+0) and log(K2+0) into PLL4F, or
  BEQ pl4old             \ use PLL4 if K2+0 = 0
@@ -33915,6 +33679,7 @@ ENDIF
  LDA #HI(PLL4+2)
  STA pl4j+2
  RTS
+
 \ ******************************************************************************
 \
 \       Name: SUN (Part 1 of 4)
@@ -33993,6 +33758,8 @@ ENDIF
                         \ to the maximum y-coordinate of the new sun on-screen
 
  BCS PLF3M3             \ If CHKON set the C flag then the new sun's circle does
+ JSR H_SUN              \ Port: in record mode, record the sun for the renderer
+                        \ (gfx-hooks.asm)
                         \ not appear on-screen, so jump to WPLS (via the JMP at
                         \ the top of this routine) to remove the sun from the
                         \ screen, returning from the subroutine using a tail
@@ -34513,6 +34280,9 @@ ENDIF
 
 .CIRCLE
 
+ JSR H_CIRC             \ Port: in record mode, record the planet's disc for the
+                        \ renderer and return (gfx-hooks.asm)
+
  JSR CHKON              \ Call CHKON to check whether the circle fits on-screen
 
  BCS RTS2               \ If CHKON set the C flag then the circle does not fit
@@ -34702,6 +34472,9 @@ ENDIF
 \ ******************************************************************************
 
 .WPLS2
+
+ JSR H_WPLS2            \ Port: in record mode there are no lines to erase
+                        \ (gfx-hooks.asm)
 
  LDY LSX2               \ If LSX2 is non-zero (which indicates the ball line
  BNE WP1                \ heap is empty), jump to WP1 to reset the line heap
@@ -36845,7 +36618,9 @@ ENDIF
 
 .TT100
 
- JSR M%                 \ Call M% to iterate through the main flight loop
+ JSR H_MFRAME           \ Call M% to iterate through the main flight loop,
+                        \ then render the frame (Port: the renderer,
+                        \ gfx-hooks.asm)
 
  DEC DLY                \ Decrement the delay counter in DLY, so any in-flight
                         \ messages get removed once the counter reaches zero
@@ -38133,7 +37908,8 @@ ENDIF
  LDA #0                 \ Set our speed in DELTA to 0, as we aren't going
  STA DELTA              \ anywhere any more
 
- JSR M%                 \ Call the M% routine to do the main flight loop once,
+ JSR H_MFRAME           \ Call the M% routine to do the main flight loop once,
+                        \ then the frame (Port: the renderer, gfx-hooks.asm),
                         \ which will display our exploding canister scene and
                         \ move everything about, as well as decrementing the
                         \ value in LASCT
@@ -38143,7 +37919,8 @@ ENDIF
 
 .D2
 
- JSR M%                 \ Call the M% routine to do the main flight loop once,
+ JSR H_MFRAME           \ Call the M% routine to do the main flight loop once,
+                        \ then the frame (Port: the renderer, gfx-hooks.asm),
                         \ which will display our exploding canister scene and
                         \ move everything about, as well as decrementing the
                         \ value in LASCT
@@ -38669,7 +38446,8 @@ ENDIF
 
  STA INWK+3             \ Set y_lo = 0, so the ship remains in the screen centre
 
- JSR LL9                \ Call LL9 to display the ship
+ JSR LL9F               \ Call LL9 to display the ship, then render the frame
+                        \ (Port: LL9F)
 
  DEC MCNT               \ Decrement the main loop counter
 
@@ -40742,6 +40520,11 @@ ENDIF
  LSR A                  \ Set EV, the extra vessels spawning counter, to 0
  STA EV                 \ (the LSR produces a 0 as A was previously 1)
 
+ LDA #%10000000         \ Port: tell the renderer that LOOK1's TT66 is this
+ STA GWARP              \ jump's, so it keeps the double-buffered space view on
+                        \ show instead of blanking it (gfx-frame_cold.asm's
+                        \ F_DIRECT; LOOK1 starts with LDA #0)
+
  LDX VIEW               \ Set X to the current view (front, rear, left or right)
  JMP LOOK1              \ and jump to LOOK1 to initialise that view, returning
                         \ from the subroutine using a tail call
@@ -40753,6 +40536,7 @@ ENDIF
 
                         \ Port: the RTS that followed is removed (unreachable:
                         \ "This instruction has no effect")
+
 \ ******************************************************************************
 \
 \       Name: DKS3
@@ -42260,15 +42044,11 @@ ENDMACRO
  BCS nono               \ the bottom of the screen, jump to nono as the ship's
                         \ dot is off the bottom of the space view
 
- JSR Shpt               \ Call Shpt to draw a horizontal four-pixel dash for the
-                        \ first row of the dot (i.e. a four-pixel dash)
+ JSR G_SHPPT            \ Port: record the dot for the renderer (gfx-gstubs.asm)
+                        \ instead of drawing its two four-pixel dashes with
+                        \ Shpt (removed, below)
 
- LDA K4                 \ Set A = y-coordinate of dot + 1 (so this is the second
- CLC                    \ row of the two-pixel high dot)
- ADC #1
-
- JSR Shpt               \ Call Shpt to draw a horizontal four-pixel dash for the
-                        \ second row of the dot (i.e. a four-pixel dash)
+.SHPPT2
 
  LDA #%00001000         \ Set bit 3 of the ship's byte #31 to record that we
  ORA XX1+31             \ have now drawn something on-screen for this ship
@@ -42288,32 +42068,9 @@ ENDMACRO
                         \ still in the ship line heap and return from the
                         \ subroutine using a tail call
 
-.Shpt
-
-                        \ This routine draws a horizontal four-pixel dash, for
-                        \ either the top or the bottom of the ship's dot
-
- STA Y1                 \ Store A in both y-coordinates, as this is a horizontal
- STA Y2                 \ dash at y-coordinate A
-
- LDA K3                 \ Set A = screen x-coordinate of the ship dot
-
- STA X1                 \ Store the x-coordinate of the ship dot in X1, as this
-                        \ is where the dash starts
-
- CLC                    \ Set A = screen x-coordinate of the ship dot + 3
- ADC #3
-
- BCC P%+4               \ If the addition overflowed, set A = 255, the
- LDA #255               \ x-coordinate of the right edge of the screen
-
- STA X2                 \ Store the x-coordinate of the ship dot in X1, as this
-                        \ is where the dash starts
-
- JMP LSPUT              \ Draw this edge using flicker-free animation, by first
-                        \ drawing the ship's new line and then erasing the
-                        \ corresponding old line from the screen, and return
-                        \ from the subroutine using a tail call
+                        \ Port: Shpt, which drew a dash of the dot and put it on
+                        \ the ship line heap (LSPUT), is removed: the dot is
+                        \ recorded (G_SHPPT, above)
 
 \ ******************************************************************************
 \
@@ -42733,6 +42490,62 @@ ENDMACRO
 
 \ ******************************************************************************
 \
+\       Name: LL9F
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: draw a ship with LL9, then the frame (the title screen)
+\
+\ ******************************************************************************
+
+.LL9F
+
+ JSR LL9                \ Draw the ship (recorded for the renderer when QQ11 = 0)
+
+ JMP hframe             \ Render the frame (gfx-hooks.asm), returning from the
+                        \ subroutine using a tail call
+
+\ ******************************************************************************
+\
+\       Name: LL9B
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: draw the mission briefing's ship with LL9, then the frame
+\
+\ ------------------------------------------------------------------------------
+\
+\ BRIEF, PAUSE and PAS1 show the Constrictor of mission 1's briefing in view
+\ types 13 and 1, which the original draws directly, erasing the last frame's
+\ lines through the ship line heap. Here the ship is one frame of the
+\ renderer, as on the title screen: QQ11 is 0 (record mode) while LL9
+\ records the ship and the frame draws it, and is then put back, so the
+\ game's state is the original's (docs/renderer.md, "The briefings"). The
+\ briefing's text, which is printed outside record mode, goes into the text
+\ map only once the frames are running (in space mode: H_CHAR, f_sync).
+\
+\ ------------------------------------------------------------------------------
+\
+\ Returns:
+\
+\   C flag, X, Y        As LL9 leaves them (hframe keeps them; MVEIT and MT23,
+\                       which follow LL9 in the briefing, start with LDA)
+\
+\ ******************************************************************************
+
+.LL9B
+
+ LDA QQ11               \ Set QQ11 = 0 for the frame, keeping the view type on
+ PHA                    \ the stack
+ STZ QQ11
+
+ JSR LL9F               \ Record the ship and render the frame
+
+ PLA                    \ Put the view type back
+ STA QQ11
+
+ RTS                    \ Return from the subroutine
+
+\ ******************************************************************************
+\
 \       Name: LL51L
 \       Type: Subroutine
 \   Category: Maths (Geometry)
@@ -42924,36 +42737,16 @@ ENDMACRO
                         \ update this value below with the actual ship's
                         \ distance if it turns out to be visible on-screen
 
-                        \ We now set things up for flicker-free ship plotting,
-                        \ by setting the following:
-                        \
-                        \   LSNUM = offset to the first coordinate in the ship's
-                        \           line heap
-                        \
-                        \   LSNUM2 = the number of bytes in the heap for the
-                        \            ship that's currently on-screen (or 0 if
-                        \            there is no ship currently on-screen)
+                        \ Port: the set-up for flicker-free ship plotting is
+                        \ removed: LSNUM = 1 (the offset of the first set of
+                        \ line coordinates in the ship line heap) and LSNUM2 =
+                        \ the heap's byte #0 (the size of the heap of the ship
+                        \ on screen), which only the line drawing read (parts
+                        \ 10 to 12 and LSPUT: nothing is drawn directly, every
+                        \ LL9 records, H_EE31)
 
- LDY #1                 \ Set LSNUM = 1, the offset of the first set of line
- STY LSNUM              \ coordinates in the ship line heap
-
- DEY                    \ Decrement Y to 0
-
- LDA #%00001000         \ If bit 3 of the ship's byte #31 is set, then the ship
- BIT INWK+31            \ is currently being drawn on-screen, so skip the
- BNE P%+5               \ following two instructions
-
- LDA #0                 \ The ship is not being drawn on screen, so set A = 0
-                        \ so that LSNUM2 gets set to 0 below (as there are no
-                        \ existing coordinates on the ship line heap for this
-                        \ ship)
-
- EQUB &2C               \ Skip the next instruction by turning it into
-                        \ &2C &B1 &BD, or BIT &BDB1 which does nothing apart
-                        \ from affect the flags
-
- LDA (XX19),Y           \ Set LSNUM2 to the first byte of the ship's line heap,
- STA LSNUM2             \ which contains the number of bytes in the heap
+ LDY #0                 \ Port: Y = 0, as that set-up left it (LL9 returns with
+                        \ it through EE51's RTS)
 
  LDA NEWB               \ If bit 7 of the ship's NEWB flags is set, then the
  BMI EE51               \ ship has been scooped or has docked, so jump down to
@@ -43056,7 +42849,8 @@ ENDMACRO
 
  JMP LSCLR              \ Jump to LSCLR to draw the ship, which removes it from
                         \ the screen, returning from the subroutine using a
-                        \ tail call
+                        \ tail call (Port: the frame layer draws only what is
+                        \ recorded, so LSCLR just returns as it did)
 
  RTS                    \ Return from the subroutine
 
@@ -44706,106 +44500,12 @@ ENDMACRO
 
 .EE31
 
- LDY #9                 \ Fetch byte #9 of the ship's blueprint, which is the
- LDA (XX0),Y            \ number of edges, and store it in XX20
- STA XX20
-
- LDA #%00001000         \ Set bit 3 of A so the next instruction sets bit 3 of
-                        \ the ship's byte #31 to denote that we are drawing
-                        \ something on-screen for this ship
-
- ORA XX1+31             \ Apply bit 3 of A to the ship's byte #31, so if there
- STA XX1+31             \ was no ship already on screen, the bit is clear,
-                        \ otherwise it is set
-
- LDY #0                 \ Set XX17 = 0, which we are going to use as a counter
-\STY LSNUM              \ for stepping through the ship's edges
- STY XX17               \
-                        \ The STY is commented out in the original source
-
- BIT XX1+31             \ If bit 6 of the ship's byte #31 is clear, then the
- BVC LL170              \ ship is not firing its lasers, so jump to LL170 to
-                        \ skip the drawing of laser lines
-
-                        \ The ship is firing its laser at us, so we need to draw
-                        \ the laser lines
-
- LDA XX1+31             \ Clear bit 6 of the ship's byte #31 so the ship doesn't
- AND #%10111111         \ keep firing endlessly
- STA XX1+31
-
- LDY #6                 \ Fetch byte #6 of the ship's blueprint, which is the
- LDA (XX0),Y            \ number * 4 of the vertex where the ship has its lasers
-
- TAY                    \ Put the vertex number into Y, where it can act as an
-                        \ index into list of vertex screen coordinates we added
-                        \ to the XX3 heap
-
- LDX XX3,Y              \ Fetch the x_lo coordinate of the laser vertex from the
- STX XX15               \ XX3 heap into XX15
-
- INX                    \ If X = 255 then the laser vertex is not visible, as
- BEQ LL170              \ the value we stored in part 2 wasn't overwritten by
-                        \ the vertex calculation in part 6 and 7, so jump to
-                        \ LL170 to skip drawing the laser lines
-
-                        \ We now build a laser beam from the ship's laser vertex
-                        \ towards our ship, as follows:
-                        \
-                        \   XX15(1 0) = laser vertex x-coordinate
-                        \
-                        \   XX15(3 2) = laser vertex y-coordinate
-                        \
-                        \   XX15(5 4) = x-coordinate of the end of the beam
-                        \
-                        \   XX12(1 0) = y-coordinate of the end of the beam
-                        \
-                        \ The end of the laser beam will be positioned to look
-                        \ good, rather than being directly aimed at us, as
-                        \ otherwise we would only see a flashing point of light
-                        \ as they unleashed their attack
-
- LDX XX3+1,Y            \ Fetch the x_hi coordinate of the laser vertex from the
- STX XX15+1             \ XX3 heap into XX15+1
-
- INX                    \ If X = 255 then the laser vertex is not visible, as
- BEQ LL170              \ the value we stored in part 2 wasn't overwritten by
-                        \ a vertex calculation in part 6 and 7, so jump to LL170
-                        \ to skip drawing the laser beam
-
- LDX XX3+2,Y            \ Fetch the y_lo coordinate of the laser vertex from the
- STX XX15+2             \ XX3 heap into XX15+2
-
- LDX XX3+3,Y            \ Fetch the y_hi coordinate of the laser vertex from the
- STX XX15+3             \ XX3 heap into XX15+3
-
- LDA #0                 \ Set XX15(5 4) = 0, so their laser beam fires to the
- STA XX15+4             \ left edge of the screen
- STA XX15+5
-
- STA XX12+1             \ Set XX12(1 0) = the ship's z_lo coordinate, which will
- LDA XX1+6              \ effectively make the vertical position of the end of
- STA XX12               \ the laser beam move around as the ship moves in space
-
- LDA XX1+2              \ If the ship's x_sign is positive, skip the next
- BPL P%+4               \ instruction
-
- DEC XX15+4             \ The ship's x_sign is negative (i.e. it's on the left
-                        \ side of the screen), so switch the laser beam so it
-                        \ goes to the right edge of the screen by decrementing
-                        \ XX15(5 4) to 255
-
- JSR CLIP               \ Call CLIP to see if the laser beam needs to be
-                        \ clipped to fit on-screen, returning the clipped line's
-                        \ end-points in (X1, Y1) and (X2, Y2)
-
- BCS LL170              \ If the C flag is set then the line is not visible on
-                        \ screen, so jump to LL170 so we don't store this line
-                        \ in the ship line heap
-
- JSR LSPUT              \ Draw the laser line using flicker-free animation, by
-                        \ first drawing the new laser line and then erasing the
-                        \ corresponding old line from the screen
+ JMP H_EE31             \ Port: record the ship for the renderer, with its
+                        \ laser beam if it is firing at us, and return from LL9
+                        \ as parts 9 to 12 would (gfx-hooks.asm): every LL9
+                        \ records (docs/renderer.md, "The briefings"), so
+                        \ the rest of this part, which drew the beam and put it
+                        \ on the ship line heap, is removed
 
 \ ******************************************************************************
 \
@@ -44829,137 +44529,10 @@ ENDMACRO
 \
 \ ******************************************************************************
 
-.LL170
-
- LDY #3                 \ Fetch byte #3 of the ship's blueprint, which contains
- CLC                    \ the low byte of the offset to the edges data
- LDA (XX0),Y
-
- ADC XX0                \ Set V = low byte edges offset + XX0
- STA V
-
- LDY #16                \ Fetch byte #16 of the ship's blueprint, which contains
- LDA (XX0),Y            \ the high byte of the offset to the edges data
-
- ADC XX0+1              \ Set V+1 = high byte edges offset + XX0+1
- STA V+1                \
-                        \ So V(1 0) now points to the start of the edges data
-                        \ for this ship
-
- LDY #5                 \ Fetch byte #5 of the ship's blueprint, which contains
- LDA (XX0),Y            \ the maximum heap size for plotting the ship (which is
- STA CNT                \ 1 + 4 * the maximum number of visible edges) and store
-                        \ it in CNT
-
-.LL75
-
- LDY #0                 \ Set Y = 0 so we start with byte #0
-
- LDA (V),Y              \ Fetch byte #0 for this edge, which contains the
-                        \ visibility distance for this edge, beyond which the
-                        \ edge is not shown
-
- CMP XX4                \ If XX4 > the visibility distance, where XX4 contains
- BCC LL78               \ the ship's z-distance reduced to 0-31 (which we set in
-                        \ part 2), then this edge is too far away to be visible,
-                        \ so jump down to LL78 to move on to the next edge
-
- INY                    \ Increment Y to point to byte #1
-
- LDA (V),Y              \ Fetch byte #1 for this edge into A, so:
-                        \
-                        \   A = %ffff ffff, where:
-                        \
-                        \     * Bits 0-3 = the number of face 1
-                        \
-                        \     * Bits 4-7 = the number of face 2
-
- STA P                  \ Store byte #1 into P
-
- AND #%00001111         \ Extract the number of face 1 into X
- TAX
-
- LDA XX2,X              \ If XX2+X is non-zero then we decided in part 5 that
- BNE LL79               \ face 1 is visible, so jump to LL79
-
- LDA P                  \ Fetch byte #1 for this edge into A
-
- LSR A                  \ Shift right four times to extract the number of face 2
- LSR A                  \ from bits 4-7 into X
- LSR A
- LSR A
- TAX
-
- LDA XX2,X              \ If XX2+X is zero then we decided in part 5 that
- BEQ LL78               \ face 2 is hidden, so jump to LL78
-
-.LL79
-
-                        \ We now build the screen line for this edge, as
-                        \ follows:
-                        \
-                        \   XX15(1 0) = start x-coordinate
-                        \
-                        \   XX15(3 2) = start y-coordinate
-                        \
-                        \   XX15(5 4) = end x-coordinate
-                        \
-                        \   XX12(1 0) = end y-coordinate
-                        \
-                        \ We can then pass this to the line clipping routine
-                        \ before storing the resulting line in the ship line
-                        \ heap
-
- INY                    \ Increment Y to point to byte #2
-
- LDA (V),Y              \ Fetch byte #2 for this edge into X, which contains
- TAX                    \ the number of the vertex at the start of the edge
-                        \
-                        \ Byte #2 contains the vertex number multiplied by 4,
-                        \ so we can use it as an index into the heap at XX3 to
-                        \ fetch the vertex's screen coordinates, which are
-                        \ stored as four bytes containing two 16-bit numbers
-
- LDA XX3,X              \ Fetch the x_lo coordinate of the edge's start vertex
- STA XX15               \ from the XX3 heap into XX15
-
- LDA XX3+1,X            \ Fetch the x_hi coordinate of the edge's start vertex
- STA XX15+1             \ from the XX3 heap into XX15+1
-
- LDA XX3+2,X            \ Fetch the y_lo coordinate of the edge's start vertex
- STA XX15+2             \ from the XX3 heap into XX15+2
-
- LDA XX3+3,X            \ Fetch the y_hi coordinate of the edge's start vertex
- STA XX15+3             \ from the XX3 heap into XX15+3
-
- INY                    \ Increment Y to point to byte #3
-
- LDA (V),Y              \ Fetch byte #3 for this edge into X, which contains
- TAX                    \ the number of the vertex at the end of the edge
-
- LDA XX3,X              \ Fetch the x_lo coordinate of the edge's end vertex
- STA XX15+4             \ from the XX3 heap into XX15+4
-
- LDA XX3+2,X            \ Fetch the y_lo coordinate of the edge's end vertex
- STA XX12               \ from the XX3 heap into XX12
-
- LDA XX3+3,X            \ Fetch the y_hi coordinate of the edge's end vertex
- STA XX12+1             \ from the XX3 heap into XX12+1
-
- LDA XX3+1,X            \ Fetch the x_hi coordinate of the edge's end vertex
- STA XX15+5             \ from the XX3 heap into XX15+5
-
- JSR CLIP2              \ Call CLIP2 to see if the new line segment needs to be
-                        \ clipped to fit on-screen, returning the clipped line's
-                        \ end-points in (X1, Y1) and (X2, Y2)
-
- BCS LL78               \ If the C flag is set then the line is not visible on
-                        \ screen, so jump to LL78 so we don't store this line
-                        \ in the ship line heap
-
- JSR LSPUT              \ Draw this edge using flicker-free animation, by first
-                        \ drawing the ship's new line and then erasing the
-                        \ corresponding old line from the screen
+                        \ Port: removed (nothing is drawn directly: H_EE31
+                        \ records the ship, and the frame layer fills its faces
+                        \ and draws its edges, so no edge is clipped or put on
+                        \ the ship line heap here)
 
 \ ******************************************************************************
 \
@@ -44978,35 +44551,8 @@ ENDMACRO
 \
 \ ******************************************************************************
 
-.LL78
-
- LDA LSNUM              \ If LSNUM >= CNT, skip to LL81 so we don't loop back
- CMP CNT                \ for the next edge (CNT was set to the maximum heap
- BCS LL81               \ size for this ship in part 10, so this checks whether
-                        \ we have just run out of space in the ship line heap,
-                        \ and stops drawing edges if we have)
-
- LDA V                  \ Increment V by 4 so V(1 0) points to the data for the
- CLC                    \ next edge
- ADC #4
- STA V
-
- BCC P%+4               \ If the above addition didn't overflow, skip the
-                        \ following instruction
-
- INC V+1                \ Otherwise increment the high byte of V(1 0), as we
-                        \ just moved the V(1 0) pointer past a page boundary
-
- INC XX17               \ Increment the edge counter to point to the next edge
-
- LDY XX17               \ If Y < XX20, which contains the number of edges in
- CPY XX20               \ the blueprint, loop back to LL75 to process the next
- BCC LL75               \ edge
-
-.LL81
-
- JMP LSCLR              \ Jump down to part 12 below to draw any remaining lines
-                        \ from the old ship that are still in the ship line heap
+                        \ Port: removed (the edge loop of part 10, and LL81's
+                        \ call of LSCLR after it)
 
 \ ******************************************************************************
 \
@@ -46088,49 +45634,17 @@ ENDMACRO
 
 .LSCLR
 
- LDY LSNUM              \ Set Y to the offset in the line heap LSNUM
+                        \ Port: nothing is drawn directly, so no old lines are
+                        \ on the screen to erase (LSC1 is removed) and the
+                        \ heap's byte #0 is not written (LSC2): nothing reads
+                        \ it but DOEXP, which writes it first. LSCLR returns as
+                        \ LSC2 did, with A = 1 (LSNUM, the empty heap's), Y = 0
+                        \ and C set (LL9's callers go on to DORND, which takes
+                        \ in C)
 
-.LSC1
-
- CPY LSNUM2             \ If Y >= LSNUM2, jump to LSC2 to return from the ship
- BCS LSC2               \ drawing routine, because the index in Y is greater
-                        \ than the size of the existing ship line heap, which
-                        \ means we have already erased all the old ship's lines
-                        \ when drawing the new ship
-
-                        \ If we get here then Y < LSNUM2, which means Y is
-                        \ pointing to an on-screen line from the old ship that
-                        \ we need to erase
-
- LDA (XX19),Y           \ Fetch the X1 line coordinate from the heap and store
- INY                    \ it in XX15, incrementing the heap pointer
- STA XX15
-
- LDA (XX19),Y           \ Fetch the Y1 line coordinate from the heap and store
- INY                    \ it in XX15+1, incrementing the heap pointer
- STA XX15+1
-
- LDA (XX19),Y           \ Fetch the X2 line coordinate from the heap and store
- INY                    \ it in XX15+2, incrementing the heap pointer
- STA XX15+2
-
- LDA (XX19),Y           \ Fetch the Y2 line coordinate from the heap and store
- INY                    \ it in XX15+3, incrementing the heap pointer
- STA XX15+3
-
- JSR LOIN               \ Draw a line from (X1, Y1) to (X2, Y2) to erase it from
-                        \ the screen
-
- JMP LSC1               \ Loop back to LSC1 to draw (i.e. erase) the next line
-                        \ from the heap
-
-.LSC2
-
- LDA LSNUM              \ Store LSNUM in the first byte of the ship line heap
+ LDA #1
  LDY #0
- STA (XX19),Y
-
-.LSC3
+ SEC
 
  RTS                    \ Return from the subroutine
 
@@ -46188,74 +45702,9 @@ ENDMACRO
 \
 \ ******************************************************************************
 
-.LSPUT
-
- LDY LSNUM              \ Set Y = LSNUM, to get the offset within the ship line
-                        \ heap where we want to insert our new line
-
- CPY LSNUM2             \ Compare LSNUM and LSNUM2 and store the flags on the
- PHP                    \ stack so we can retrieve them later
-
- LDX #3                 \ We now want to copy the line coordinates (X1, Y1) and
-                        \ (X2, Y2) to XX12...XX12+3, so set a counter to copy
-                        \ 4 bytes
-
-.LSC4
-
- LDA X1,X               \ Copy the X-th byte of X1/Y1/X2/Y2 to the X-th byte of
- STA XX12,X             \ XX12
-
- DEX                    \ Decrement the loop counter
-
- BPL LSC4               \ Loop back until we have copied all four bytes
-
- JSR LOIN               \ Draw a line from (X1, Y1) to (X2, Y2)
-
- LDA (XX19),Y           \ Set X1 to the Y-th coordinate on the ship line heap,
- STA X1                 \ i.e. the one we are replacing in the heap
-
- LDA XX12               \ Replace it with the X1 coordinate in XX12
- STA (XX19),Y
-
- INY                    \ Increment the index to point to the Y1 coordinate
-
- LDA (XX19),Y           \ Set Y1 to the Y-th coordinate on the ship line heap,
- STA Y1                 \ i.e. the one we are replacing in the heap
-
- LDA XX12+1             \ Replace it with the Y1 coordinate in XX12+1
- STA (XX19),Y
-
- INY                    \ Increment the index to point to the X2 coordinate
-
- LDA (XX19),Y           \ Set X2 to the Y-th coordinate on the ship line heap,
- STA X2                 \ i.e. the one we are replacing in the heap
-
- LDA XX12+2             \ Replace it with the X2 coordinate in XX12+2
- STA (XX19),Y
-
- INY                    \ Increment the index to point to the Y2 coordinate
-
- LDA (XX19),Y           \ Set Y2 to the Y-th coordinate on the ship line heap,
- STA Y2                 \ i.e. the one we are replacing in the heap
-
- LDA XX12+3             \ Replace it with the Y2 coordinate in XX12+3
- STA (XX19),Y
-
- INY                    \ Increment the index to point to the next coordinate
- STY LSNUM              \ and store the updated index in LSNUM
-
- PLP                    \ Restore the result of the comparison above, so if the
- BCS LSC3               \ original value of LSNUM >= LSNUM2, then we have
-                        \ already redrawn all the lines from the old ship's line
-                        \ heap, so return from the subroutine (as LSC3 contains
-                        \ an RTS)
-
- JMP LOIN               \ Otherwise there are still more lines to erase from the
-                        \ old ship on-screen, so the coordinates in (X1, Y1) and
-                        \ (X2, Y2) that we just pulled from the ship line heap
-                        \ point to a line that is still on-screen, so call LOIN
-                        \ to draw this line and erase it from the screen,
-                        \ returning from the subroutine using a tail call
+                        \ Port: removed (nothing is drawn directly, so no line
+                        \ is put on the ship line heap: LL9 records the ship,
+                        \ H_EE31, and SHPPT the dot, G_SHPPT)
 
 \ ******************************************************************************
 \
@@ -47896,6 +47345,9 @@ ENDMACRO
  LDA #20                \ Set QQ19+2 to size 20 for the crosshairs size
  STA QQ19+2
 
+ JSR H_SIGHT            \ Port: in record mode the renderer draws the sights
+                        \ (gfx-hooks.asm)
+
  JSR TT15               \ Call TT15 to draw crosshairs of size 20 just to the
                         \ left of the middle of the screen
 
@@ -47910,6 +47362,7 @@ ENDMACRO
 .SIG2
 
  RTS                    \ Return from the subroutine (no laser on this view)
+
 \ ******************************************************************************
 \
 \       Name: sightcol
@@ -49234,9 +48687,11 @@ ENDIF
 \ pages &D900-&DAFF, &DC00 up to the command's end and &DF00-&DFFF during a
 \ disc command, and keep their own lasting state in &C2C0-&C2FF and
 \ &DFDA-&DFDB (docs/master-memory.md); a third-party ROM may write its own
-\ page of HAZEL too. So the whole of HAZEL is stashed in main RAM
-\ &4000-&5FFF, which is not on show, for the command and copied back
-\ afterwards. DFS's and the MOS's lasting bytes (&C2C0-&C2FF, and &DFC0-&DFFF: the MOS's FSCV copy
+\ page of HAZEL too. So the whole of HAZEL is stashed in screen buffer 0
+\ (main RAM &4000-&5FFF, not on show while docked) for the command and copied
+\ back afterwards, and GSTASH tells the renderer that buffer 0 no longer
+\ holds a frame (the next space-mode frame clears it, f_b0new). DFS's and
+\ the MOS's lasting bytes (&C2C0-&C2FF, and &DFC0-&DFFF: the MOS's FSCV copy
 \ at &DFDA-&DFDB, and the ACCCON its error path puts back from &DFDC when
 \ &DFDD is non-zero) live in DFSST while the game runs (the loader takes
 \ them after its last disc access): they go back before the command and are
@@ -49250,25 +48705,27 @@ ENDIF
 \ the 1770 is quietened (Force Interrupt) and the minimal handler the loader
 \ installed goes back (a stray NMI would otherwise run DFS's handler with
 \ the game's zero page at &A0-&A7). The error path (BRKV, NEWBRK) does the
-\ same through DOSNMI. The MOS reads the command from a copy at &6000
+\ same through DOSNMI. The MOS reads the command from a copy in buffer 0
 \ (DOSBUF, after HAZEL's stash), as the commands' strings (CTLI, DELI,
 \ savosc, lodosc) are in the cold area, which is not paged in while the
 \ MOS and DFS run the command.
 \
 \ ******************************************************************************
 
-DOSBUF = &6000          \ the command's copy, after HAZEL's stash
+DOSBUF = &6000          \ the command's copy, in buffer 0 after HAZEL's stash
 
 .DOSCLI
 
- PHA                    \ Stash HAZEL at &4000 (A and the command's address
- PHX                    \ in Y X are kept)
- PHY
+ PHA                    \ Stash HAZEL in buffer 0 (A and the command's address
+ PHX                    \ in Y X are kept), with GSTASH set (in HAZEL: the copy
+ PHY                    \ back keeps it): buffer 0 holds no frame from now on
+ LDA #&80
+ STA GSTASH
  LDX #&C0
  LDY #&40
  JSR dosmv
 
- PLY                    \ Copy the command, to its CR, from (Y X) to DOSBUF,
+ PLY                    \ Copy the command, to its CR, from (Y X) into buffer 0
  PLX                    \ after HAZEL's stash (ACCCON X = 0, as dosmv left it),
  STX dosc0+1            \ where the MOS reads it whatever ROM is paged in (the
  STY dosc0+2            \ commands' strings are in the cold area, with the code
@@ -49299,7 +48756,7 @@ DOSBUF = &6000          \ the command's copy, after HAZEL's stash
  STA DFSIN              \ (a disc command is under way)
  PLA
 
- LDX #LO(DOSBUF)        \ The command, from its copy at DOSBUF
+ LDX #LO(DOSBUF)        \ The command, from its copy in buffer 0
  LDY #HI(DOSBUF)
  JSR OSCLI
 
@@ -49342,7 +48799,7 @@ DOSBUF = &6000          \ the command's copy, after HAZEL's stash
  BIT DFSIN              \ After a disc command (or its error), stash DFS's
  BPL dosn3              \ lasting bytes again (the command may have changed
  PHX                    \ them: *DIR, *DRIVE), then put HAZEL back from
- PHY                    \ &4000
+ PHY                    \ buffer 0
  LDX #63
 .dosn2
  LDA &C2C0,X
@@ -49364,7 +48821,7 @@ DOSBUF = &6000          \ the command's copy, after HAZEL's stash
  RTS
 
 .dosmv                  \ Copy the 32 pages (8K) from page X on to page Y on,
- LDA #4                 \ with ACCCON X = 0 (&4000-&5FFF is main RAM)
+ LDA #4                 \ with ACCCON X = 0 (buffer 0 is main RAM)
  TRB VIA+&34
  STX dosm1+2
  STY dosm2+2
