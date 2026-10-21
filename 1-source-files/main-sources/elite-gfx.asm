@@ -1,7 +1,7 @@
 \ ******************************************************************************
 \
 \ elite-gfx.asm - the filled renderer's memory: its shared workspace in main
-\ RAM, and its rasteriser in bank 5 and ANDY
+\ RAM, its glue in HAZEL, banks 5 and 6 and ANDY
 \ (docs/memory-map.md)
 \
 \ INCLUDEd at the end of elite-source.asm (after the game's code, so that the
@@ -20,6 +20,8 @@
 \                    gfx-raster_lcold.asm; gfx-raster_disc.asm)
 \   build/RASTA.bin  ANDY: the rasteriser's polygon window (gfx-raster_poly.asm,
 \                    gfx-raster_line.asm)
+\   build/BANK6.bin  sideways RAM bank 6: the frame layer (gfx-frame.asm),
+\                    the ship faces and colours (gfx-faces.asm) and its state
 \
 \ ******************************************************************************
 
@@ -106,3 +108,34 @@ INCLUDE "1-source-files/main-sources/gfx-raster_line.asm"   \ R_LINE
 ASSERT RA_END <= &9000
 PRINT "ANDY: rasteriser polygon window &8000-", ~RA_END-1, " free ", &9000-RA_END
 SAVE "3-assembled-output/RASTA.bin", &8000, RA_END, &8000
+
+CLEAR &8000, &C000
+ORG &8000
+INCLUDE "1-source-files/main-sources/gfx-frame.asm"
+INCLUDE "1-source-files/main-sources/gfx-faces.asm"
+INCLUDE "1-source-files/main-sources/gfx-light6.asm"   \ the lighting tables (and the first ramps)
+INCLUDE "1-source-files/main-sources/gfx-light.asm"    \ the lighting's L_SUN and L_REC
+INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
+INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 5)
+INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are in HAZEL)
+.B6_CODE_END
+.F_HW   SKIP 256        \ planet half-widths
+.F_HW2  SKIP 256        \ sun half-widths
+.F_DL                   \ ship records: XX2 then XX3 copies (1536 bytes)
+ SKIP &22
+ INCLUDE "1-source-files/main-sources/gfx-finit.asm"   \ F_INIT, run once before the first frame
+ SKIP F_DL + 1536 - P%
+.F_DLEND
+.F_TM   SKIP 768        \ text map: desired characters, 24 rows of 32
+.F_ST   SKIP 768        \ what each buffer shows in each cell (gfx-frame.asm)
+ASSERT F_ST = F_TM + &300
+.F_TMR  SKIP 24         \ non-empty cells per row
+.F_SHR0 SKIP 24
+.F_SHR1 SKIP 24
+.F_DSX  SKIP NDSTAR     \ the stars drawn directly (gfx-frame_cold.asm's F_DSTAR,
+.F_DSY  SKIP NDSTAR     \ f_unstar): x and y (F_DSS, their sizes, in the
+                        \ shared workspace after R_SS, cleared with it)
+.B6_END
+PRINT "Bank 6: frame layer &8000-", ~B6_CODE_END-1, ", data ", ~F_HW, "-", ~B6_END-1, " free ", &C000-B6_END
+ASSERT B6_END <= &C000
+SAVE "3-assembled-output/BANK6.bin", &8000, B6_END, &8000

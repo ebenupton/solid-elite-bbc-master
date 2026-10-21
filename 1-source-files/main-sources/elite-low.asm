@@ -16,9 +16,14 @@
 \   * the far calls between Elite's home bank and the cold area
 \     (elite-far.asm), which page the banks;
 \
-\   * the renderer's shared variables with their initial values
-\     (gfx-gvars.asm), which the game, the IRQ handler and the renderer's
-\     banks share.
+\   * the renderer's glue: the variables that the game, the IRQ handler and
+\     the renderer's banks share, with their initial values (gfx-gvars.asm),
+\     the trampolines from the frame layer into the rasteriser
+\     (gfx-tramp.asm), the hooks that CHPR (WRCHV: any ROM paged, ACCCON X
+\     set) and IRQ1 call (gfx-lowhooks.asm), and, needing only game context
+\     but outside the banks they page, the G_ stubs that page the frame layer
+\     in (gfx-gstubs.asm) and the hooks in Elite's drawing code
+\     (gfx-hooks.asm).
 \
 \ ******************************************************************************
 
@@ -26,4 +31,8 @@
 
  INCLUDE "1-source-files/main-sources/elite-far.asm"            \ far calls to and from the cold area
 
- INCLUDE "1-source-files/main-sources/gfx-gvars.asm"            \ the renderer's shared variables
+ INCLUDE "1-source-files/main-sources/gfx-gvars.asm"            \ the renderer's glue: shared variables,
+ INCLUDE "1-source-files/main-sources/gfx-tramp.asm"            \ the trampolines into the rasteriser,
+ INCLUDE "1-source-files/main-sources/gfx-lowhooks.asm"         \ the text map's and the IRQ's hooks
+ INCLUDE "1-source-files/main-sources/gfx-gstubs.asm"           \ the stubs that page the frame layer in
+ INCLUDE "1-source-files/main-sources/gfx-hooks.asm"            \ the hooks in Elite's drawing code

@@ -509,9 +509,9 @@ ENDIF
 
                         \ Port: the rest of the loader runs from K% (&0400),
                         \ where its image at LTAIL is copied now: it writes
-                        \ the renderer's shared workspace (DFSST), which is in
-                        \ main RAM from &0E00 up to the main code, where this
-                        \ loader is (elite-gfx.asm).
+                        \ the renderer's shared workspace (DFSST here, G_INIT
+                        \ the rest), which is in main RAM from &0E00 up to
+                        \ the main code, where this loader is (elite-gfx.asm).
                         \ The game sets up K% itself, as it does WP, which was
                         \ the loader's place in the original
 
@@ -661,6 +661,9 @@ ENDIF
 
  CLI
 
+ JSR GINIT              \ Port: initialise the renderer (G_INIT: the rasteriser's
+                        \ state, and shadow RAM's screen cleared)
+
  LDA #SBANK             \ Set the RAM copy of the currently selected paged ROM
  STA LATCH              \ to SBANK, the bank of the game's entry point S% (the
                         \ cold area, ROMSEL &87, from build/game-addresses.asm),
@@ -806,6 +809,10 @@ ENDIF
  EQUB 5, %00001001
  EQUW &8000, B5LEN
 
+ EQUW MESS10            \ BANK6: the renderer's frame layer, bank 6
+ EQUB 6, %00001001
+ EQUW &8000, B6LEN
+
  EQUW MESS12            \ HAZEL: the game data and the hangar's tables, staged
  EQUB HOMEBANK, %00001001 \ in main RAM at &4000 (screen buffer 0) and copied to
  EQUW &4000, HZLEN      \ HAZEL after the last disc access (see LDEND), as DFS
@@ -901,6 +908,11 @@ ENDIF
 .MESS9
 
  EQUS "L.BANK5 FFFF1300"    \ Port: *LOAD BANK5 FFFF1300
+ EQUB 13
+
+.MESS10
+
+ EQUS "L.BANK6 FFFF1300"    \ Port: *LOAD BANK6 FFFF1300
  EQUB 13
 
 .MESS12

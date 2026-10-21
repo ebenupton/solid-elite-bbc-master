@@ -2853,9 +2853,11 @@ ENDIF
                         \ boundary). The whole screen is now one MODE 1 screen
                         \ in one CMYK palette, set once by the loader, so there
                         \ is no switch to mode 2 and no dashboard palette (nor
-                        \ the escape pod's tint of it) here any more. The
-                        \ dashboard is in shadow RAM: show shadow RAM from here
-                        \ to the end of the frame (ACCCON D = 1, X as it is)
+                        \ the escape pod's tint of it) here any more. The space
+                        \ view is double buffered (main or shadow RAM, shown at
+                        \ vsync by H_VSYNC), and the dashboard is in shadow RAM:
+                        \ show shadow RAM from here to the end of the frame
+                        \ (ACCCON D = 1, X as it is)
 
  LDA #1
  TSB VIA+&34
@@ -2926,6 +2928,9 @@ ENDIF
                         \ longer has any effect, as no mode or palette change
                         \ follows)
 
+ JSR H_VSYNC            \ Port: the renderer's flip: show the front buffer
+                        \ (ACCCON D; gfx-hooks.asm)
+
  PHX                    \ Call SOINT to send the current sound data to the
  JSR SOINT              \ 76489 sound chip, stashing X on the stack so it gets
  PLX                    \ preserved across the call
@@ -2936,6 +2941,7 @@ ENDIF
 
  RTI                    \ Return from interrupts, so this interrupt is not
                         \ passed on to the next interrupt handler
+
 \ ******************************************************************************
 \
 \       Name: VSCAN

@@ -64,7 +64,8 @@
 \ E%, KWL%, KWH%, the blueprints from the missile's to the Dodo's, SNE and
 \ ACT. DOSCLI stashes all of HAZEL in main RAM around each disc command, so
 \ the data may sit anywhere in it; nothing the IRQ handler or CHPR uses
-\ during a command is here. Saved as HAZEL (it ends below &DF00: the MOS's
+\ during a command is here. After the data, the hangar's tables
+\ (gfx-hangar-hz.asm), then HANGHEAP. Saved as HAZEL (it ends below &DF00: the MOS's
 \ own bytes from &DF00 on are left as the loader's disc accesses left them,
 \ and are not for the game's data), which the loader copies into place after
 \ its last disc access (and the data as HZDATA, for the tools).
@@ -81,6 +82,8 @@
 .HZDATA_END%
 
 
+ INCLUDE "1-source-files/main-sources/gfx-hangar-hz.asm"    \ Port: the hangar's tables
+
 .HZ_END
 
 HANGHEAP = &DE00        \ Port: the hangar's ship line heap, which LL9 writes
@@ -90,7 +93,7 @@ HANGHEAP = &DE00        \ Port: the hangar's ship line heap, which LL9 writes
 
  ASSERT HZ_END <= HANGHEAP
 
- PRINT "HAZEL: game data &C000-", ~HZ_END-1, ", free ", HANGHEAP-HZ_END, " (+ 256 at HANGHEAP, the hangar's heap, and 256 at &DF00, the MOS's)"
+ PRINT "HAZEL: game data &C000-", ~HZDATA_END%-1, ", the hangar's tables to ", ~HZ_END-1, ", free ", HANGHEAP-HZ_END, " (+ 256 at HANGHEAP, the hangar's heap, and 256 at &DF00, the MOS's)"
  ASSERT HZ_END <= &DF00  \ (&DF00-&DFFF is the MOS's: its FS numbers and
                         \ filing-system names, its lasting state)
  SAVE "3-assembled-output/HZDATA.bin", &C000, HZDATA_END%, &C000
@@ -127,4 +130,4 @@ HANGHEAP = &DE00        \ Port: the hangar's ship line heap, which LL9 writes
  PRINT "G% = ", ~G%
  PRINT "NA2% = ", ~NA2%
 
- INCLUDE "1-source-files/main-sources/elite-gfx.asm"      \ Port: the filled renderer (its shared workspace, bank 5 and ANDY)
+ INCLUDE "1-source-files/main-sources/elite-gfx.asm"      \ Port: the filled renderer (HAZEL, banks 5 and 6, ANDY)
