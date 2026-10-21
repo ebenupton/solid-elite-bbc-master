@@ -6527,7 +6527,36 @@ ENDIF
 
 .PIX1
 
- JSR ADDK               \ Set (A X) = (A P) + (S R)
+                        \ Set (A X) = (A P) + (S R) (Port: ADDK inlined; all
+                        \ three callers set P = 0, so the same-sign low byte
+                        \ is X = R + 0 with C = 0, exactly as ADDK's CLC : LDA R
+                        \ : ADC P : TAX, and the opposite-sign case calls MU8K,
+                        \ ADDK's own tail, with T and T1 set as ADDK sets them)
+
+ STA T1                 \ Store argument A in T1
+
+ AND #%10000000         \ Extract the sign of A into T
+ STA T
+
+ EOR S                  \ If A and S have the same sign, add them at pxad
+ BPL pxad
+
+ JSR MU8K               \ Different signs: (A X) = (A P) + (S R) via MU8K
+                        \ (ADDK's tail, as PIX1 may run with ACCCON X set)
+
+ BRA pxst
+
+.pxad
+
+ LDX R                  \ X = R + P = R (P = 0, no carry)
+
+ LDA S                  \ A = S + T1 + 0, with ADD's C and V
+ CLC
+ ADC T1
+
+ ORA T                  \ Give the result the sign of argument A
+
+.pxst
 
  STA YY+1               \ Set YY+1 to A, the high byte of the result
 
@@ -6536,7 +6565,6 @@ ENDIF
 
                         \ Fall through into PIXEL2 to draw the stardust particle
                         \ at (X1,Y1)
-
 \ ******************************************************************************
 \
 \       Name: PIXEL2
@@ -6578,8 +6606,9 @@ ENDIF
                         \ to skip the following negation
 
  EOR #%01111111         \ The x-coordinate offset is negative, so flip all the
- CLC                    \ bits apart from the sign bit and add 1, to convert it
- ADC #1                 \ from a sign-magnitude number to a signed number
+ INC A                  \ bits apart from the sign bit and add 1, to convert it
+                        \ from a sign-magnitude number to a signed number (Port:
+                        \ INC A, as C is dead here and V is not read after PIXEL2)
 
 .PX21
 
@@ -6588,35 +6617,42 @@ ENDIF
                         \ So X is now the offset converted to an x-coordinate,
                         \ centred on x-coordinate 128
 
- LDA Y1                 \ Fetch the y-coordinate offset into A and clear the
- AND #%01111111         \ sign bit, so A = |Y1|
+ LDA Y1                 \ Fetch the y-coordinate offset into A
+
+ BPL PX23               \ If it is positive, A = |Y1| already, so jump to PX23
+                        \ to do the on-screen check
+
+ AND #%01111111         \ Clear the sign bit, so A = |Y1|
 
  CMP #Y                 \ If |Y1| >= #Y then it's off the screen (as #Y is half
  BCS PXR1               \ the screen height), so return from the subroutine (as
                         \ PXR1 contains an RTS)
 
- LDA Y1                 \ Fetch the y-coordinate offset into A
+ EOR #%11111111         \ The y-coordinate offset is negative, so negate |Y1|
+ ADC #1                 \ (C is clear) to convert A from a sign-magnitude number
+                        \ into a traditional signed number (the same ADC
+                        \ operand, $FF - |Y1|, as Y1 EOR %01111111 gives, so
+                        \ the result and flags are as before)
 
- BPL PX22               \ If the y-coordinate offset is positive, jump to PX22
-                        \ to skip the following negation
+ BRA PX22               \ Jump to PX22 to convert it to a screen y-coordinate
 
- EOR #%01111111         \ The y-coordinate offset is negative, so flip all the
- ADC #1                 \ bits apart from the sign bit and subtract 1 to convert
-                        \ A from a sign-magnitude number into a traditional
-                        \ signed number, so A is now Y1 in a form that can be
-                        \ used with the SBC instruction
+.PX23
+
+ CMP #Y                 \ If Y1 >= #Y then it's off the screen, so return from
+ BCS PXR1               \ the subroutine (as PXR1 contains an RTS)
 
 .PX22
 
- STA T                  \ Set A = #Y + 1 - Y1
- LDA #Y+1               \
- SBC T                  \ So if Y1 is positive we display the point up from the
+ STA T                  \ Set A = #Y + 1 - Y1 (Port: as ~T + #Y + 1 + C, which
+ EOR #%11111111         \ is exactly what SBC T computes, with the same C, N,
+ ADC #Y+1               \ Z and V; T is still stored)
+                        \
+                        \ So if Y1 is positive we display the point up from the
                         \ centre at y-coordinate 97, while a negative Y1 means
                         \ down from the centre
 
                         \ Fall through into PIXEL to draw the stardust at the
                         \ screen coordinates in (X, A)
-
 \ ******************************************************************************
 \
 \       Name: PIXEL
