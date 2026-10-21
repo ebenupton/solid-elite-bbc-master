@@ -17904,12 +17904,13 @@ ENDIF
  RTS                    \ Return from the subroutine
 \ ******************************************************************************
 \
-\ Port: the main code continues in main RAM at &7000 from here, and runs on
-\ through &8000 into bank 4 (docs/memory-map.md), at a routine that nothing
-\ falls into. The part from CODE%, below &4000, is saved as BCODE; the part
-\ from &7000 as HICODE and the rest, in bank 4, with the blocks tagged bank 4
-\ after it, as BANK4 (elite-layout.asm). Main RAM &4000-&6FFF is left for the
-\ filled renderer's second screen buffer
+\ Port: the main code continues in main RAM at &7000 from here, after the high
+\ code (elite-hi.asm), and runs on through &8000 into bank 4
+\ (docs/memory-map.md), at a routine that nothing falls into. The part from
+\ CODE%, below &4000, is saved as BCODE; the part from &7000 as HICODE and
+\ the rest, in bank 4, with the blocks tagged bank 4 after it, as BANK4
+\ (elite-layout.asm). Main RAM &4000-&6FFF is left for the filled renderer's
+\ second screen buffer
 \
 \ ******************************************************************************
 
@@ -17920,6 +17921,8 @@ ENDIF
 
  CLEAR &7000, &C000
  ORG &7000
+
+ INCLUDE "1-source-files/main-sources/elite-hi.asm"             \ the quarter squares
 
 .HI_RUN%
 \ ******************************************************************************
@@ -21307,8 +21310,40 @@ ENDIF
  STA P                  \ Copy A into P and X
  TAX
 
- BNE MU11               \ If X = 0 fall through into MU1 to return a 0,
-                        \ otherwise jump to MU11 to return P * X
+ BEQ MU1                \ If X = 0 jump to MU1 to return a 0
+
+                        \ Port: P * P by quarter squares directly, with MU11's
+                        \ exact results: |P - P| = 0 and QS(0) = 0, so
+                        \ (A P) = QS(2P); T = P - 1, X = 0, Y kept, C and V
+                        \ clear, Z set, N clear (as MU11's SBC QSH / LDX #0)
+
+ DEX                    \ Set T = X - 1
+ STX T
+
+ ASL A                  \ X = 2P mod 256, C = bit 8 of 2P
+ TAX
+
+ BCS sq5
+
+ LDA QSL,X              \ (A P) = QS(2P) = P * P
+ STA P
+ LDA QSH,X
+
+.sq6
+
+ LDX #0                 \ X = 0, V and C clear, as MU11 leaves them (C is
+ CLV                    \ already clear here: BCS sq5 was not taken, and sq5
+                        \ clears it before joining)
+
+ RTS                    \ Return from the subroutine
+
+.sq5
+
+ LDA QSL+256,X          \ As above, with 2P - 256 in X
+ STA P
+ LDA QSH+256,X
+ CLC                    \ C was set by the ASL A
+ BRA sq6
 
 \ ******************************************************************************
 \
@@ -21348,6 +21383,13 @@ ENDIF
 \
 \   (A P) = |y_hi| * Q
 \
+\ ------------------------------------------------------------------------------
+\
+\ MLU1, MLU2 and MLU3 are only called by STL1 and STL2, which set Q = A OR 1,
+\ so Q is never 0 here and the MULTU test for Q = 0 is not needed. MLU3 also
+\ skips setting T = Q - 1, so it may only be called when T is already set from
+\ the same Q by a previous call to MLU1 or MLU2.
+\
 \ ******************************************************************************
 
 .MLU1
@@ -21359,31 +21401,20 @@ ENDIF
                         \
                         \   (A P) = |A| * Q
 
-\ ******************************************************************************
-\
-\       Name: MLU2
-\       Type: Subroutine
-\   Category: Maths (Arithmetic)
-\    Summary: Calculate (A P) = |A| * Q
-\
-\ ------------------------------------------------------------------------------
-\
-\ Do the following multiplication of a sign-magnitude 8-bit number P with an
-\ unsigned number Q:
-\
-\   (A P) = |A| * Q
-\
-\ ******************************************************************************
-
 .MLU2
+
+ LDX Q                  \ Set T = Q - 1 (Q is never 0 here, see above)
+ DEX
+ STX T
+
+.MLU3
 
  AND #%01111111         \ Clear the sign bit in P, so P = |A|
  STA P
 
-                        \ Fall through into MULTU to calculate:
-                        \
-                        \   (A P) = P * Q
-                        \         = |A| * Q
+ BRA MU11               \ Port: join MU11 to calculate (A P) = P * Q = |A| * Q
+                        \ (the original's MLU2 fell through MULTU's test into
+                        \ it; the port's MULTU falls into MU11)
 
 \ ******************************************************************************
 \
@@ -21408,113 +21439,86 @@ ENDIF
                         \ clear the C flag and return from the subroutine using
                         \ a tail call
 
-                        \ Otherwise fall through into MU11 to set (A P) = P * X
+ DEX                    \ Set T = X - 1 (X is never 0 here)
+ STX T
+
+ LDA P                  \ Set A = P and fall through into MU11 to set
+                        \ (A P) = P * Q
 
 \ ******************************************************************************
 \
 \       Name: MU11
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
-\    Summary: Calculate (A P) = P * X
-\  Deep dive: Shift-and-add multiplication
-\
-\ ------------------------------------------------------------------------------
-\
-\ Do the following multiplication of two unsigned 8-bit numbers:
-\
-\   (A P) = P * X
-\
-\ This uses the same shift-and-add approach as MULT1, but it's simpler as we
-\ are dealing with unsigned numbers in P and X.
+\    Summary: Calculate (A P) = P * (T + 1), entered with A = P
 \
 \ ******************************************************************************
 
 .MU11
 
- DEX                    \ Set T = X - 1
- STX T                  \
-                        \ We subtract 1 as the C flag will be set when we want
-                        \ to do an addition in the loop below
+                        \ Port: the product by quarter squares (the tables QSL
+                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ results: (A P) = P * X (X = T + 1 = 1..255), T = X - 1,
+                        \ X = 0, Y kept, C clear (callers use it)
 
- LDA #0                 \ Set A = 0 so we can start building the answer in A
+ STY mu7+1              \ Keep Y (in the operand of the LDY #0 at mu7)
 
-\LDX #8                 \ This instruction is commented out in the original
-                        \ source
-
- TAX                    \ Copy A into X. There is a comment in the original
-                        \ source here that says "just in case", which refers to
-                        \ the MU11 routine in the BBC Micro cassette and disc
-                        \ versions, which set X to 0 (as they use X as a loop
-                        \ counter)
-                        \
-                        \ The version here doesn't use a loop, but this
-                        \ instruction makes sure the unrolled version returns
-                        \ the same results as the loop versions, just in case
-                        \ something out there relies on MU11 returning X = 0
-
- LSR P                  \ Set P = P >> 1
-                        \ and C flag = bit 0 of P
-
-                        \ We now repeat the following four instruction block
-                        \ eight times, one for each bit in P. In the BBC Micro
-                        \ cassette and disc versions of Elite the following is
-                        \ done with a loop, but it is marginally faster to
-                        \ unroll the loop and have eight copies of the code,
-                        \ though it does take up a bit more memory (though that
-                        \ isn't a big concern when you have a 6502 Second
-                        \ Processor)
-
- BCC P%+4               \ If C (i.e. bit 0 of P) is set, do the
- ADC T                  \ addition for this bit of P:
-                        \
-                        \   A = A + T + C
-                        \     = A + X - 1 + 1
-                        \     = A + X
-
- ROR A                  \ Shift A right to catch the next digit of our result,
-                        \ which the next ROR sticks into the left end of P while
-                        \ also extracting the next bit of P
-
- ROR P                  \ Add the overspill from shifting A to the right onto
-                        \ the start of P, and shift P right to fetch the next
-                        \ bit for the calculation into the C flag
-
- BCC P%+4               \ Repeat for the second time
+                        \ Set X = P + X, with C set if it is 256 or more (A = P)
+ SEC
  ADC T
- ROR A
- ROR P
+ TAX
 
- BCC P%+4               \ Repeat for the third time
- ADC T
- ROR A
- ROR P
+ BCS mu5                \ If P + X >= 256, jump to mu5 for the tables' upper
+                        \ halves
 
- BCC P%+4               \ Repeat for the fourth time
- ADC T
- ROR A
- ROR P
+ LDA P                  \ Set Y = |P - X| (C is clear here as BCS mu5 was
+ SBC T                  \ not taken, so this is P - T - 1 = P - X)
+ BCS mu4
+ EOR #&FF               \ Negate A (C is clear here, as BCS mu4 was not
+ INC A                  \ taken)
+ SEC                    \ Set C for the SBC below (BCS mu4 arrives with C set)
 
- BCC P%+4               \ Repeat for the fifth time
- ADC T
- ROR A
- ROR P
+.mu4
 
- BCC P%+4               \ Repeat for the sixth time
- ADC T
- ROR A
- ROR P
+ TAY
 
- BCC P%+4               \ Repeat for the seventh time
- ADC T
- ROR A
- ROR P
+ LDA QSL,X              \ Set (A P) = (P + X)^2 / 4 - (P - X)^2 / 4
+ SBC QSL,Y              \           = P * X (C is set on both paths)
+ STA P
+ LDA QSH,X
+ SBC QSH,Y
 
- BCC P%+4               \ Repeat for the eighth time
- ADC T
- ROR A
- ROR P
+.mu7
+
+ LDY #0                 \ Restore Y (self-modified: the operand is the Y
+                        \ that MU11 was called with)
+
+ LDX #0                 \ X = 0 and C clear, as the original leaves them
+ CLC
 
  RTS                    \ Return from the subroutine
+
+.mu5
+
+ LDA P                  \ Set Y = |P - X| (C is set here as BCS mu5 was
+ SBC Q                  \ taken, and Q = T + 1 = X on every entry to MU11)
+ BCS mu6
+ EOR #&FF               \ Negate A (C is clear here, as BCS mu6 was not
+ INC A                  \ taken)
+ SEC                    \ Set C for the SBC below (BCS mu6 arrives with C set)
+
+.mu6
+
+ TAY
+
+ LDA QSL+256,X          \ As above, with P + X - 256 in X
+ SBC QSL,Y
+ STA P
+ LDA QSH+256,X
+ SBC QSH,Y
+
+ BRA mu7                \ Restore Y, set X = 0 and C clear, and return
+
 
 \ ******************************************************************************
 \
