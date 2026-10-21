@@ -33,3 +33,5 @@ run.bat
 2-build-files/__pycache__/
 3-assembled-output/dashtab-*.asm
 3-assembled-output/*.png
+3-assembled-output/lighting/
+3-assembled-output/flare/

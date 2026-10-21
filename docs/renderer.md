@@ -226,18 +226,29 @@ state: a full heap stops `NWSHP`.
 
 ## Generated tables
 
-Some of the renderer's sources are tables that tools in the port's
-development tree generated. They are checked in here, and the build does not
-regenerate them:
+Some of the renderer's sources are tables that tools in `2-build-files`
+generate. They are checked in, and the build does not regenerate them; run
+the tool again after changing it:
 
-* `gfx-faces.asm` comes from `faces.py`. It parses the 33 blueprints, rebuilds
-  each face's polygon, turns detail edges into filled details, fins and
-  lines, finds each ship's symmetries, and gives the faces colours so that
-  adjacent faces never match.
-* `gfx-light6.asm` comes from `lightramps.py`, the lighting model that
-  chooses the nine ramps.
-* The hangar's inks come from `hangarcols.py` and `hangarinks.py`, which
-  measured which ships blend into the hangar's tans.
+* `gfx-faces.asm` and `gfx-light6.asm` come from
+  `python3 2-build-files/faces.py`, run after a build (it reads the build's
+  `HZDATA.bin` and `symbols.txt`, the blueprints, which do not depend on the
+  tables). It parses the 33 blueprints, rebuilds each face's polygon, turns
+  detail edges into filled details, fins and lines, finds each ship's
+  symmetries, and gives the faces colours so that adjacent faces never
+  match. It prints a report per ship.
+* `lightramps.py` is the lighting model that chooses the nine ramps and
+  writes `gfx-light6.asm` (through `faces.py`); run alone, it renders the
+  ramps (and, with `anim`, a tumbling preview of each ship) into
+  `3-assembled-output/lighting`. `lightcheck.py` checks the 6502's lighting
+  against the model over a run of `6-harness/mlight.mjs`.
+* The hangar's inks come from `hangarcols.py`, which packs the panels'
+  dithers into `HPWL`/`HPWH`, and `hangarinks.py`, which measured (with
+  `6-harness/mhangar.mjs`'s screenshots) which ships blend into the
+  hangar's tans.
+* The lens flare's tables (`gfx-flare.asm`) come from `flare.py`, the model
+  the 6502 code matches pixel for pixel (`--check` compares an emulator
+  frame against it).
 
 `2-build-files/dashboard.py` (with `swatch35.py`, the dither cells) does run
 in the build. It draws the dashboard's image and writes its routines'

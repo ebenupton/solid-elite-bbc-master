@@ -4,7 +4,7 @@
 \ part in shadow RAM, run with ACCCON X = 1
 \
 \ From the demo port's lens flare (src/flare*.asm, docs/renderer.md and the
-\ model tools/flare.py there), with the same recipe, arithmetic and pixels.
+\ model, here 2-build-files/flare.py), with the same recipe, arithmetic and pixels.
 \ When SUN has drawn the sun this frame, in the front view, with its centre on
 \ the screen (x 1..255, y 0..191) and not inside the planet's disc, eight
 \ ghosts go over the frame after the lasers and before the text, sights and
@@ -298,7 +298,7 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  BCC fsr1
  RTS
 
-\ The tables (tools/flare.py: GHOSTS, LADDER, BAYER, RING, hw_table: fl_htab
+\ The tables (2-build-files/flare.py: GHOSTS, LADDER, BAYER, RING, hw_table: fl_htab
 \ is in gfx-raster.asm, in run page 19's tail, as it must be in one page)
 
                         \ the ghosts, by number (k = 8, 5, 3, -1, -3, -4, -6,

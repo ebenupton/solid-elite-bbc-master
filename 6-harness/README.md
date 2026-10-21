@@ -88,4 +88,6 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mtrace.mjs` | Traces chosen routines and variables over chosen iterations (`mcompare.mjs --trace`). |
 | `profile.mjs` | Profiles cycles by PC over exactly the gate's run, with `--pagex` for page-crossing cycles. |
 | `test_raster.py`, `raster_model.py` | The filled renderer's rasteriser (banks 5 and ANDY) on py65, against a pixel-exact model of every primitive: polygons, lines, discs, stars, the dirty-row repair. It also checks that nothing outside the screen, the rasteriser's own memory and its zero page is written. `--quick` runs in the gate; the full run takes longer. |
+| `mlight.mjs` | Records what the lighting (`L_REC`) was given and wrote for every ship drawn, for `2-build-files/lightcheck.py` to check against the model. |
+| `mhangar.mjs` | Screenshots of the hangar in chosen configurations, for `2-build-files/hangarinks.py`. |
 | `verify.sh` | The gate. |
