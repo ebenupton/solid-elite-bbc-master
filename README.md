@@ -2,6 +2,13 @@
 
 A port of Acornsoft's BBC Master Elite with filled, lit ships, a new memory map and faster game logic. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
 
+<p align="center">
+<img src="images/solid-elite-ship-and-planet.png" width="24%" alt="A sunlit ship in front of a planet with a crater">
+<img src="images/solid-elite-sun-and-flare.png" width="24%" alt="The sun and its lens flare">
+<img src="images/solid-elite-coriolis-station.png" width="24%" alt="Approaching a Coriolis station">
+<img src="images/solid-elite-lasers.png" width="24%" alt="Lasers firing on a ship">
+</p>
+
 ## Credits
 
 * **Elite** was written by **Ian Bell and David Braben** and is copyright &copy; Acornsoft 1986.
