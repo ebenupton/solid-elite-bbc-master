@@ -14,7 +14,7 @@ Every commit of the port passes the gate, `6-harness/verify.sh`.
   opens a window). Run `npm install` in this folder, or point `JSBEEB` at a
   jsbeeb checkout or package directory.
 * Python 3 and BeebAsm 1.11 for the build, as for the rest of the
-  repository.
+  repository, and py65 (`pip install py65`) for the rasteriser's test.
 
 ## The gate
 
@@ -87,4 +87,5 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mboot.mjs` | Boots a build to the title screen and checks every image that the loader installs. |
 | `mtrace.mjs` | Traces chosen routines and variables over chosen iterations (`mcompare.mjs --trace`). |
 | `profile.mjs` | Profiles cycles by PC over exactly the gate's run, with `--pagex` for page-crossing cycles. |
+| `test_raster.py`, `raster_model.py` | The filled renderer's rasteriser (banks 5 and ANDY) on py65, against a pixel-exact model of every primitive: polygons, lines, discs, stars, the dirty-row repair. It also checks that nothing outside the screen, the rasteriser's own memory and its zero page is written. `--quick` runs in the gate; the full run takes longer. |
 | `verify.sh` | The gate. |

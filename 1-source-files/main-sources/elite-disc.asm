@@ -44,6 +44,8 @@ IF _SNG47
  PUTFILE "3-assembled-output/BANK4.bin", "BANK4", &000000, &000000
  PUTFILE "3-assembled-output/COLD7.bin", "COLD7", &000000, &000000
  PUTFILE "3-assembled-output/BCODE.bin", "BCODE", &000000, &000000
+ PUTFILE "3-assembled-output/BANK5.bin", "BANK5", &000000, &000000
+ PUTFILE "3-assembled-output/RASTA.bin", "RASTA", &000000, &000000
  PUTFILE "3-assembled-output/HAZEL.bin", "HAZEL", &000000, &000000
  PUTFILE "3-assembled-output/HICODE.bin", "HICODE", &000000, &000000
 ELIF _COMPACT

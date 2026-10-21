@@ -6,8 +6,8 @@
 # area, build/elite-source-low.asm, and the files they INCLUDE in main RAM:
 # elite-far.asm; their labels
 # assembled at &8000-&BFFF, where the main code continues, are in bank 4),
-# "bank4" (elite-source.asm's blocks in bank 4, build/elite-source-bank4.asm),
-# "cold" (elite-source.asm's cold blocks,
+# "bank4" (elite-source.asm's blocks in bank 4, build/elite-source-bank4.asm,
+# with the CMYK dashboard), "cold" (elite-source.asm's cold blocks,
 # build/elite-source-cold.asm and build/elite-data-cold.asm: ROMSEL COLDBANK,
 # bank 7). Each side's far-call stubs are in its own copy, at their targets'
 # places (2-build-files/streams.py). Main RAM and bank 4 see each other (bank 4 is paged
@@ -21,22 +21,59 @@
 #    (it may take an address: #LO/#HI);
 #  * main and bank 4 code reach cold code only through stubs (JSR far7 /
 #    far7j : EQUW name_C), and never read cold data;
+#  * data in shadow RAM ("shadow": the extended tokens) is only read with
+#    ACCCON X set, by readers marked "bankcheck: ok"; other references to it
+#    must be immediate (#LO/#HI: its address);
 #  * a line with the comment "bankcheck: ok" is exempt (reviewed by hand).
+#  * the renderer's banks (bank5: gfx-raster.asm, the rasteriser's shared region,
+#    with its disc window bank5d, gfx-raster_disc.asm, and its polygon window
+#    bank5a, gfx-raster_poly.asm and gfx-raster_line.asm, in ANDY, which never
+#    refer to each other; the shared region, which runs with either window
+#    paged in, refers to neither (but for lines marked bankcheck: ok);
+#    bank6: the frame layer, the
+#    faces, the lighting tables, frame_cold and the flare's bank 6 part,
+#    bank5 also the lens flare and R_LINE's cold part, gfx-raster_lcold.asm) are reached
+#    from other areas only through the stubs in GLUE files (G_ stubs, T_
+#    trampolines, the low area's hooks) or as addresses (#LO/#HI); their
+#    code calls main RAM and HAZEL code directly but nothing in another bank,
+#    reads no other bank's data, and reads main RAM data only below &3000 (the frame layer may run with ACCCON
+#    X set, which hides main RAM above);
 #  * "hazel" is visible to every area: HAZEL (the game data,
-#    build/elite-data-hot.asm).
+#    build/elite-data-hot.asm) and the renderer's shared
+#    workspace in main RAM below &3000 (elite-gfx.asm, gfx-raster_scr.asm,
+#    gfx-raster_vars.asm); the renderer's glue is main RAM below &3000 (the
+#    low area), which every area sees too.
 # Exit status 1 if any rule is broken.
 import re, sys
 
 SRC = "1-source-files/main-sources/"
 FILES = {"../../3-assembled-output/elite-source-run.asm": "main", "../../3-assembled-output/elite-source-low.asm": "main",
-         "../../3-assembled-output/elite-source-bank4.asm": "bank4", "../../3-assembled-output/elite-source-cold.asm": "cold", "elite-layout.asm": "main", "elite-far.asm": "main", "elite-hi.asm": "main",
+         "../../3-assembled-output/elite-source-bank4.asm": "bank4", "../../3-assembled-output/elite-source-cold.asm": "cold", "elite-layout.asm": "main", "elite-far.asm": "main", "gfx-gstubs.asm": "main", "elite-hi.asm": "main", "gfx-hooks.asm": "main",
          # elite-data.asm's hot data (in HAZEL) and cold data (in the cold area)
          "../../3-assembled-output/elite-data-hot.asm": "hazel", "../../3-assembled-output/elite-data-cold.asm": "cold",
-         "elite-low.asm": "main"}
+         # the renderer: its HAZEL glue (stubs, trampolines, hooks, shared state)
+         # and its banks
+         "elite-low.asm": "main",
+         "gfx-gvars.asm": "main", "gfx-tramp.asm": "main", "gfx-lowhooks.asm": "main",
+         "gfx-raster_scr.asm": "hazel",
+         "gfx-raster_vars.asm": "hazel", "elite-gfx.asm": "hazel",
+         "gfx-raster.asm": "bank5", "gfx-raster_disc.asm": "bank5d", "gfx-raster_poly.asm": "bank5a",
+         "gfx-raster_line.asm": "bank5a", "gfx-raster_lcold.asm": "bank5",
+         "gfx-frame.asm": "bank6", "gfx-faces.asm": "bank6", "gfx-light6.asm": "bank6", "gfx-light.asm": "bank6", "gfx-finit.asm": "bank6",
+         "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar-hz.asm": "hazel", "gfx-flare.asm": "bank5"}
 # the copies of elite-source.asm that 2-build-files/streams.py writes, one per area
 # (their line numbers are elite-source.asm's)
 SHOW = {"../../3-assembled-output/elite-source-%s.asm" % a: "elite-source.asm" for a in ("run", "low", "bank4", "cold")}
 SHOW.update({"../../3-assembled-output/elite-data-%s.asm" % a: "elite-data.asm" for a in ("hot", "cold")})
+RENDER = ("bank5", "bank5d", "bank5a", "bank6")
+# the rasteriser's bank 5: its shared region (bank5, &9000-&BFFF) is seen with
+# either window, the disc window (bank5d, ROMSEL 5) or the polygon window
+# (bank5a, ANDY, ROMSEL &85), which are never paged in together
+RAST5 = ("bank5", "bank5d", "bank5a")
+# the files that hold the cross-bank stubs into the renderer's banks (the G_
+# stubs page bank 6 in from game code, the T_ trampolines bank 5 (ANDY over it
+# for R_POLY and R_LINE) from bank 6, the low area's hooks bank 6 from any bank)
+GLUE = ("gfx-gstubs.asm", "gfx-tramp.asm", "gfx-lowhooks.asm")
 MNEM = set(("ADC AND ASL BCC BCS BEQ BIT BMI BNE BPL BRA BRK BVC BVS CLC CLD CLI CLV CMP CPX CPY "
             "DEC DEX DEY EOR INC INX INY JMP JSR LDA LDX LDY LSR NOP ORA PHA PHP PHX PHY PLA PLP PLX "
             "PLY ROL ROR RTI RTS SBC SEC SED SEI STA STX STY STZ TAX TAY TRB TSB TSX TXA TXS TYA").split())
@@ -130,8 +167,28 @@ for f, a in FILES.items():
             if b is None or b == a or b == "self" or x in ("far4", "far4j", "far7", "far7j"):
                 continue                   # (the far-call code is callable from anywhere)
             where = "%s:%d" % (SHOW.get(f, f), n)
+            if b == "shadow":
+                if not op.strip().startswith("#"):
+                    errors.append("%s: %s reads shadow RAM data %s outside a reader marked bankcheck: ok" % (where, a, x))
+                continue
+            if a in RAST5 and b in RAST5:
+                if {a, b} == {"bank5d", "bank5a"} and not op.strip().startswith("#"):
+                    errors.append("%s: %s refers to %s label %s (the disc and polygon windows are never paged in together)" % (where, a, b, x))
+                elif a == "bank5" and not op.strip().startswith("#"):
+                    errors.append("%s: the shared region refers to %s label %s (it runs with either window paged in)" % (where, b, x))
+                continue
             if mn in BRANCH:
                 errors.append("%s: branch from %s to %s %s" % (where, a, b, x))
+            elif b in RENDER or a in RENDER:
+                if op.strip().startswith("#") or f in GLUE:
+                    continue               # (an address, or a stub that pages the bank in)
+                if a in RENDER and b in ("main", "hazel") and mn in ("JSR", "JMP"):
+                    continue               # (main RAM and HAZEL code is visible from the banks)
+                if a in RENDER and b == "main" and addr.get(x, 0x10000) < 0x3000:
+                    continue               # (main RAM below &3000 is visible whatever ACCCON X)
+                if b == "hazel":
+                    continue
+                errors.append("%s: %s refers to %s label %s (use a stub)" % (where, a, b, x))
             elif a == "cold":
                 if op.strip().startswith("#"):
                     continue               # (an address, not a read)

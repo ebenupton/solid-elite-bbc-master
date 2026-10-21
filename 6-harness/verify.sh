@@ -4,7 +4,10 @@
 #
 #  1. build: make (from the repository's root); FAIL on a non-zero exit or an
 #     error or failed ASSERT in the output. Reports how many of the five
-#     original binaries still match 4-reference-binaries/sng47.
+#     original binaries still match 4-reference-binaries/sng47. Once the
+#     build has the filled renderer's rasteriser, its soak test
+#     (6-harness/test_raster.py --quick: every primitive against a
+#     pixel-exact model, on py65) runs first.
 #  2. determinism: 6-harness/mcompare.mjs --iters N (default 10000) of the
 #     released SNG47 disc (4-reference-binaries/sng47) against the new build
 #     (5-compiled-game-discs/elite-master-sng47.ssd, with its own symbols),
@@ -46,7 +49,14 @@ fail() { echo "VERIFY FAIL $1"; exit 1; }
 CAND=5-compiled-game-discs/elite-master-sng47.ssd
 CSYMS=3-assembled-output/symbols.txt
 
-# ---- 1. build
+# ---- 1. the rasteriser's soak test, and the build
+if [ -f 1-source-files/main-sources/gfx-raster.asm ]; then
+    if python3 6-harness/test_raster.py --quick > "$LOG/test_raster.log" 2>&1; then
+        echo "test_raster: PASS"
+    else
+        tail -20 "$LOG/test_raster.log"; echo "test_raster: FAIL"; fail test_raster
+    fi
+fi
 if ! make > "$LOG/build.log" 2>&1; then
     tail -20 "$LOG/build.log"; echo "build: FAIL (exit status)"; fail build
 fi

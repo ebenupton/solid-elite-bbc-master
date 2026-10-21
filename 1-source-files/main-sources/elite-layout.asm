@@ -28,6 +28,7 @@
 \   * the cold area, sideways RAM bank 7: elite-source.asm's cold blocks,
 \     then elite-data.asm's (build/elite-data-cold.asm);
 \
+\ then the renderer (elite-gfx.asm).
 \ elite-data.asm's blocks tagged BDATA, the dashboard image, are assembled on
 \ their own (build/elite-data-bdata.asm, by the Makefile).
 \
@@ -126,3 +127,4 @@ HANGHEAP = &DE00        \ Port: the hangar's ship line heap, which LL9 writes
  PRINT "G% = ", ~G%
  PRINT "NA2% = ", ~NA2%
 
+ INCLUDE "1-source-files/main-sources/elite-gfx.asm"      \ Port: the filled renderer (its shared workspace, bank 5 and ANDY)

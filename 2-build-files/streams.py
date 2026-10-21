@@ -257,7 +257,7 @@ NORETURN = {"BAY", "DEATH2", "TT170", "FRCE", "GOIN", "BEGIN"}
 # the files outside elite-source.asm whose references to cold labels need
 # stubs (everything else that elite-layout.asm assembles)
 OTHERS = ("1-source-files/main-sources/elite-layout.asm", "1-source-files/main-sources/elite-low.asm",
-          "1-source-files/main-sources/elite-hi.asm")
+          "1-source-files/main-sources/elite-hi.asm", "1-source-files/main-sources/elite-gfx.asm")
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*%?")
 
 

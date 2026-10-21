@@ -16,9 +16,9 @@
 \   * the far calls between Elite's home bank and the cold area
 \     (elite-far.asm), which page the banks;
 \
-\   * DOSCLI's stash of the filing system's lasting bytes in HAZEL (DFSST),
-\     which the loader fills and DOSCLI, in the cold area, uses around each
-\     disc command (docs/master-memory.md).
+\   * the renderer's shared variables with their initial values
+\     (gfx-gvars.asm), which the game, the IRQ handler and the renderer's
+\     banks share.
 \
 \ ******************************************************************************
 
@@ -26,12 +26,4 @@
 
  INCLUDE "1-source-files/main-sources/elite-far.asm"            \ far calls to and from the cold area
 
-.DFSST  SKIP 128        \ DFS's and the MOS's lasting bytes in HAZEL, &C2C0-&C2FF
-                        \ and &DFC0-&DFFF (the MOS's FSCV copy at &DFDA-&DFDB, the
-                        \ ACCCON its error path puts back at &DFDC-&DFDD), while
-                        \ the game uses those places: put back for each disc
-                        \ command (DOSCLI; the loader takes them first)
-
-.DFSIN  SKIP 1          \ bit 7: a disc command is under way (DOSCLI, DOSNMI)
-
- ASSERT DFSIN = DFSST + 128      \ (the loader clears it)
+ INCLUDE "1-source-files/main-sources/gfx-gvars.asm"            \ the renderer's shared variables

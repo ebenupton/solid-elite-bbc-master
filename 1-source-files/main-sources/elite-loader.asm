@@ -301,7 +301,7 @@ ENDIF
                         \ M128Elt (the CMYK palette made B% 18 bytes longer)
 
  JSR CHKRAM             \ Port: first of all, check that sideways RAM banks 4
-                        \ to 7, which the port's memory map uses, are all
+                        \ to 7, which the game and the renderer use, are all
                         \ RAM (before the screen mode, palette or ACCCON are
                         \ changed, so that the message can be seen)
 
@@ -507,13 +507,37 @@ ENDIF
  JSR OSCLI              \ Call OSCLI to run the OS command in MESS3, which
                         \ changes the disc directory to E
 
+                        \ Port: the rest of the loader runs from K% (&0400),
+                        \ where its image at LTAIL is copied now: it writes
+                        \ the renderer's shared workspace (DFSST), which is in
+                        \ main RAM from &0E00 up to the main code, where this
+                        \ loader is (elite-gfx.asm).
+                        \ The game sets up K% itself, as it does WP, which was
+                        \ the loader's place in the original
+
+ LDX #0
+.LTC
+ LDA LTAIL,X
+ STA LTRUN,X
+ INX
+ CPX #LTEND-LTRUN
+ BNE LTC
+ JMP LTRUN
+
+.LTAIL
+
+ ORG &0400              \ (assembled to run at &0400, its image here: COPYBLOCK
+                        \ after LTEND)
+
+.LTRUN
+
                         \ Port: that was the last disc access, so DFS is done
                         \ with HAZEL: stash DFS's and the MOS's lasting bytes,
                         \ as the game uses their places (DOSCLI puts them back
                         \ for each disc command): &C2C0-&C2FF and &DFC0-&DFFF
                         \ (ACCCON Y = 1 maps HAZEL at &C000-&DFFF), then copy
-                        \ HAZEL's contents (the game data) from their staging
-                        \ copy at &4000 into place
+                        \ HAZEL's contents (the game data and the renderer's
+                        \ glue) from their staging copy at &4000 into place
 
  SEI
  LDA #%00001001
@@ -595,7 +619,7 @@ ENDIF
                         \ on hooks BYTEV through an extended vector), and a
                         \ hook would then run on every call and could write its
                         \ private workspace, a page of HAZEL (the table at
-                        \ &0DF0), which holds the game data. Kept: BRKV and IRQ1V
+                        \ &0DF0), which the renderer uses. Kept: BRKV and IRQ1V
                         \ (&0202-&0205) and WRCHV (&020E-&020F), which the game
                         \ sets itself, and the filing system vectors FILEV to
                         \ FSCV (&0212-&021F), which must stay the DFS's for the
@@ -652,6 +676,14 @@ ENDIF
  RTI
 
 .NMIHEND
+
+.LTEND
+
+ ASSERT LTEND - LTRUN <= 256 AND LTEND <= &05BB    \ (one copy loop; within K%)
+
+ ORG LTAIL + LTEND - LTRUN      \ (back to the loader, after the image)
+
+ COPYBLOCK LTRUN, LTEND, LTAIL
 
 \ ******************************************************************************
 \
@@ -766,13 +798,21 @@ ENDIF
  EQUB 7, %00001001      \ QQ18 and the extended tokens, then the cold code)
  EQUW &8000, C7LEN
 
- EQUW MESS12            \ HAZEL: the game data, staged in main RAM at &4000 and
- EQUB HOMEBANK, %00001001 \ copied to
+ EQUW MESS8             \ RASTA: the rasteriser's polygon window, ANDY
+ EQUB &85, %00001001    \ (ROMSEL bit 7: ANDY over bank 5's &8000-&8FFF)
+ EQUW &8000, RALEN
+
+ EQUW MESS9             \ BANK5: the renderer's rasteriser, bank 5
+ EQUB 5, %00001001
+ EQUW &8000, B5LEN
+
+ EQUW MESS12            \ HAZEL: the game data and the hangar's tables, staged
+ EQUB HOMEBANK, %00001001 \ in main RAM at &4000 (screen buffer 0) and copied to
  EQUW &4000, HZLEN      \ HAZEL after the last disc access (see LDEND), as DFS
                         \ uses HAZEL
 
- EQUW MESS14            \ HICODE: the main code's run from &7000, main RAM
- EQUB HOMEBANK, %00001001 \ &7000-&7FFF
+ EQUW MESS14            \ HICODE: the high code (the quarter squares), then the
+ EQUB HOMEBANK, %00001001 \ main code's run, main RAM &7000-&7FFF
  EQUW &7000, HILEN
 
  EQUW 0
@@ -851,6 +891,16 @@ ENDIF
 .MESS6
 
  EQUS "L.COLD7 FFFF1300"    \ Port: *LOAD COLD7 FFFF1300
+ EQUB 13
+
+.MESS8
+
+ EQUS "L.RASTA FFFF1300"    \ Port: *LOAD RASTA FFFF1300
+ EQUB 13
+
+.MESS9
+
+ EQUS "L.BANK5 FFFF1300"    \ Port: *LOAD BANK5 FFFF1300
  EQUB 13
 
 .MESS12

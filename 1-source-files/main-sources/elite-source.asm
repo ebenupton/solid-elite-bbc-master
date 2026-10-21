@@ -45,7 +45,11 @@
 \
 \ ******************************************************************************
 
- CODE% = &1300          \ The address where the code will be run
+ CODE% = &1EDC          \ The address where the code will be run (Port: the
+                        \ renderer's shared workspace is below it, elite-gfx.asm,
+                        \ docs/memory-map.md; its low byte is chosen so that the
+                        \ font, at its place after ADDK, starts a page with no
+                        \ padding: the build prints the padding, FONTPAD%)
 
  LOAD% = CODE%          \ The address where the code will be loaded
 
@@ -275,6 +279,7 @@
  OSBYTE = &FFF4         \ The address for the OSBYTE routine
 
  OSCLI = &FFF7          \ The address for the OSCLI routine
+
 \ ******************************************************************************
 \
 \       Name: ZP
@@ -1242,7 +1247,9 @@ ENDIF
                         \ the MOS's sound, printer, RS423, cassette and speech
                         \ buffers and &0B00-&0CFF, which the game never uses,
                         \ with its bytes' places in their pages as in the
-                        \ original)
+                        \ original, and the renderer's shared workspace from
+                        \ &0E00 up to the main code, see elite-gfx.asm and
+                        \ docs/memory-map.md)
 
 .WP
 
@@ -2063,6 +2070,7 @@ ENDIF
                         \ commands take it from here, &087E, as the file's
                         \ catalogue entry does not depend on it: *SAVE gives
                         \ load and execution addresses 0)
+
 \ ******************************************************************************
 \
 \ ELITE A FILE
