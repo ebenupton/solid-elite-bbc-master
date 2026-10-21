@@ -43576,102 +43576,84 @@ ENDMACRO
 
 .LL48
 
+                        \ Port: the vertex's coordinates are fetched only once
+                        \ it is known to be visible, and the face bytes are
+                        \ re-read rather than kept in P (the demo port's
+                        \ 9e57c03 w_0171 and 30e0da9 w_0172)
+
  STY XX17               \ Set XX17 = Y, so XX17 now contains the offset of the
-                        \ current vertex's data
+                        \ vertex data for the vertex we are processing
 
- LDA (V),Y              \ Fetch byte #0 for this vertex into XX15, so:
- STA XX15               \
-                        \   XX15 = magnitude of the vertex's x-coordinate
-
- INY                    \ Increment Y to point to byte #1
-
- LDA (V),Y              \ Fetch byte #1 for this vertex into XX15+2, so:
- STA XX15+2             \
-                        \   XX15+2 = magnitude of the vertex's y-coordinate
-
- INY                    \ Increment Y to point to byte #2
-
- LDA (V),Y              \ Fetch byte #2 for this vertex into XX15+4, so:
- STA XX15+4             \
-                        \   XX15+4 = magnitude of the vertex's z-coordinate
-
- INY                    \ Increment Y to point to byte #3
+ INY                    \ Set Y to point to byte #3
+ INY
+ INY
 
  LDA (V),Y              \ Fetch byte #3 for this vertex into T, so:
  STA T                  \
-                        \   T = %xyz vvvvv, where:
-                        \
-                        \     * Bits 0-4 = visibility distance, beyond which the
-                        \                  vertex is not shown
-                        \
-                        \     * Bits 7-5 = the sign bits of x, y and z
+                        \   T = %ZZZZZ (z_sign, y_sign, x_sign, visibility)
 
  AND #%00011111         \ Extract bits 0-4 to get the visibility distance
 
  CMP XX4                \ If XX4 > the visibility distance, where XX4 contains
- BCC LL49-3             \ the ship's z-distance reduced to 0-31 (which we set in
-                        \ part 2), then this vertex is too far away to be
-                        \ visible, so jump down to LL50 (via the JMP instruction
-                        \ in LL49-3) to move on to the next vertex
+ BCC LL48n              \ the ship's z-distance reduced to 0-31 (which we set in
+                        \ part 4), then this vertex is too far away to be
+                        \ visible, so jump down to LL50 (via the JMP at LL48n)
+                        \ to move on to the next vertex
 
  INY                    \ Increment Y to point to byte #4
 
- LDA (V),Y              \ Fetch byte #4 for this vertex into P, so:
- STA P                  \
-                        \  P = %ffff ffff, where:
-                        \
-                        \    * Bits 0-3 = the number of face 1
-                        \
-                        \    * Bits 4-7 = the number of face 2
-
- AND #%00001111         \ Extract the number of face 1 into X
+ LDA (V),Y              \ Fetch byte #4 and extract the number of face 1 into X
+ AND #%00001111
  TAX
 
  LDA XX2,X              \ If XX2+X is non-zero then we decided in part 5 that
- BNE LL49               \ face 1 is visible, so jump to LL49
+ BNE LL48v              \ face 1 is visible, so jump to LL48v
 
- LDA P                  \ Fetch byte #4 for this vertex into A
-
- LSR A                  \ Shift right four times to extract the number of face 2
- LSR A                  \ from bits 4-7 into X
+ LDA (V),Y              \ Fetch byte #4 again and shift right four times to
+ LSR A                  \ extract the number of face 2 from bits 4-7 into X
+ LSR A
  LSR A
  LSR A
  TAX
 
  LDA XX2,X              \ If XX2+X is non-zero then we decided in part 5 that
- BNE LL49               \ face 2 is visible, so jump to LL49
+ BNE LL48v              \ face 2 is visible, so jump to LL48v
 
  INY                    \ Increment Y to point to byte #5
 
- LDA (V),Y              \ Fetch byte #5 for this vertex into P, so:
- STA P                  \
-                        \  P = %ffff ffff, where:
-                        \
-                        \    * Bits 0-3 = the number of face 3
-                        \
-                        \    * Bits 4-7 = the number of face 4
-
- AND #%00001111         \ Extract the number of face 1 into X
+ LDA (V),Y              \ Fetch byte #5 and extract the number of face 3 into X
+ AND #%00001111
  TAX
 
  LDA XX2,X              \ If XX2+X is non-zero then we decided in part 5 that
- BNE LL49               \ face 3 is visible, so jump to LL49
+ BNE LL48v              \ face 3 is visible, so jump to LL48v
 
- LDA P                  \ Fetch byte #5 for this vertex into A
-
- LSR A                  \ Shift right four times to extract the number of face 4
+ LDA (V),Y              \ Fetch byte #5 again and extract the number of face 4
  LSR A                  \ from bits 4-7 into X
  LSR A
  LSR A
+ LSR A
  TAX
 
  LDA XX2,X              \ If XX2+X is non-zero then we decided in part 5 that
- BNE LL49               \ face 4 is visible, so jump to LL49
+ BNE LL48v              \ face 4 is visible, so jump to LL48v
 
- JMP LL50               \ If we get here then none of the four faces associated
-                        \ with this vertex are visible, so this vertex is also
-                        \ not visible, so jump to LL50 to move on to the next
-                        \ vertex
+.LL48n
+
+ JMP LL50               \ None of the four faces is visible, so neither is the
+                        \ vertex: move on to the next vertex
+
+.LL48v
+
+ LDY XX17               \ The vertex is visible: fetch bytes #0 to #2 into
+ LDA (V),Y              \ XX15, XX15+2 and XX15+4 (the magnitudes of x, y
+ STA XX15               \ and z)
+ INY
+ LDA (V),Y
+ STA XX15+2
+ INY
+ LDA (V),Y
+ STA XX15+4             \ (and fall into LL49, which is where it was)
 
 .LL49
 
@@ -43856,7 +43838,8 @@ ENDMACRO
  ADC #0                 \ we know the sign byte of vertv_y is 0)
  STA U
 
- JMP LL57               \ We've added the z-coordinates, so jump to LL57
+ BRA LL57A              \ We've added the z-coordinates, so jump to LL57A
+                        \ (A = U already)
 
                         \ The adding process is continued in part 7, after a
                         \ couple of subroutines that we don't need quite yet
@@ -43973,13 +43956,11 @@ ENDMACRO
  STA XX3,X              \ Store the low byte of the result in the X-th byte of
                         \ the heap at XX3
 
- INX                    \ Increment the heap pointer in X to point to the next
-                        \ byte
 
  LDA #0                 \ And then subtract the high bytes
  SBC U
 
- STA XX3,X              \ Store the low byte of the result in the X-th byte of
+ STA XX3+1,X            \ Store the low byte of the result in the X-th byte of
                         \ the heap at XX3
 
  JMP LL66               \ Jump down to LL66
@@ -44037,7 +44018,7 @@ ENDMACRO
  BCC LL140              \ If the subtraction just underflowed, skip to LL140 to
                         \ set (U T) to the minimum value of 4
 
- BNE LL57               \ If U is non-zero, jump down to LL57
+ BNE LL57A              \ If U is non-zero, jump down to LL57A (A = U already)
 
  LDA T                  \ If T >= 4, jump down to LL57
  CMP #4
@@ -44045,10 +44026,9 @@ ENDMACRO
 
 .LL140
 
- LDA #0                 \ If we get here then either (U T) < 4 or the
- STA U                  \ subtraction underflowed, so set (U T) = 4
- LDA #4
- STA T
+ LDA #4                 \ If we get here then either (U T) < 4 or the
+ STA T                  \ subtraction underflowed, so set (U T) = 4
+ STZ U                  \ and fall through into LL57
 
 .LL57
 
@@ -44056,9 +44036,14 @@ ENDMACRO
                         \ the 16-bit results down into 8-bit values
 
  LDA U                  \ If the high bytes of the result are all zero, we are
- ORA XX15+1             \ done, so jump down to LL60 for the next stage
+
+.LL57A
+
+ ORA XX15+1             \ done, so jump to LL60 for the next stage
  ORA XX15+4
  BEQ LL60
+
+.LL57S
 
  LSR XX15+1             \ Shift XX15(1 0) to the right
  ROR XX15
@@ -44069,8 +44054,10 @@ ENDMACRO
  LSR U                  \ Shift (U T) to the right
  ROR T
 
- JMP LL57               \ Jump back to LL57 to see if we can shift the result
-                        \ any more
+ LSR A                  \ Port: A = U OR XX15+1 OR XX15+4 of the shifted values
+ BNE LL57S              \ (shifting each right shifts their OR right), so loop
+                        \ until the high bytes are all zero, then fall through
+                        \ into LL60
 
 \ ******************************************************************************
 \
@@ -44173,29 +44160,26 @@ ENDMACRO
  STA XX3,X              \ Store the low byte of the result in the X-th byte of
                         \ the heap at XX3
 
- INX                    \ Increment the heap pointer in X to point to the next
-                        \ byte
 
  LDA U                  \ And then add the high bytes
  ADC #0
 
- STA XX3,X              \ Store the high byte of the result in the X-th byte of
+ STA XX3+1,X            \ Store the high byte of the result in the X-th byte of
                         \ the heap at XX3
 
 .LL66
 
+                        \ Port: X is not saved here, as LL68 reloads it from
+                        \ CNT (LL28 and LL61 leave CNT alone), and Q still
+                        \ holds z_lo from LL60 (LL28 and LL61 only read Q)
+
                         \ We've just stored the screen x-coordinate of the
                         \ vertex on the XX3 heap, so now for the y-coordinate
 
- TXA                    \ Store the heap pointer in X on the stack (at this
- PHA                    \ it points to the last entry on the heap, not the first
-                        \ free byte)
 
  LDA #0                 \ Set U = 0
  STA U
 
- LDA T                  \ Set Q = z_lo
- STA Q
 
  LDA XX15+3             \ Set A = y_lo
 
@@ -44233,6 +44217,7 @@ ENDMACRO
 
  JMP LL50               \ Jump to LL50 to move on to the next vertex
 
+
 .LL67
 
  JSR LL28               \ Call LL28 to calculate:
@@ -44263,12 +44248,9 @@ ENDMACRO
                         \ up the screen, converts to a low y-coordinate, which
                         \ is the opposite way round to the x-coordinates
 
- PLA                    \ Restore the heap pointer from the stack into X
- TAX
-
- INX                    \ When we stored the heap pointer, it pointed to the
-                        \ last entry on the heap, not the first free byte, so we
-                        \ increment it so it does point to the next free byte
+ LDX CNT                \ Port: set X = CNT + 2, the heap pointer for the
+ INX                    \ y-coordinate, reloaded from CNT in place of the PHA
+ INX                    \ and PLA of X around the division
 
  LDA XX15+5             \ If y_sign is negative, jump up to LL70, which will
  BMI LL70               \ store #Y + (U R) on the XX3 heap and return by jumping
