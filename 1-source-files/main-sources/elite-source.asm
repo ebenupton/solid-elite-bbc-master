@@ -42270,79 +42270,217 @@ ENDMACRO
 
 .LL51
 
- LDX #0                 \ Set X = 0, which will contain the offset of the vector
-                        \ to use in the calculation, increasing by 6 for each
-                        \ new vector
+                        \ Port: LL51 with the logs of x_lo, y_lo and z_lo
+                        \ patched into LL51L once per call (the demo port's
+                        \ 75cd7ba w_0151, nine products inline with the
+                        \ coordinates patched once, with Master's log tables):
+                        \ each product is FMLTU's alogh(log(a) + log(q)), or 0
+                        \ when a = 0 or the log sum is below 256; a zero
+                        \ coordinate patches 0 and 0, so that the sum never
+                        \ carries and the product is 0, as FMLTU (nothing in
+                        \ LL51 reads the C that FMLTU leaves). Q is left as
+                        \ z_lo, as before
 
- LDY #0                 \ Set Y = 0, which will contain the offset of the
-                        \ result bytes in XX12, increasing by 2 for each new
-                        \ result
+ LDX XX15               \ Patch the logs of XX15 (0 and 0 if it is 0)
+ LDA logL,X
+ LDY log,X
+ CPX #1
+ BCS P%+6
+ LDA #0
+ LDY #0
+ STA lfa1+1
+ STY lfb1+1
 
-.ll51
+ LDX XX15+2               \ Patch the logs of XX15+2 (0 and 0 if it is 0)
+ LDA logL,X
+ LDY log,X
+ CPX #1
+ BCS P%+6
+ LDA #0
+ LDY #0
+ STA lfa2+1
+ STY lfb2+1
 
- LDA XX15               \ Set Q = x_lo
- STA Q
+ LDX XX15+4               \ Patch the logs of XX15+4 (0 and 0 if it is 0)
+ LDA logL,X
+ LDY log,X
+ CPX #1
+ BCS P%+6
+ LDA #0
+ LDY #0
+ STA lfa3+1
+ STY lfb3+1
 
- LDA XX16,X             \ Set A = |sidev_x|
+ JMP LL51L              \ Run the loop (at the end of bank 4)
 
- JSR FMLTU              \ Set T = A * Q / 256
- STA T                  \       = |sidev_x| * x_lo / 256
+.ll51yt
+
+ EQUB 6, 0, 12          \ Next Y for X = -6 (+0) and X = -4 (+2)
+
+
+.lfn1
+
+ LDA Q                  \ Different signs: A = R - product, as LL39, and if
+ EOR #&FF               \ that underflows, negate A, store it in R and flip
+ SEC                    \ the sign in S, as LL40
+ ADC R
+ BCC P%+5
+ JMP lfr1
+ EOR #&FF
+ ADC #1
+ STA R
+ LDA S
+ EOR #%10000000
+ STA S
+ JMP lfr1s
+
+.lfn2
+
+ LDA Q                  \ As lfn1, for the third term
+ EOR #&FF
+ SEC
+ ADC R
+ BCC P%+5
+ JMP lfr2
+ EOR #&FF
+ ADC #1
+ LDX lfx+1
+ STA XX12+6,X
+ LDA S
+ EOR #%10000000
+ STA S
+ JMP lfr2s
+
+\ ******************************************************************************
+\
+\       Name: LL51L
+\       Type: Subroutine
+\   Category: Maths (Geometry)
+\    Summary: LL51's loop, with the coordinates' logs patched in by LL51
+\
+\ ******************************************************************************
+
+.LL51L
+
+ LDX #256-6             \ X = -6, the result offset (relative to XX12+6)
+ LDY #0                 \ Y = 0, the vector offset (relative to XX16)
+
+.lf51
+
+ STX lfx+1              \ Keep X for the stores (X is the log index below)
+
+ LDA XX16,Y            \ Set A = |XX16,Y| * coordinate / 256, as FMLTU
+ BEQ lf1s              \ (A = 0: the product is 0)
+ TAX
+ CLC
+ LDA logL,X
+.lfa1
+ ADC #0                 \ (patched: logL of the coordinate, or 0)
+ LDA log,X
+.lfb1
+ ADC #0                 \ (patched: log of the coordinate, or 0)
+ TAX
+ LDA alogh,X
+ BCS lf1s
+ LDA #0                 \ (log sum below 256: the product is 0)
+.lf1s
+
+ STA R                  \ R = |sidev_x| * x_lo / 256
 
  LDA XX15+1             \ Set S to the sign of x_sign * sidev_x
- EOR XX16+1,X
+ EOR XX16+1,Y
  STA S
 
- LDA XX15+2             \ Set Q = y_lo
- STA Q
-
- LDA XX16+2,X           \ Set A = |sidev_y|
-
- JSR FMLTU              \ Set Q = A * Q / 256
- STA Q                  \       = |sidev_y| * y_lo / 256
-
- LDA T                  \ Set R = T
- STA R                  \       = |sidev_x| * x_lo / 256
-
- LDA XX15+3             \ Set A to the sign of y_sign * sidev_y
- EOR XX16+3,X
-
- JSR LL38               \ Set (S T) = (S R) + (A Q)
- STA T                  \           = |sidev_x| * x_lo + |sidev_y| * y_lo
-
- LDA XX15+4             \ Set Q = z_lo
- STA Q
-
- LDA XX16+4,X           \ Set A = |sidev_z|
-
- JSR FMLTU              \ Set Q = A * Q / 256
- STA Q                  \       = |sidev_z| * z_lo / 256
-
- LDA T                  \ Set R = T
- STA R                  \       = |sidev_x| * x_lo + |sidev_y| * y_lo
-
- LDA XX15+5             \ Set A to the sign of z_sign * sidev_z
- EOR XX16+5,X
-
- JSR LL38               \ Set (S A) = (S R) + (A Q)
-                        \           = |sidev_x| * x_lo + |sidev_y| * y_lo
-                        \             + |sidev_z| * z_lo
-
- STA XX12,Y             \ Store the result in XX12+Y(1 0)
- LDA S
- STA XX12+1,Y
-
- INY                    \ Set Y = Y + 2
- INY
-
- TXA                    \ Set X = X + 6
- CLC
- ADC #6
+ LDA XX16+2,Y            \ Set A = |XX16+2,Y| * coordinate / 256, as FMLTU
+ BEQ lf2s              \ (A = 0: the product is 0)
  TAX
+ CLC
+ LDA logL,X
+.lfa2
+ ADC #0                 \ (patched: logL of the coordinate, or 0)
+ LDA log,X
+.lfb2
+ ADC #0                 \ (patched: log of the coordinate, or 0)
+ TAX
+ LDA alogh,X
+ BCS lf2s
+ LDA #0                 \ (log sum below 256: the product is 0)
+.lf2s
 
- CMP #17                \ If X < 17, loop back to ll51 for the next vector
- BCC ll51
+ STA Q                  \ Q = |sidev_y| * y_lo / 256
 
- RTS                    \ Return from the subroutine
+ LDA S                  \ Jump to lfn1 if the sign of y_sign * sidev_y
+ EOR XX15+3             \ differs from S
+ EOR XX16+3,Y
+ BMI lfn1j
+
+ LDA Q                  \ Same signs: (S R) = (S R) + (A Q), R + A
+ CLC
+ ADC R
+
+.lfr1
+
+ STA R
+
+.lfr1s
+
+ LDA XX16+4,Y            \ Set A = |XX16+4,Y| * coordinate / 256, as FMLTU
+ BEQ lf3s              \ (A = 0: the product is 0)
+ TAX
+ CLC
+ LDA logL,X
+.lfa3
+ ADC #0                 \ (patched: logL of the coordinate, or 0)
+ LDA log,X
+.lfb3
+ ADC #0                 \ (patched: log of the coordinate, or 0)
+ TAX
+ LDA alogh,X
+ BCS lf3s
+ LDA #0                 \ (log sum below 256: the product is 0)
+.lf3s
+
+ STA Q                  \ Q = |sidev_z| * z_lo / 256
+
+ LDA XX15+5             \ Jump to lfn2 if the sign of z_sign * sidev_z
+ EOR XX16+5,Y           \ differs from S
+ EOR S
+ BMI lfn2j
+
+ LDA Q                  \ Same signs: R + A
+ CLC
+ ADC R
+
+.lfr2
+
+.lfx
+
+ LDX #0                 \ (patched) X = the result offset
+ STA XX12+6,X           \ Store the result in XX12+X+6(1 0)
+ LDA S
+
+.lfr2s
+
+ STA XX12+7,X
+
+ LDY ll51yt-&FA,X       \ Set Y = Y + 6 by lookup on X
+ INX                    \ Set X = X + 2
+ INX
+ BEQ P%+5               \ Loop back until X wraps from -2 to 0 (the loop is
+ JMP lf51               \ too long for a branch)
+
+ LDA XX15+4             \ Q = z_lo, as LL51 left it
+ STA Q
+
+ RTS
+
+.lfn1j
+
+ JMP lfn1               \ Different signs: lfn1 and lfn2 are in LL51
+
+.lfn2j
+
+ JMP lfn2
 
 \ ******************************************************************************
 \
