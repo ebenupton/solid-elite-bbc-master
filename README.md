@@ -1,12 +1,24 @@
 # Solid Elite for the BBC Master
 
-A port of Acornsoft's BBC Master Elite with filled, lit ships, a new memory map and faster game logic. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
+A port of Acornsoft's BBC Master Elite with solid, sunlit ships instead of wireframes, running on an unmodified BBC Master 128. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
+
+What's new:
+
+* **Solid ships, lit by the sun.** Every ship, the space station and the cargo are drawn with filled, dithered faces, shaded by the direction of the sun.
+* **Planets and suns as discs.** Planets are solid, with their craters and meridians drawn over them; suns are solid discs with a lens flare when you look towards them.
+* **Flicker-free, double-buffered flight.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades.
+* **A new dashboard** in the same palette, redrawing only what changes, split cleanly from the space view by a raster-timed interrupt.
+* **A solid hangar** when you dock, and the Constrictor turning in solid in the mission briefing.
+* **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. Even with all the extra drawing, the game runs about 23% faster in flight than the original (17.24 against 13.97 main-loop iterations a second); the same speed-ups with the original wireframe graphics run 28% faster.
+* **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's.
+
+To make room, the game is reorganised across all of the Master's memory: main RAM, shadow RAM, the sideways RAM banks, and the 8K and 4K paged areas (HAZEL and ANDY), with frequently-run code kept in main memory and the rest moved out of the way.
 
 <p align="center">
 <img src="images/solid-elite-ship-and-planet.png" width="24%" alt="A sunlit ship in front of a planet with a crater">
 <img src="images/solid-elite-sun-and-flare.png" width="24%" alt="The sun and its lens flare">
 <img src="images/solid-elite-coriolis-station.png" width="24%" alt="Approaching a Coriolis station">
-<img src="images/solid-elite-lasers.png" width="24%" alt="Lasers firing on a ship">
+<img src="images/solid-elite-combat.png" width="24%" alt="Lasers on a sunlit ship at close range">
 </p>
 
 ## Credits
@@ -18,6 +30,8 @@ A port of Acornsoft's BBC Master Elite with filled, lit ships, a new memory map 
 * Mark in turn credits Paul Brink's annotated disassembly and Kieran Connell's [BeebAsm version](https://github.com/kieranhj/elite-beebasm); see his acknowledgements below.
 
 * **The port** (the changes on this branch) is by Eben Upton, written with [Claude Code](https://claude.com/claude-code).
+
+* **Regression testing** used **Dom Pajak**'s [elite-agent](https://github.com/8bitkick/elite-agent), a rule-based Elite player that plays the game through the keyboard and joystick. Every change was checked by running the port and the original side by side on the same inputs from elite-agent's play and comparing them at every iteration, and long elite-agent careers (one of them over 30 game hours) were played through the final build with no difference from the original.
 
 This is an independent fork. It is not affiliated with or endorsed by Mark Moxon, Ian Bell, David Braben or Acornsoft, and problems with the port should be reported here, not to Mark.
 
@@ -31,7 +45,7 @@ The port is a series of commits on top of Mark's source, in three parts:
 2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
 3. **The filled renderer.** Filled ships lit by the sun, disc planets and suns, a double-buffered CMYK screen, a lens flare, a filled hangar and the briefing's ship: 17.24 flight iterations per emulated second (1.234 times the original).
 
-Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details.
+Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. Every commit was checked this way. See [docs/README.md](docs/README.md) for the details.
 
 ---
 
