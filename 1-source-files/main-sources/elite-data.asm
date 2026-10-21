@@ -5010,9 +5010,10 @@ ENDMACRO
 
 .SNE
 
- FOR I%, 0, 31
+ FOR I%, 0, 47          \ Port: SNE+32 to SNE+47 repeat SNE to SNE+15, so PLL4
+                        \ can read |cos| at SNE+16+X for X = 0 to 31
 
-  N = ABS(SIN((I% / 64) * 2 * PI))
+  N = ABS(SIN(((I% MOD 32) / 64) * 2 * PI))
 
   IF N >= 1
    EQUB 255

@@ -33872,6 +33872,9 @@ ENDIF
 
 .PLS22
 
+ JSR pl4pat             \ Port: pick this loop or PLL4F for the new curve
+                        \ (pl4pat)
+
  LDX #0                 \ Set CNT = 0
  STX CNT
 
@@ -33881,98 +33884,60 @@ ENDIF
 
 .PLL4
 
- LDA CNT2               \ Set X = CNT2 mod 32
+ LDA CNT2               \ Set the C flag if CNT2 >= 33, i.e. C = the sign of
+ CMP #33                \ sin(CNT2) (set for 180 to 360 degrees)
  AND #31                \
- TAX                    \ So X is the starting segment, reduced to the range 0
-                        \ to 32, so as there are 64 segments in the circle, this
-                        \ reduces the starting angle to 0 to 180 degrees, so we
-                        \ can use X as an index into the sine table (which only
-                        \ contains values for segments 0 to 31)
-                        \
-                        \ Also, because CNT2 mod 32 is in the range 0 to 180
-                        \ degrees, we know that sin(CNT2 mod 32) is always
-                        \ positive, or to put it another way:
-                        \
-                        \   sin(CNT2 mod 32) = |sin(CNT2)|
-
- LDA SNE,X              \ Set Q = sin(X)
- STA Q                  \       = sin(CNT2 mod 32)
-                        \       = |sin(CNT2)|
-
- LDA K2+2               \ Set A = K2+2
-                        \       = |v_x|
-
- JSR FMLTU              \ Set R = A * Q / 256
- STA R                  \       = |v_x| * |sin(CNT2)|
-
- LDA K2+3               \ Set A = K2+3
-                        \       = |v_y|
-
- JSR FMLTU              \ Set K = A * Q / 256
- STA K                  \       = |v_y| * |sin(CNT2)|
-
- LDX CNT2               \ If CNT2 >= 33 then this sets the C flag, otherwise
- CPX #33                \ it's clear, so this means that:
-                        \
-                        \   * C is clear if the segment starts in the first half
-                        \     of the circle, 0 to 180 degrees
-                        \
-                        \   * C is set if the segment starts in the second half
-                        \     of the circle, 180 to 360 degrees
-                        \
-                        \ In other words, the C flag contains the sign bit for
-                        \ sin(CNT2), which is positive for 0 to 180 degrees
-                        \ and negative for 180 to 360 degrees
+ TAX                    \ Set X = CNT2 mod 32, so sin(X) = |sin(CNT2)|
 
  LDA #0                 \ Shift the C flag into the sign bit of XX16+5, so
  ROR A                  \ XX16+5 has the correct sign for sin(CNT2)
- STA XX16+5             \
-                        \ Because we set the following above:
-                        \
-                        \   K = |v_y| * |sin(CNT2)|
-                        \   R = |v_x| * |sin(CNT2)|
-                        \
-                        \ we can add XX16+5 as the high byte to give us the
-                        \ following:
-                        \
-                        \   (XX16+5 K) = |v_y| * sin(CNT2)
-                        \   (XX16+5 R) = |v_x| * sin(CNT2)
+ STA XX16+5             \ (this also clears the C flag)
 
- LDA CNT2               \ Set X = (CNT2 + 16) mod 32
- CLC                    \
- ADC #16                \ So we can use X as a lookup index into the SNE table
- AND #31                \ to get the cosine (as there are 16 segments in a
- TAX                    \ quarter-circle)
+ EOR XX16+2             \ Set S = the sign of XX16+2 * XX16+5
+ STA S                  \       = the sign of v_x * XX16+5
+                        \ (A still holds XX16+5; the FMLTU calls below do not
+                        \ touch S or XX16+2), so once R is set below:
                         \
-                        \ Also, because the sine table only contains positive
-                        \ values, we know that sin((CNT2 + 16) mod 32) will
-                        \ always be positive, or to put it another way:
-                        \
-                        \   sin((CNT2 + 16) mod 32) = |cos(CNT2)|
+                        \   (S R) = v_x * sin(CNT2)
 
  LDA SNE,X              \ Set Q = sin(X)
- STA Q                  \       = sin((CNT2 + 16) mod 32)
-                        \       = |cos(CNT2)|
+ STA Q                  \       = |sin(CNT2)|
 
- LDA K2+1               \ Set A = K2+1
-                        \       = |u_y|
+ LDA K2+2               \ Set R = K2+2 * Q / 256
+ JSR FMLTU              \       = |v_x| * |sin(CNT2)|
+ STA R                  \ so (XX16+5 R) = |v_x| * sin(CNT2)
 
- JSR FMLTU              \ Set K+2 = A * Q / 256
- STA K+2                \         = |u_y| * |cos(CNT2)|
+ LDA K2+3               \ Set K = K2+3 * Q / 256
+ JSR FMLTU+2            \       = |v_y| * |sin(CNT2)|
+                        \ (skip FMLTU's STX P: the previous FMLTU call already
+                        \ left P = X, and X is unchanged since)
+ STA K                  \ so (XX16+5 K) = |v_y| * sin(CNT2)
 
- LDA K2                 \ Set A = K2
-                        \       = |u_x|
+ CLC                    \ Clear the C flag, as the original ADC #16 did, as it
+                        \ can pass through FMLTU into the ADC #207 below
 
- JSR FMLTU              \ Set P = A * Q / 256
- STA P                  \       = |u_x| * |cos(CNT2)|
-                        \
+ LDA SNE+16,X           \ Set Q = sin((CNT2 + 16) mod 32) = |cos(CNT2)|, as
+ STA Q                  \ X = CNT2 mod 32 (FMLTU preserves X) and SNE+32 to
+                        \ SNE+47 repeat SNE to SNE+15
+
+ LDA K2+1               \ Set K+2 = K2+1 * Q / 256
+ JSR FMLTU              \         = |u_y| * |cos(CNT2)|
+ STA K+2
+
+ LDA K2                 \ Set P = K2 * Q / 256
+ JSR FMLTU+2            \       = |u_x| * |cos(CNT2)|
+                        \ (skip FMLTU's STX P: the previous FMLTU call already
+                        \ left P = X, and X is unchanged since)
+ STA P                  \
                         \ The call to FMLTU also sets the C flag, so in the
-                        \ following, ADC #15 adds 16 rather than 15
+                        \ following, ADC #207 adds 208 rather than 207
 
- LDA CNT2               \ If (CNT2 + 16) mod 64 >= 33 then this sets the C flag,
- ADC #15                \ otherwise it's clear, so this means that:
- AND #63                \
- CMP #33                \   * C is clear if the segment starts in the first or
+.pl4t
+
+ LDA CNT2               \ Port: (CNT2 + 15 + C) mod 64 >= 33 exactly when
+ ADC #207               \ 18 <= CNT2 + C <= 48 (CNT2 + C is 0 to 64), i.e. when
+ CMP #225               \ CNT2 + C + 207 is 225 to 255, so this means that:
+                        \   * C is clear if the segment starts in the first or
                         \     last quarter of the circle, 0 to 90 degrees or 270
                         \     to 360 degrees
                         \
@@ -33997,19 +33962,8 @@ ENDIF
                         \   (XX16+4 K+2) = |u_y| * cos(CNT2)
                         \   (XX16+4 P)   = |u_x| * cos(CNT2)
 
- LDA XX16+5             \ Set S = the sign of XX16+2 * XX16+5
- EOR XX16+2             \       = the sign of v_x * XX16+5
- STA S                  \
-                        \ So because we set this above:
-                        \
-                        \   (XX16+5 R) = |v_x| * sin(CNT2)
-                        \
-                        \ we now have this:
-                        \
-                        \   (S R) = v_x * sin(CNT2)
-
- LDA XX16+4             \ Set A = the sign of XX16 * XX16+4
- EOR XX16               \       = the sign of u_x * XX16+4
+ EOR XX16               \ A still holds XX16+4, so set A = the sign of
+                        \ XX16 * XX16+4 = the sign of u_x * XX16+4
                         \
                         \ So because we set this above:
                         \
@@ -34019,8 +33973,23 @@ ENDIF
                         \
                         \   (A P) = u_x * cos(CNT2)
 
- JSR ADD                \ Set (A X) = (A P) + (S R)
-                        \           = u_x * cos(CNT2) + v_x * sin(CNT2)
+ STA T1                 \ Set (A X) = (A P) + (S R), as ADD (Port: inlined,
+ AND #%10000000         \ with MU8 for different signs)
+ STA T
+ EOR S
+ BPL pl4ca
+ JSR MU8
+ BRA pl4cb
+.pl4ca
+ CLC
+ LDA R
+ ADC P
+ TAX
+ LDA S
+ ADC T1
+ ORA T
+.pl4cb
+                        \ = u_x * cos(CNT2) + v_x * sin(CNT2)
 
  STA T                  \ Store the high byte in T, so the result is now:
                         \
@@ -34028,16 +33997,25 @@ ENDIF
 
  BPL PL42               \ If the result is positive, jump down to PL42
 
- TXA                    \ The result is negative, so we need to negate the
- EOR #%11111111         \ magnitude using two's complement, first doing the low
- CLC                    \ byte in X
- ADC #1
- TAX
+ TXA                    \ The result is negative. Port: if X <> 0 then the
+ BEQ pl42z              \ negated (T X) is (T EOR &7F, (X EOR &FF) + 1) with no
+ EOR #%11111111         \ carry out of either byte, so add it to K3(1 0) direct:
+ SEC                    \ K6 = K3 + (X EOR &FF) + 1 + 256 * (T EOR &7F), which
+ ADC K3                 \ is bit for bit what the negation below and PL42 give
+ STA K6                 \ (X and T are dead after PL42, so they need not hold
+ LDA T                  \ the negated value)
+ EOR #%01111111
+ ADC K3+1
+ BRA pl42e
 
- LDA T                  \ And then the high byte in T, making sure to leave the
- EOR #%01111111         \ sign bit alone
- ADC #0
- STA T
+.pl42z
+
+                        \ X = 0, so negating the low byte gives 0 with C set
+ SEC                    \ (A = X = 0 already)
+
+ LDA #%10000000         \ And then the high byte in T, keeping the sign bit:
+ SBC T                  \ &80 - T - borrow = (T EOR &7F) + C, with the same
+ STA T                  \ C (set only for T = &80, X = 0) as EOR/ADC #0
 
 .PL42
 
@@ -34047,6 +34025,9 @@ ENDIF
 
  LDA T                  \ And then doing the high bytes, so we now get:
  ADC K3+1               \
+
+.pl42e
+
  STA K6+1               \   K6(1 0) = K3(1 0) + (T X)
                         \           = K3(1 0) + u_x * cos(CNT2)
                         \                     + v_x * sin(CNT2)
@@ -34083,8 +34064,23 @@ ENDIF
                         \
                         \   (A P) = u_y * cos(CNT2)
 
- JSR ADD                \ Set (A X) = (A P) + (S R)
-                        \           =  u_y * cos(CNT2) + v_y * sin(CNT2)
+ STA T1                 \ Set (A X) = (A P) + (S R), as ADD (Port: inlined,
+ AND #%10000000         \ with MU8 for different signs)
+ STA T
+ EOR S
+ BPL pl4da
+ JSR MU8
+ BRA pl4db
+.pl4da
+ CLC
+ LDA R
+ ADC P
+ TAX
+ LDA S
+ ADC T1
+ ORA T
+.pl4db
+                        \ = u_y * cos(CNT2) + v_y * sin(CNT2)
 
  EOR #%10000000         \ Store the negated high byte in T, so the result is
  STA T                  \ now:
@@ -34108,10 +34104,9 @@ ENDIF
  ADC #1
  TAX
 
- LDA T                  \ And then the high byte in T, making sure to leave the
- EOR #%01111111         \ sign bit alone
- ADC #0
- STA T
+ LDA #%10000000         \ And then the high byte in T, keeping the sign bit:
+ SBC T                  \ &80 - T - borrow = (T EOR &7F) + C, with the same
+ STA T                  \ C (set only for T = &80, X = 0) as EOR/ADC #0
 
 .PL43
 
@@ -34134,22 +34129,214 @@ ENDIF
  JSR BLINE              \ Call BLINE to draw this segment, which also returns
                         \ the updated value of CNT in A
 
- CMP TGT                \ If CNT > TGT then jump to PL40 to stop drawing the
- BEQ P%+4               \ ellipse (which is how we draw half-ellipses)
- BCS PL40
+ DEC A                  \ If CNT > TGT then jump to PL40 to stop drawing the
+ CMP TGT                \ ellipse (which is how we draw half-ellipses) (Port:
+ BCS PL40               \ CNT > TGT is CNT - 1 >= TGT, as CNT >= STP >= 2 here,
+                        \ and this leaves C clear for the ADC below; A and Z
+                        \ at PL40 are dead in every caller of PLANET)
 
- LDA CNT2               \ Set CNT2 = (CNT2 + STP) mod 64
- CLC
+ LDA CNT2               \ Set CNT2 = (CNT2 + STP) mod 64 (C is clear)
  ADC STP
  AND #63
  STA CNT2
 
- JMP PLL4               \ Jump back to PLL4 to draw the next segment
+ ASSERT CNT2 < &100     \ (LDA CNT2 at PLL4 is a 2-byte zero-page load)
+
+.pl4j
+
+ JMP PLL4+2             \ Jump back to PLL4 (Port: patched by pl4pat: or to
+                        \ PLL4F) to draw the next segment, skipping
+                        \ its LDA CNT2 as A already holds the new CNT2
 
 .PL40
 
  RTS                    \ Return from the subroutine
+\ ******************************************************************************
+\
+\       Name: PLL4F
+\       Type: Subroutine
+\   Category: Drawing planets
+\    Summary: Port: PLL4 with the curve's four FMLTU multipliers patched in once
+\             per curve
+\
+\ ------------------------------------------------------------------------------
+\
+\ The points of a planet curve (PLS22's loop) when none of K2 to K2+3 is zero:
+\ pl4pat (bank 4) patches logL(K2+n) and log(K2+n) into the ADC # operands
+\ below and PLL4's loop-back jump (pl4j) to here, so each product K2+n * |sin|
+\ or |cos| adds log(q) inline and takes the antilog, exactly as FMLTU does (0,
+\ with C clear, when the log sum is below 256; 0 with C unchanged when q = 0),
+\ then joins PLL4 at pl4t.
+\
+\ ******************************************************************************
 
+.PLL4F
+
+ LDA CNT2               \ As PLL4: C = the sign of sin(CNT2), X = CNT2 mod 32,
+ CMP #33                \ XX16+5 = that sign, S = its EOR with XX16+2
+ AND #31
+ TAX
+ LDA #0
+ ROR A
+ STA XX16+5
+ EOR XX16+2
+ STA S
+
+ STX pl4x+1             \ Keep X = CNT2 mod 32 for the cos look-up
+
+ LDA SNE,X              \ Set Q = q = |sin(CNT2)|
+ STA Q
+ BEQ pl4z1              \ If q = 0, R = K = 0
+ TAX
+ CLC
+ LDA logL,X             \ Set A = FMLTU's alogh(log(K2+2) + log(q)), or 0
+.pl4a2                   \ (with C clear) if the sum is below 256, as FMLTU
+ ADC #0                 \ (patched: logL(K2+2))
+ LDA log,X
+.pl4b2
+ ADC #0                 \ (patched: log(K2+2))
+ TAX
+ LDA alogh,X
+ BCS P%+4
+ LDA #0
+ STA R
+
+ LDX Q
+ CLC
+ LDA logL,X             \ Set A = FMLTU's alogh(log(K2+3) + log(q)), or 0
+.pl4a3                   \ (with C clear) if the sum is below 256, as FMLTU
+ ADC #0                 \ (patched: logL(K2+3))
+ LDA log,X
+.pl4b3
+ ADC #0                 \ (patched: log(K2+3))
+ TAX
+ LDA alogh,X
+ BCS P%+4
+ LDA #0
+ STA K
+
+.pl4x
+
+ LDX #0                 \ (patched) X = CNT2 mod 32
+
+ CLC                    \ Set Q = q = |cos(CNT2)| (C clear, as PLL4)
+ LDA SNE+16,X
+ STA Q
+ BEQ pl4z2              \ If q = 0, K+2 = P = 0 with C clear
+ TAX
+ LDA logL,X             \ Set A = FMLTU's alogh(log(K2+1) + log(q)), or 0
+.pl4a1                   \ (with C clear) if the sum is below 256, as FMLTU
+ ADC #0                 \ (patched: logL(K2+1))
+ LDA log,X
+.pl4b1
+ ADC #0                 \ (patched: log(K2+1))
+ TAX
+ LDA alogh,X
+ BCS P%+4
+ LDA #0
+ STA K+2
+
+ LDX Q
+ CLC
+ LDA logL,X             \ Set A = FMLTU's alogh(log(K2+0) + log(q)), or 0
+.pl4a0                   \ (with C clear) if the sum is below 256, as FMLTU
+ ADC #0                 \ (patched: logL(K2+0))
+ LDA log,X
+.pl4b0
+ ADC #0                 \ (patched: log(K2+0))
+ TAX
+ LDA alogh,X
+ BCS P%+4
+ LDA #0
+ STA P
+
+ JMP pl4t               \ Join PLL4 (C as FMLTU leaves it, for its ADC #207)
+
+.pl4z1
+
+ STZ R                  \ q = 0: R = K = 0, as FMLTU (C is cleared below)
+ STZ K
+ BRA pl4x
+
+.pl4z2
+
+ STZ K+2                \ q = 0: K+2 = P = 0, C still clear, as FMLTU leaves
+ STZ P                  \ them
+ JMP pl4t
+
+\ ******************************************************************************
+\
+\       Name: pl4pat
+\       Type: Subroutine
+\   Category: Drawing planets
+\    Summary: Pick PLL4 or PLL4F for a new curve, patching PLL4F's multipliers
+\             (Port: the demo port's per-curve PLL4 operand patching, 5518429
+\             and demo-final's pl4k/pl4p operands, with Master's log tables)
+\
+\ ------------------------------------------------------------------------------
+\
+\ Called by PLS22 at the start of each curve. K2 to K2+3 are fixed for the
+\ curve, so when none of them is 0, PLL4F replaces the four FMLTU calls of
+\ PLL4 by inline sums of log(q) and the patched-in log(K2+n), with exactly
+\ FMLTU's results (the antilog of the 16-bit log sum, or 0 with C clear when
+\ the sum is below 256, or 0 with C unchanged when q = 0); PLL4F then joins
+\ PLL4 at pl4t, and PLL4's loop-back JMP (pl4j) is patched to PLL4F+2. With
+\ any K2+n = 0 (FMLTU's A = 0 case, which leaves C unchanged) the curve uses
+\ PLL4 as before. Y is preserved.
+\
+\ ******************************************************************************
+
+.pl4pat
+
+ LDA K2+0               \ Patch logL(K2+0) and log(K2+0) into PLL4F, or
+ BEQ pl4old             \ use PLL4 if K2+0 = 0
+ TAX
+ LDA logL,X
+ STA pl4a0+1
+ LDA log,X
+ STA pl4b0+1
+ LDA K2+1               \ Patch logL(K2+1) and log(K2+1) into PLL4F, or
+ BEQ pl4old             \ use PLL4 if K2+1 = 0
+ TAX
+ LDA logL,X
+ STA pl4a1+1
+ LDA log,X
+ STA pl4b1+1
+ LDA K2+2               \ Patch logL(K2+2) and log(K2+2) into PLL4F, or
+ BEQ pl4old             \ use PLL4 if K2+2 = 0
+ TAX
+ LDA logL,X
+ STA pl4a2+1
+ LDA log,X
+ STA pl4b2+1
+ LDA K2+3               \ Patch logL(K2+3) and log(K2+3) into PLL4F, or
+ BEQ pl4old             \ use PLL4 if K2+3 = 0
+ TAX
+ LDA logL,X
+ STA pl4a3+1
+ LDA log,X
+ STA pl4b3+1
+
+ LDA #LO(PLL4F+2)       \ Loop back to PLL4F
+ STA pl4j+1
+ LDA #HI(PLL4F+2)
+ STA pl4j+2
+
+ PLA                    \ Do PLS22's set-up and enter PLL4F instead of PLL4,
+ PLA                    \ dropping the return address into PLS22 (PL40's RTS
+ LDX #0                 \ returns to PLS22's caller)
+ STX CNT
+ DEX
+ STX FLAG
+ JMP PLL4F
+
+.pl4old
+
+ LDA #LO(PLL4+2)        \ Loop back to PLL4, and return to PLS22 to run it
+ STA pl4j+1
+ LDA #HI(PLL4+2)
+ STA pl4j+2
+ RTS
 \ ******************************************************************************
 \
 \       Name: SUN (Part 1 of 4)
