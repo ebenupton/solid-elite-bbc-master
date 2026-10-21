@@ -22424,6 +22424,43 @@ ENDIF
 
 .DVID4
 
+ STZ P                  \ Port: if A < Q then the quotient is 0 and the
+ CMP Q                  \ remainder is A (no subtraction can happen and the
+ BCS DVdiv              \ remainder never overflows), so set P = 0 and fall
+                        \ through to the remainder conversion with A
+                        \ unchanged and C clear, exactly as the unrolled
+                        \ division below would leave them (grind: the full
+                        \ division is rare, so it is done out of line in
+                        \ DVdiv, which jumps back to DVID4z when done)
+
+.DVID4z
+
+ TAX                    \ This contains the code from the LL28+4 routine, so
+ BEQ LLfix22            \ this section is exactly equivalent to a JMP LL28+4
+ LDA log,X              \ call, but is slightly faster as it's been inlined
+ STA widget             \ (so it converts the remainder in A into an integer
+ LDA logL,X             \ representation of the fractional value A / Q, in R,
+ LDX Q                  \ where 1.0 = 255, and it also clears the C flag)
+ CMP logL,X             \ C = borrow from low bytes of log(A) - log(Q)
+ LDA widget
+ SBC log,X
+ BCS LL222
+ TAX
+ LDA alogh,X
+
+.LLfix22
+
+ STA R                  \ This is also part of the inline LL28+4 routine
+ RTS
+
+.LL222
+
+ LDA #255               \ This is also part of the inline LL28+4 routine
+ STA R
+ RTS
+
+.DVdiv
+
 \LDX #8                 \ This instruction is commented out in the original
                         \ source
 
@@ -22470,58 +22507,46 @@ ENDIF
  SBC Q
  ROL P
 
- ROL A                  \ Repeat for the fifth time
- CMP Q
- BCC P%+4
- SBC Q
+ ROL A                  \ Repeat for the fifth time (grind: the subtraction is
+ CMP Q                  \ rare here, so it is done out of line in DV4s5, which
+ BCS DV4s5              \ makes the common no-subtract path one cycle faster)
+.DV4r5
  ROL P
 
  ROL A                  \ Repeat for the sixth time
  CMP Q
- BCC P%+4
- SBC Q
+ BCS DV4s6
+.DV4r6
  ROL P
 
  ROL A                  \ Repeat for the seventh time
  CMP Q
- BCC P%+4
- SBC Q
+ BCS DV4s7
+.DV4r7
  ROL P
 
  ROL A                  \ Repeat for the eighth time
  CMP Q
- BCC P%+4
- SBC Q
+ BCS DV4s8
+.DV4r8
  ROL P
+ BRA DVID4z             \ grind: rejoin the remainder conversion above
 
- LDX #0                 \ Set X = 0 so this unrolled version of DVID4 also
-                        \ returns X = 0
+.DV4s5                  \ grind: out-of-line subtractions for DVID4's fifth to
+ SBC Q                  \ eighth steps (C = 1 on entry and exit, as in-line)
+ BRA DV4r5
 
- STA widget             \ This contains the code from the LL28+4 routine, so
- TAX                    \ this section is exactly equivalent to a JMP LL28+4
- BEQ LLfix22            \ call, but is slightly faster as it's been inlined
- LDA logL,X             \ (so it converts the remainder in A into an integer
- LDX Q                  \ representation of the fractional value A / Q, in R,
- SEC                    \ where 1.0 = 255, and it also clears the C flag
- SBC logL,X
- LDX widget
- LDA log,X
- LDX Q
- SBC log,X
- BCS LL222
- TAX
- LDA alogh,X
+.DV4s6
+ SBC Q
+ BRA DV4r6
 
-.LLfix22
+.DV4s7
+ SBC Q
+ BRA DV4r7
 
- STA R                  \ This is also part of the inline LL28+4 routine
- RTS
-
-.LL222
-
- LDA #255               \ This is also part of the inline LL28+4 routine
- STA R
- RTS
+.DV4s8
+ SBC Q
+ BRA DV4r8
 
 \ ******************************************************************************
 \
