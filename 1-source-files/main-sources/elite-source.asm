@@ -22261,8 +22261,10 @@ ENDIF
  AND #%10000000
  STA T
 
- TXA                    \ Set A to the high byte of the result with the sign bit
- AND #%01111111         \ cleared, so (A ?) = |X * A + (S R)|
+ TXA                    \ Set A to the high byte of the result (Port: its sign
+                        \ bit need not be cleared, as the ASL A at the start of
+                        \ DVL3 drops it, so (A ?) = |X * A + (S R)| as far as
+                        \ the loop is concerned)
 
                         \ The following is identical to TIS2, except Q is
                         \ hard-coded to 96, so this does A = A / 96
@@ -41608,50 +41610,55 @@ ENDMACRO
  CMP Q                  \ If A >= Q then jump to TI4 to return a 1 with the
  BCS TI4                \ correct sign
 
- LDX #%11111110         \ Set T to have bits 1-7 set, so we can rotate through 7
- STX T                  \ loop iterations, getting a 1 each time, and then
-                        \ getting a 0 on the 8th iteration... and we can also
-                        \ use T to catch our result bits into bit 0 each time
+ STZ T                  \ Port: set T = 0; the six iterations below are fully
+                        \ unrolled (the demo port's e9770fa, w_0139), so T
+                        \ needs no marker bits to end a loop
 
-.TIL2
-
- ASL A                  \ Shift A to the left
-
+ ASL A                  \ Iteration 1: shift A to the left
  CMP Q                  \ If A < Q skip the following subtraction
  BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
- SBC Q                  \ A >= Q, so set A = A - Q
-                        \
-                        \ Going into this subtraction we know the C flag is
-                        \ set as we passed through the BCC above, and we also
-                        \ know that A >= Q, so the C flag will still be set once
-                        \ we are done
+ ASL A                  \ Iteration 2: shift A to the left
+ CMP Q                  \ If A < Q skip the following subtraction
+ BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
- ROL T                  \ Rotate the counter in T to the left, and catch the
-                        \ result bit into bit 0 (which will be a 0 if we didn't
-                        \ do the subtraction, or 1 if we did)
+ ASL A                  \ Iteration 3: shift A to the left
+ CMP Q                  \ If A < Q skip the following subtraction
+ BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
- BCS TIL2               \ If we still have set bits in T, loop back to TIL2 to
-                        \ do the next iteration of 7
+ ASL A                  \ Iteration 4: shift A to the left
+ CMP Q                  \ If A < Q skip the following subtraction
+ BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
-                        \ We've done the division and now have a result in the
-                        \ range 0-255 here, which we need to reduce to the range
-                        \ 0-96. We can do that by multiplying the result by 3/8,
-                        \ as 256 * 3/8 = 96
+ ASL A                  \ Iteration 5: shift A to the left
+ CMP Q                  \ If A < Q skip the following subtraction
+ BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
- LDA T                  \ Set T = T / 4
- LSR A
- LSR A
- STA T
+ ASL A                  \ Iteration 6: shift A to the left
+ CMP Q                  \ If A < Q skip the following subtraction
+ BCC P%+4
+ SBC Q                  \ A >= Q (C set), so set A = A - Q (C stays set)
+ ROL T                  \ Catch the quotient bit into bit 0 of T
 
- LSR A                  \ Set T = T / 8 + T / 4
- ADC T                  \       = 3T / 8
- STA T
+ LDA T                  \ Set A = T + T / 2 (+ the bit shifted out)
+ LSR A                  \       = 3/8 of the full 8-bit quotient, as before
+ ADC T                  \ (grind: T is dead after TIS2 -- every path out of
+                        \ NORM writes T in MULT1 or SPS2 before reading it --
+                        \ so the result is not stored back in T)
 
- TYA                    \ Fetch the sign bit of the original argument A
- AND #%10000000
-
- ORA T                  \ Apply the sign bit to T
+ CPY #%10000000         \ If the original argument A (in Y) was positive, we
+ BCC P%+4               \ are done as A = T, otherwise set bit 7 of A to apply
+ ORA #%10000000         \ the negative sign
 
  RTS                    \ Return from the subroutine
 
