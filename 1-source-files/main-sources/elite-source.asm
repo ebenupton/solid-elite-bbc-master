@@ -46786,13 +46786,22 @@ ENDMACRO
  LDA ALPHA              \ Set Q = alpha (the roll angle to rotate through)
  STA Q
 
+ ASL A                  \ Port: if |alpha| = 0 (alpha = 0 or &80) and nosev_y
+ BNE mvs4a              \ is not -0 (nosev_y_hi <> &80), then the first MAD
+ LDA INWK+3,Y           \ below leaves nosev_y unchanged, and everything else
+ CMP #%10000000         \ it writes (A, X, flags, P, T, T1, R, S) is written
+ BNE mvs4b              \ again by the second MAD (with Q = 0 it ignores A),
+                        \ so skip straight to the second MAD
+
+.mvs4a
+
  LDX INWK+2,Y           \ Set (S R) = nosev_y
  STX R
  LDX INWK+3,Y
  STX S
 
- LDX INWK,Y             \ These instructions have no effect as MAD overwrites
- STX P                  \ X and P when called, but they set X = P = nosev_x_lo
+                        \ Port: the original's dead LDX INWK,Y and STX P
+                        \ (MAD overwrites X and P) are dropped here
 
  LDA INWK+1,Y           \ Set A = -nosev_x_hi
  EOR #%10000000
@@ -46804,15 +46813,17 @@ ENDMACRO
                         \
                         \ nosev_y = nosev_y - alpha * nosev_x_hi
 
- STX P                  \ This instruction has no effect as MAD overwrites P,
-                        \ but it sets P = nosev_y_lo
+                        \ Port: the original's dead STX P (MAD sets P before
+                        \ reading it) is dropped here
+
+.mvs4b
 
  LDX INWK,Y             \ Set (S R) = nosev_x
  STX R
  LDX INWK+1,Y
  STX S
 
- LDA INWK+3,Y           \ Set A = nosev_y_hi
+                        \ Port: A = nosev_y_hi still, from the STA above
 
  JSR MAD                \ Set (A X) = Q * A + (S R)
  STA INWK+1,Y           \           = alpha * nosev_y_hi + nosev_x
@@ -46821,20 +46832,25 @@ ENDMACRO
                         \
                         \ nosev_x = nosev_x + alpha * nosev_y_hi
 
- STX P                  \ This instruction has no effect as MAD overwrites P,
-                        \ but it sets P = nosev_x_lo
+                        \ Port: the original's dead STX P (MAD sets P before
+                        \ reading it) and LDX INWK+4,Y are dropped here
 
  LDA BETA               \ Set Q = beta (the pitch angle to rotate through)
  STA Q
+
+ ASL A                  \ Port: if |beta| = 0 (beta = 0 or &80) and nosev_y
+ BNE mvs4c              \ is not -0 (nosev_y_hi <> &80), then the next MAD
+ LDA INWK+3,Y           \ leaves nosev_y unchanged, and everything else it
+ CMP #%10000000         \ writes (A, X, flags, P, T, T1, R, S) is written
+ BNE mvs4d              \ again by the last MAD (with Q = 0 it ignores A),
+                        \ so skip straight to the last MAD
+
+.mvs4c
 
  LDX INWK+2,Y           \ Set (S R) = nosev_y
  STX R
  LDX INWK+3,Y
  STX S
- LDX INWK+4,Y
-
- STX P                  \ This instruction has no effect as MAD overwrites P,
-                        \ but it sets P = nosev_y
 
  LDA INWK+5,Y           \ Set A = -nosev_z_hi
  EOR #%10000000
@@ -46846,15 +46862,14 @@ ENDMACRO
                         \
                         \ nosev_y = nosev_y - beta * nosev_z_hi
 
- STX P                  \ This instruction has no effect as MAD overwrites P,
-                        \ but it sets P = nosev_y_lo
+.mvs4d
 
  LDX INWK+4,Y           \ Set (S R) = nosev_z
  STX R
  LDX INWK+5,Y
  STX S
 
- LDA INWK+3,Y           \ Set A = nosev_y_hi
+                        \ Port: A = nosev_y_hi still, from the STA above
 
  JSR MAD                \ Set (A X) = Q * A + (S R)
  STA INWK+5,Y           \           = beta * nosev_y_hi + nosev_z
