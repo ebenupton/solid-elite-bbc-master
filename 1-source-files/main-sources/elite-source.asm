@@ -22228,7 +22228,9 @@ ENDIF
  STX P                  \ Store X in P so we can preserve it through the call to
                         \ FMLTU
 
- STA widget             \ Store A in widget, so now widget = argument A
+ STA FMLA+1             \ Port: store A in the low byte of the operand of the
+                        \ ADC at FMLA (log is page-aligned), so that ADC reads
+                        \ log + A = high byte of La without reloading A into X
 
  TAX                    \ Transfer A into X, so now X = argument A
 
@@ -22252,8 +22254,14 @@ ENDIF
 
  LDA log,X              \ Set A = high byte of Lq
 
- LDX widget             \ Set A = A + C + high byte of La
- ADC log,X              \       = high byte of Lq + high byte of La + C
+ ASSERT LO(log) = 0     \ (the operand's low byte is the argument A)
+
+.FMLA
+
+ ADC log                \ Set A = A + C + high byte of La
+                        \       = high byte of Lq + high byte of La + C
+                        \
+                        \ (self-modified: the operand is log + argument A)
                         \
                         \ so we now have:
                         \
