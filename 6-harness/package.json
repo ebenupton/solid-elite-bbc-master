@@ -1,0 +1,9 @@
+{
+  "name": "elite-master-harness",
+  "private": true,
+  "type": "module",
+  "description": "Determinism harness and gate for the BBC Master Elite port",
+  "dependencies": {
+    "jsbeeb": "1.6.0"
+  }
+}

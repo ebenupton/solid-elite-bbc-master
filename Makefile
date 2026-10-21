@@ -95,6 +95,7 @@ all:
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
 	$(BEEBASM) -i 1-source-files/main-sources/elite-loader.asm -v > 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-source.asm -v >> 3-assembled-output/compile.txt
+	$(BEEBASM) -i 1-source-files/main-sources/elite-source.asm -d > 3-assembled-output/symbols.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-data.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt
 	$(PYTHON) 2-build-files/elite-checksum.py $(unencrypt) -rel$(variant-number)
@@ -117,3 +118,7 @@ ifeq ($(variant), compact)
 else
 	curl -H "Content-Type:application/binary" --upload-file "5-compiled-game-discs/elite-master$(suffix).ssd" "http://localhost:48075/run/b2?name=elite-master$(suffix).ssd"
 endif
+
+.PHONY:verify
+verify:
+	sh 6-harness/verify.sh
