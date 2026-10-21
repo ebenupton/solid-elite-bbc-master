@@ -21004,12 +21004,23 @@ ENDIF
 \
 \ ******************************************************************************
 
+.mlt3z
+
+ STA K+2                \ |A| = 0 (A is 0 here), so set (K+3 K+2) = 0 and
+ STA K+3                \ join the second product
+ BRA mlt3s
+
 .MULT3
 
- STA R                  \ Store the high byte of (A P+1 P) in R
+                        \ Port: by quarter squares (QSL and QSH, elite-hi.asm):
+                        \ the three bytes' products by |Q|, added. Exactly the
+                        \ original's results: K(3 2 1 0) with the sign of A
+                        \ EOR Q, A = K+3, R = the argument A, Y kept, N and Z
+                        \ from A (T, X, C and V are left differently, but all
+                        \ four callers, in MV40, MV1 and MV2, overwrite them
+                        \ before reading them)
 
- AND #%01111111         \ Set K+2 to |A|, the high byte of K(2 1 0)
- STA K+2
+ STA R                  \ Store the high byte of (A P+1 P) in R
 
  LDA Q                  \ Set A to bits 0-6 of Q, so A = |Q|
  AND #%01111111
@@ -21017,72 +21028,96 @@ ENDIF
  BEQ MU5                \ If |Q| = 0, jump to MU5 to set K(3 2 1 0) to 0,
                         \ returning from the subroutine using a tail call
 
- SEC                    \ Set T = |Q| - 1
- SBC #1
- STA T
+ STA T                  \ Set T = |Q| for the products
 
-                        \ We now use the same shift-and-add algorithm as MULT1
-                        \ to calculate the following:
-                        \
-                        \ K(2 1 0) = K(2 1 0) * |Q|
-                        \
-                        \ so we start with the first shift right, in which we
-                        \ take (K+2 P+1 P) and shift it right, storing the
-                        \ result in K(2 1 0), ready for the multiplication loop
-                        \ (so the multiplication loop actually calculates
-                        \ (|A| P+1 P) * |Q|, as the following sets K(2 1 0) to
-                        \ (|A| P+1 P) shifted right)
+ ASL A                  \ Set K = 2 * |Q| - 1, so that with C clear, SBC K
+ DEC A                  \ turns a sum src + |Q| into the difference src - |Q|
+ STA K                  \ (K is free until the third product stores K)
 
- LDA P+1                \ Set A = P+1
+ STY mlt3y+1            \ Keep Y in the operand of the LDY at mlt3y
 
- LSR K+2                \ Shift the high byte in K+2 to the right
+ LDA R                  \ Set A = |A|, the high byte of the argument, and if
+ AND #%01111111         \ it is zero, jump to mlt3z to set (K+3 K+2) to 0
+ BEQ mlt3z
 
- ROR A                  \ Shift the middle byte in A to the right and store in
- STA K+1                \ K+1 (so K+1 contains P+1 shifted right)
+                        \ Set (K+3 K+2) = |A| * |Q|; both are below 128, so
+                        \ the sum never reaches 256 and C is clear after the
+                        \ ADC
 
- LDA P                  \ Shift the middle byte in P to the right and store in
- ROR A                  \ K, so K(2 1 0) now contains (|A| P+1 P) shifted right
+ CLC                    \ X = |A| + |Q|
+ ADC T
+ TAX
+ SBC K                  \ Y = ||A| - |Q||, leaving C set
+ BCS mlt3p
+ EOR #&FF
+ ADC #1
+ SEC
+.mlt3p
+ TAY
+ LDA QSL,X              \ (K+3 K+2) = QS(X) - QS(Y)
+ SBC QSL,Y
+ STA K+2
+ LDA QSH,X
+ SBC QSH,Y
+ STA K+3
+
+.mlt3s
+
+ LDA P+1                \ Set (A K+1) = P+1 * |Q| and add A to (K+3 K+2),
+ CLC                    \ with a sum of 256 or more handled out of line at
+ ADC T                  \ mlt3h1 (X = P+1 + |Q|, Y = |P+1 - |Q||, C set)
+ TAX
+ BCS mlt3h1
+ SBC K
+ BCS mlt3d1
+ EOR #&FF
+ ADC #1
+ SEC
+.mlt3d1
+ TAY
+ LDA QSL,X
+ SBC QSL,Y
+ STA K+1
+ LDA QSH,X
+ SBC QSH,Y
+.mlt3e1
+ CLC
+ ADC K+2
+ STA K+2
+ BCS mlt3c1             \ The carry into K+3 is handled out of line at mlt3c1
+
+.mlt3
+
+ LDA P                  \ Set (A K) = P * |Q| and add A to (K+3 K+2 K+1),
+ CLC                    \ with a sum of 256 or more handled out of line at
+ ADC T                  \ mlt3h2
+ TAX
+ BCS mlt3h2
+ SBC K
+ BCS mlt3d2
+ EOR #&FF
+ ADC #1
+ SEC
+.mlt3d2
+ TAY
+ LDA QSL,X
+ SBC QSL,Y
  STA K
+ LDA QSH,X
+ SBC QSH,Y
+.mlt3e2
+ CLC
+ ADC K+1
+ STA K+1
+ BCS mlt3c2             \ The carry into (K+3 K+2) is handled out of line at
+                        \ mlt3c2; K+3 stays below 64 as the product is under
+                        \ 2^30
 
-                        \ We now use the same shift-and-add algorithm as MULT1
-                        \ to calculate the following:
-                        \
-                        \ K(2 1 0) = K(2 1 0) * |Q|
+.mlt3b
 
- LDA #0                 \ Set A = 0 so we can start building the answer in A
+.mlt3y
 
- LDX #24                \ Set up a counter in X to count the 24 bits in K(2 1 0)
-
-.MUL2
-
- BCC P%+4               \ If C (i.e. the next bit from K) is set, do the
- ADC T                  \ addition for this bit of K:
-                        \
-                        \   A = A + T + C
-                        \     = A + |Q| - 1 + 1
-                        \     = A + |Q|
-
- ROR A                  \ Shift A right by one place to catch the next digit
- ROR K+2                \ next digit of our result in the left end of K(2 1 0),
- ROR K+1                \ while also shifting K(2 1 0) right to fetch the next
- ROR K                  \ bit for the calculation into the C flag
-                        \
-                        \ On the last iteration of this loop, the bit falling
-                        \ off the end of K will be bit 0 of the original A, as
-                        \ we did one shift before the loop and we are doing 24
-                        \ iterations. We set A to 0 before looping, so this
-                        \ means the loop exits with the C flag clear
-
- DEX                    \ Decrement the loop counter
-
- BNE MUL2               \ Loop back for the next bit until K(2 1 0) has been
-                        \ rotated all the way
-
-                        \ The result (|A| P+1 P) * |Q| is now in (A K+2 K+1 K),
-                        \ but it is positive and doesn't have the correct sign
-                        \ of the final result yet
-
- STA T                  \ Save the high byte of the result into T
+ LDY #0                 \ Restore Y (the operand is set at the start)
 
  LDA R                  \ Fetch the sign byte from the original (A P+1 P)
                         \ argument that we stored in R
@@ -21092,14 +21127,50 @@ ENDIF
 
  AND #%10000000         \ Extract the sign bit
 
- ORA T                  \ Apply this to the high byte of the result in T, so
-                        \ that A now has the correct sign for the result, and
-                        \ (A K+2 K+1 K) therefore contains the correctly signed
-                        \ result
+ ORA K+3                \ Apply this to the high byte of the result in K+3
 
  STA K+3                \ Store A in K+3, so K(3 2 1 0) now contains the result
 
  RTS                    \ Return from the subroutine
+
+.mlt3c1
+
+ INC K+3                \ Propagate the second product's carry into K+3
+ BRA mlt3
+
+.mlt3c2
+
+ INC K+2                \ Propagate the third product's carry into (K+3 K+2)
+ BNE mlt3b
+ INC K+3
+ BRA mlt3b
+
+.mlt3h1
+
+ CLC                    \ The second product's sum is 256 or more (rare): with
+ SBC K                  \ C set by the ADC, Y = P+1 - |Q| (positive)
+ TAY
+ LDA QSL+256,X
+ SEC
+ SBC QSL,Y
+ STA K+1
+ LDA QSH+256,X
+ SBC QSH,Y
+ BRA mlt3e1
+
+.mlt3h2
+
+ CLC                    \ The third product's sum is 256 or more (rare)
+ SBC K
+ TAY
+ LDA QSL+256,X
+ SEC
+ SBC QSL,Y
+ STA K
+ LDA QSH+256,X
+ SBC QSH,Y
+ BRA mlt3e2
+
 
 \ ******************************************************************************
 \
@@ -21677,52 +21748,96 @@ ENDIF
 
 .MLTU2
 
- EOR #%11111111         \ Flip the bits in A and rotate right, storing the
- LSR A                  \ result in P+1, so we now calculate (P+1 P) * Q
+                        \ Port: by quarter squares (QSL and QSH, elite-hi.asm):
+                        \ (A P+1 P) = Q * (A ~P) as the two bytes' products,
+                        \ added. Exactly the original's results: Q kept, C
+                        \ clear (X, Y, N and Z differ: no caller reads them,
+                        \ as each caller's next use of X and Y sets them)
+
+ STA P+1                \ Y = |A - Q|
+ SEC
+ SBC Q
+ BCS MLTU2a
+ EOR #&FF
+ ADC #1
+
+.MLTU2a
+
+ TAY
+ LDA P+1                \ X = A + Q, C = bit 8
+ CLC
+ ADC Q
+ TAX
+ BCS MLTU2b
+ LDA QSL,X              \ Set (A P+1) = A * Q
+ SEC
+ SBC QSL,Y
  STA P+1
+ LDA QSH,X
+ SBC QSH,Y
+ BRA MLTU2c
 
- LDA #0                 \ Set A = 0 so we can start building the answer in A
+.MLTU2b
 
- LDX #16                \ Set up a counter in X to count the 16 bits in (P+1 P)
+ LDA QSL+256,X
+ SEC
+ SBC QSL,Y
+ STA P+1
+ LDA QSH+256,X
+ SBC QSH,Y
 
- ROR P                  \ Set P = P >> 1 with bit 7 = bit 0 of A
-                        \ and C flag = bit 0 of P
+.MLTU2c
 
-.MUL7
+ PHA                    \ Keep the high byte
 
- BCS MU21               \ If C (i.e. the next bit from P) is set, do not do the
-                        \ addition for this bit of P, and instead skip to MU21
-                        \ to just do the shifts
+                        \ Now the low byte lo = ~P, without inverting P: we
+                        \ have lo + Q = Q - P - 1 and |lo - Q| = |P + Q - 255|
 
- ADC Q                  \ Do the addition for this bit of P:
-                        \
-                        \   A = A + Q + C
-                        \     = A + Q
+ CLC                    \ Y = |lo - Q|: A = P + Q; if that doesn't carry then
+ LDA P                  \ lo - Q = 255 - (P + Q) = ~A (the common case, as Q
+ ADC Q                  \ is small), else Q - lo = A + 1 (at MLTU2g)
+ BCS MLTU2g
+ EOR #&FF
 
- ROR A                  \ Rotate (A P+1 P) to the right, so we capture the next
- ROR P+1                \ digit of the result in P+1, and extract the next digit
- ROR P                  \ of (P+1 P) in the C flag
+.MLTU2d
 
- DEX                    \ Decrement the loop counter
+ TAY
+ CLC                    \ X = lo + Q = Q - P - 1, C = bit 8 (set if Q > P)
+ LDA Q
+ SBC P
+ TAX
+ BCS MLTU2e
+ LDA QSL,X              \ Set (A P) = lo * Q
+ SEC
+ SBC QSL,Y
+ STA P
+ LDA QSH,X
+ SBC QSH,Y
+ BRA MLTU2f
 
- BNE MUL7               \ Loop back for the next bit until P has been rotated
-                        \ all the way
+.MLTU2e
+
+ LDA QSL+256,X
+ SEC
+ SBC QSL,Y
+ STA P
+ LDA QSH+256,X
+ SBC QSH,Y
+
+.MLTU2f
+
+ CLC                    \ Add this high byte to (A P+1), which leaves C clear
+ ADC P+1                \ as the product fits in 24 bits
+ STA P+1
+ PLA
+ ADC #0
 
  RTS                    \ Return from the subroutine
 
-.MU21
+.MLTU2g
 
- LSR A                  \ Shift (A P+1 P) to the right, so we capture the next
- ROR P+1                \ digit of the result in P+1, and extract the next digit
- ROR P                  \ of (P+1 P) in the C flag
-
- DEX                    \ Decrement the loop counter
-
- BNE MUL7               \ Loop back for the next bit until P has been rotated
-                        \ all the way
-
- RTS                    \ Return from the subroutine
-
+ ADC #0                 \ C is set, so A = P + Q - 255 = Q - lo = |lo - Q|
+ BRA MLTU2d
 \ ******************************************************************************
 \
 \       Name: MUT3
