@@ -20,14 +20,17 @@ import sys
 argv = sys.argv
 encrypt = True
 release = 1
+compile_txt = None
 
-for arg in argv[1:]:
+for i, arg in enumerate(argv[1:]):
     if arg == "-u":
         encrypt = False
     if arg == "-rel1":
         release = 1
     if arg == "-rel2":
         release = 2
+    if arg == "-c":
+        compile_txt = argv[i + 2]
 
 print("Master Elite Checksum")
 print("Encryption = ", encrypt)
@@ -55,9 +58,23 @@ elif release == 2:
     scramble_from = 0x2CC1      # G%
     na2_per_cent = 0x34CD       # NA2%
 
-# Configuration variables for BCODE
+# Port: with -c <file>, take F%, G% and NA2%, and the address that BCODE is
+# loaded at, from the assembler's output (compile.txt), so the commander
+# checksum lands in the right place in a source that has changed
 
 load_address = 0x1300
+
+if compile_txt:
+    import re
+    with open(compile_txt) as c:
+        text = c.read()
+    f = int(re.search(r"^F% = &([0-9A-F]+)", text, re.M).group(1), 16)
+    scramble_from = int(re.search(r"^G% = &([0-9A-F]+)", text, re.M).group(1), 16)
+    na2_per_cent = int(re.search(r"^NA2% = &([0-9A-F]+)", text, re.M).group(1), 16)
+    load_address = int(re.search(r"^S\.BCODE &([0-9A-F]+) ", text, re.M).group(1), 16)
+
+# Configuration variables for BCODE
+
 seed = 0x19
 
 if release == 1:

@@ -2,9 +2,15 @@ BEEBASM?=beebasm
 PYTHON?=python
 DISC?=oaknut-disc
 
-# A make command with no arguments will build the SNG47 variant with
-# encrypted binaries, checksums enabled, the standard commander and
-# crc32 verification of the game binaries
+# A make command with no arguments will build the SNG47 variant with the
+# standard commander, and report whether the game binaries still match the
+# originals (crc32)
+#
+# This is the BBC Master port (docs/README.md): its code moves, so it is built
+# without the copy protection, whose encryption ranges and checksums are tied
+# to the original's addresses (as with "encrypt=no" in the original's
+# Makefile: no encryption, no checksum tests, and the commander file checksum
+# set at the address that the assembler reports)
 #
 # Optional arguments for the make command are:
 #
@@ -15,19 +21,17 @@ DISC?=oaknut-disc
 #
 #   commander=max       Start with a maxed-out commander
 #
-#   encrypt=no          Disable encryption and checksum routines
-#
 #   match=no            Do not attempt to match the original game binaries
 #                       (i.e. omit workspace noise)
 #
-#   verify=no           Disable crc32 verification of the game binaries
+#   verify=no           Do not compare the game binaries with the originals
 #
 # So, for example:
 #
-#   make variant=compact commander=max encrypt=no match=no verify=no
+#   make commander=max match=no verify=no
 #
-# will build an unencrypted Master Compact variant with a maxed-out commander,
-# no workspace noise and no crc32 verification
+# will build the SNG47 variant with a maxed-out commander, no workspace noise
+# and no crc32 comparison
 #
 # The following variables are written into elite-build-options.asm depending on
 # the above arguments, so they can be passed to BeebAsm:
@@ -51,8 +55,7 @@ DISC?=oaknut-disc
 #   TRUE  = Match binaries to released version (i.e. fill workspaces with noise)
 #   FALSE = Zero-fill workspaces
 #
-# The encrypt and verify arguments are passed to the elite-checksum.py and
-# crc32.py scripts, rather than BeebAsm
+# The verify argument is passed to the crc32.py script, rather than BeebAsm
 
 ifeq ($(commander), max)
   max-commander=TRUE
@@ -60,13 +63,8 @@ else
   max-commander=FALSE
 endif
 
-ifeq ($(encrypt), no)
-  unencrypt=-u
-  remove-checksums=TRUE
-else
-  unencrypt=
-  remove-checksums=FALSE
-endif
+unencrypt=-u
+remove-checksums=TRUE
 
 ifeq ($(match), no)
   match-original-binaries=FALSE
@@ -98,7 +96,7 @@ all:
 	$(BEEBASM) -i 1-source-files/main-sources/elite-source.asm -d > 3-assembled-output/symbols.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-data.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt
-	$(PYTHON) 2-build-files/elite-checksum.py $(unencrypt) -rel$(variant-number)
+	$(PYTHON) 2-build-files/elite-checksum.py $(unencrypt) -rel$(variant-number) -c 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-disc.asm $(boot) -do 5-compiled-game-discs/elite-master$(suffix).ssd -title "E L I T E"
 ifneq ($(verify), no)
 	@$(PYTHON) 2-build-files/crc32.py 4-reference-binaries/$(folder) 3-assembled-output
