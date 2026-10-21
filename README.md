@@ -1,3 +1,37 @@
+# Solid Elite for the BBC Master
+
+A port of Acornsoft's BBC Master Elite with filled, lit ships, a new memory map and faster game logic. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
+
+## Credits
+
+* **Elite** was written by **Ian Bell and David Braben** and is copyright &copy; Acornsoft 1986.
+
+* **The source code this port is built on** is **Mark Moxon**'s reconstruction of BBC Master Elite from a disassembly of the original binaries, with every line documented and explained. The commentary is copyright &copy; Mark Moxon. His work made this port possible: the memory map, the speed-ups and the renderer were all worked out from his annotated source, and his build, which reproduces the released game byte for byte, is what every change here was checked against. See his [elite.bbcelite.com](https://elite.bbcelite.com) for the full story of how Elite works.
+
+* Mark in turn credits Paul Brink's annotated disassembly and Kieran Connell's [BeebAsm version](https://github.com/kieranhj/elite-beebasm); see his acknowledgements below.
+
+* **The port** (the changes on this branch) is by Eben Upton, written with [Claude Code](https://claude.com/claude-code).
+
+This is an independent fork. It is not affiliated with or endorsed by Mark Moxon, Ian Bell, David Braben or Acornsoft, and problems with the port should be reported here, not to Mark.
+
+The copyright position is unchanged from Mark's repository: the original game and Mark's commentary are copyright, and, as with Mark's repository, no licence is granted (see [his note on licences](#user-content-a-note-on-licences-copyright-etc) below).
+
+## The port
+
+The port is a series of commits on top of Mark's source, in three parts:
+
+1. **The memory map.** The game is laid out over main RAM, sideways RAM banks 4 and 7, and HAZEL, freeing main RAM `&4000-&6FFF`, banks 5 and 6 and ANDY for a renderer. The game is still the original, iteration for iteration and pixel for pixel.
+2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
+3. **The filled renderer.** Filled ships lit by the sun, disc planets and suns, a double-buffered CMYK screen, a lens flare, a filled hangar and the briefing's ship: 17.24 flight iterations per emulated second (1.234 times the original).
+
+Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details.
+
+---
+
+## Mark Moxon's README
+
+_What follows is Mark Moxon's README for [his repository](https://github.com/markmoxon/elite-source-code-bbc-master), unchanged; "I" and "my" are Mark._
+
 # Fully documented source code for Elite on the BBC Master
 
 <details>
@@ -19,8 +53,6 @@ See [my profile](https://github.com/markmoxon) for more repositories to explore.
 </details>
 
 ![Screenshot of Elite on the BBC Master](https://elite.bbcelite.com/images/github/Elite-Master.png)
-
-> **This branch** is a port of BBC Master Elite built on this source: a new memory map over main RAM, sideways RAM and HAZEL, faster game logic, and a filled, lit, double-buffered renderer, as a series of commits that each keep the game logic byte for byte the original's. See [docs/README.md](docs/README.md).
 
 This repository contains source code for Ian Bell and David Braben's classic game Elite on the BBC Master, with every single line documented and (for the most part) explained. It has been reconstructed by hand from a disassembly of the original game binaries.
 
