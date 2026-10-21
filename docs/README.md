@@ -9,27 +9,36 @@ Master Elite (the Acornsoft SNG47 release), in three parts:
    original's order, with each routine's header naming the area it lives in
    ([memory-map.md](memory-map.md)).
 2. **The speed-ups** of the game logic, one idea per commit
-   ([speedups.md](speedups.md)).
-3. **The filled renderer.**
+   ([speedups.md](speedups.md)). At the end of this part the game still
+   draws the original's wireframe, pixel for pixel, at 17.86 flight
+   iterations per emulated second against SNG47's 13.97 (1.278 times).
+3. **The filled renderer** ([renderer.md](renderer.md)). Ships are filled
+   and lit by the sun, the planet and the sun are discs, the screen is double
+   buffered in one CMYK palette, and there are a lens flare, a filled hangar
+   and the briefing's ship. This runs at 17.24 flight iterations per emulated
+   second (1.234 times SNG47).
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
 deterministic pilot, and requires the game state to be byte for byte the
 original's at every one of 10,000 main-loop iterations. While the port
 still draws as the original does, it also requires the screen to match at
-every iteration.
+every iteration. The memory map's hardware findings are in
+[master-memory.md](master-memory.md).
 
 ## Building
 
     make                        (BeebAsm 1.11 and Python 3, as upstream)
-    make verify                 (the gate: Node.js and jsbeeb, see 6-harness)
+    make verify                 (the gate: Node.js, jsbeeb and py65, see 6-harness)
 
 `make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd`
 and the binaries to `3-assembled-output`. It also reports whether each game
 binary still matches the original's. The disc needs a BBC Master 128 with
 sideways RAM in banks 4 to 7 (links LK18 and LK19 set to RAM), and boots
 with SHIFT-BREAK. The tracked outputs in `3-assembled-output` and
-`5-compiled-game-discs` are refreshed at the end of each part.
+`5-compiled-game-discs` are refreshed at the end of each part. The Master
+Compact files there are the original's, as the port is the SNG47 variant
+only.
 
 ## The copy protection
 
@@ -43,27 +52,15 @@ commander file's checksum. It takes the addresses it needs (`F%`, `G%`,
 (`-c 3-assembled-output/compile.txt`). This matches the original's `make
 encrypt=no`.
 
-## Part 1: the memory map
+## The results
 
-| Commit | Gate |
-|---|---|
-| The determinism harness and the gate | passes on the unmodified source: the game state and the screen identical at all 10,000 iterations |
-| The port without the copy protection | identical (strict, with the screen) |
-| WP and the commander buffer below page `&0D`, and the hangar's heap | identical (strict, with the screen) |
-| The layout over main RAM, banks 4 and 7, and HAZEL | identical (strict, with the screen), and the disc menu's save, load, failed load and catalogue check passes |
-| The original's unreachable code and unused tables removed | identical (strict, with the screen) |
+| | Flight it/s | Against SNG47 | Cycles per flight iteration |
+|---|---:|---:|---:|
+| SNG47 | 13.97 | 1.000 | 143,137 |
+| End of part 1: the memory map | 13.95 | 0.999 | 143,347 |
+| End of part 2: the speed-ups (the original's wireframe) | 17.86 | 1.278 | 111,970 |
+| End of part 3: the filled renderer | 17.24 | 1.234 | 115,992 |
 
-At the end of part 1 the game runs at 13.95 flight iterations per emulated
-second in the gate's run, against SNG47's 13.97. Code that moved now
-straddles page boundaries in new places, which costs about 200 cycles a
-flight iteration (143,347 against the original's 143,137). Page &0D is
-never written, and saved commander files are byte for byte the original's.
-
-## Part 2: the speed-ups
-
-24 commits, one idea each, make the game logic faster without changing what
-it computes ([speedups.md](speedups.md)). Each passes the gate with the game
-state identical to the original's and the screen, still the original's
-wireframe, identical at every iteration. At the end of part 2 the game runs
-at 17.86 flight iterations per emulated second against SNG47's 13.97 (1.278
-times): 111,970 cycles per flight iteration against 143,137.
+These are the gate's run: the pilot's mix of launches, fights, approaches to
+the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never
+written, and saved commander files are byte for byte the original's.

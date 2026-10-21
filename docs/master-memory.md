@@ -8,7 +8,7 @@ describes how the port lays itself out in this memory.
 
 | Region | Usable by the game? | Bytes |
 |---|---|---:|
-| ANDY `&8000-&8FFF` (ROMSEL bit 7) | Yes, all of it, if the MOS's VDU drivers are never used (Elite prints through its own WRCHV) and soft keys are never expanded (Master Elite sets `*FX 225,128`). Disc access does not touch it. | 4096 |
+| ANDY `&8000-&8FFF` (ROMSEL bit 7) | Yes, all of it, if the MOS's VDU drivers are never used (Elite prints through its own WRCHV) and soft keys are never expanded (Master Elite sets `*FX 225,128`). Disc access does not touch it. The port's rasteriser uses it as its polygon window; the save test checks it around every disc command. | 4096 |
 | HAZEL `&C000-&DFFF` (ACCCON Y) | Yes, all of it in flight. Around a disc command, keep 128 bytes, poke 6 and restore what DFS and the MOS overwrite (see below). | 8192 |
 | Shadow `&3000-&3FFF` (ACCCON X) | Yes. Master Elite saves the top of zero page at `&3090-&30FF` during disc access. | 4096 |
 | Shadow `&7E00-&7FFF` | Yes. It is not displayed (CRTC R6 = 31). | 512 |
@@ -68,9 +68,9 @@ erased.
 The port keeps its game data in HAZEL, so it does this around every disc
 command (`DOSCLI`):
 
-* Copy all 8K of HAZEL to main RAM `&4000-&5FFF`. This RAM is not on show
-  (in the filled renderer it is screen buffer 0, which holds no frame while
-  docked).
+* Copy all 8K of HAZEL to main RAM `&4000-&5FFF`, screen buffer 0, which
+  is not on show while docked. The next entry to space mode starts the
+  buffer afresh (`GSTASH`).
 * Put DFS's and the MOS's 128 lasting bytes back from `DFSST`. The loader
   takes them after its last disc access.
 * Write `&FF` to the six drive-state bytes.
@@ -112,7 +112,10 @@ ADFS's (`&D9`).
 | `&0B00-&0CFF` | unused on the Master | yes |
 | `&0D00-&0DFF` | DFS's NMI routine, extended vectors, ROM workspace table | **never** |
 
-The port puts Elite's workspace `WP` at `&0841-&0CA9`. This is the original's
+The port puts Elite's workspace `WP` at `&0841-&0CA9`, followed by the CMYK
+dashboard's variables to `&0CCE`. From `&0E00` (OSHWM) up to the main code
+is the renderer's shared workspace; the loader runs there first, and its
+last part from `&0400`. This is the original's
 `&0E41-&12A9`, moved down by `&600` so that each byte keeps its place in its
 page. The commander file buffer (`commbuf`, which shares its place with
 `LSX2`) is at `&087E`. `*SAVE` gives commander files load and execution

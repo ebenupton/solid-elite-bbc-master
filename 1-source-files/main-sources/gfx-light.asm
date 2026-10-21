@@ -3,7 +3,7 @@
 \ gfx-light.asm - flat-shaded lighting of the ships: the game-context half
 \
 \ From the Demonstration Disc port's shade7.asm (branch lighting). The model
-\ is 2-build-files/lightramps.py: a face's light is I = 0.5 + 0.5 max(0, n.L)
+\ is lightramps.py (docs/renderer.md): a face's light is I = 0.5 + 0.5 max(0, n.L)
 \ for its unit normal n and L the unit vector towards the light, entry
 \ round(31 max(0, n.L)) of its hue's 32-entry ramp of 4x4 dithers (one pool
 \ of nine hue ramps shared by every ship, each from 50% to 100% of the hue's

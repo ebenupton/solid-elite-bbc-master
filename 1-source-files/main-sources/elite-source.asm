@@ -17345,7 +17345,7 @@ ENDIF
 \ inks of the wall's tan (2Y+M+K) and half the floor's (2Y+M+C). Measured on
 \ the rendered hangar (every type, 12 placements each), they are the only
 \ ones HALL can choose with no cyan in their faces; the others have 20% (the
-\ Krait) to 64% (the Viper) (2-build-files/hangarinks.py). HAS1 draws them as the nearest ships of their
+\ Krait) to 64% (the Viper) (hangarinks.py, docs/renderer.md). HAS1 draws them as the nearest ships of their
 \ size (HAS1 places a ship by its targetable area) that stand out: the
 \ Sidewinder (area 4225) as an Asp Mk II (3600), the Mamba (4900) as a Viper
 \ (5625). Only the blueprint that LL9 draws changes (G_HLL9, gfx-gstubs.asm,

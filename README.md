@@ -20,6 +20,8 @@ See [my profile](https://github.com/markmoxon) for more repositories to explore.
 
 ![Screenshot of Elite on the BBC Master](https://elite.bbcelite.com/images/github/Elite-Master.png)
 
+> **This branch** is a port of BBC Master Elite built on this source: a new memory map over main RAM, sideways RAM and HAZEL, faster game logic, and a filled, lit, double-buffered renderer, as a series of commits that each keep the game logic byte for byte the original's. See [docs/README.md](docs/README.md).
+
 This repository contains source code for Ian Bell and David Braben's classic game Elite on the BBC Master, with every single line documented and (for the most part) explained. It has been reconstructed by hand from a disassembly of the original game binaries.
 
 It is a companion to the [elite.bbcelite.com website](https://elite.bbcelite.com).

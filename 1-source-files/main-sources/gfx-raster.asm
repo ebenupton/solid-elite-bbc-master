@@ -1,7 +1,7 @@
 \ ============================================================================
 \ raster.asm -- filled-polygon / disc-layer / line / dot / star rasteriser for
 \ the double-buffered CMYK MODE 1 Elite (BBC Master, 65C02).  See
-\ docs/DESIGN.md for the screen layout and the frame model.
+\ docs/renderer.md for the screen layout and the frame model.
 \
 \ Files: raster_vars.asm and raster_scr.asm hold every variable and array the
 \ caller reads or writes, and the state the rasteriser's parts share (the

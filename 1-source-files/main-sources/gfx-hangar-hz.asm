@@ -15,7 +15,7 @@ FOR q, 12, 2, -1
 NEXT
 
 \ HPWL, HPWH: the wall's and the floor's colours in f_col's packed form
-\ (2-build-files/hangarcols.py): the wall a darker tan, two yellow, a magenta
+\ (hangarcols.py, docs/renderer.md): the wall a darker tan, two yellow, a magenta
 \ and a black pixel in each 2x2 cell (RGB about 191, 128, 64), the floor a
 \ light tan, two yellow, a magenta and a cyan (about 191, 191, 128). Ink
 \ counts in quarters make f_col's 4x4 Bayer tile a 2x2 one, yellow on a

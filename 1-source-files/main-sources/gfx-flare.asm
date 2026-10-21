@@ -3,7 +3,7 @@
 \ gfx-flare.asm - the lens flare (docs/renderer.md, "Lens flare"): the
 \ part in shadow RAM, run with ACCCON X = 1
 \
-\ From the demo port's lens flare (src/flare*.asm, docs/FLARE.md and the
+\ From the demo port's lens flare (src/flare*.asm, docs/renderer.md and the
 \ model tools/flare.py there), with the same recipe, arithmetic and pixels.
 \ When SUN has drawn the sun this frame, in the front view, with its centre on
 \ the screen (x 1..255, y 0..191) and not inside the planet's disc, eight
