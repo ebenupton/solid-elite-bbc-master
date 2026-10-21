@@ -45288,7 +45288,7 @@ ENDMACRO
 
                         \ If we get here, (x1, y1) is on-screen
 
- LDA XX13               \ If XX13 is non-zero, i.e. (x2, y2) is off-screen, jump
+ TXA                    \ If XX13 (still in X) is non-zero, i.e. (x2, y2) is off-screen, jump
  BNE LL108              \ to LL108 to halve it before continuing at LL83
 
                         \ If we get here, the high bytes are all zero, which
