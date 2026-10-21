@@ -46,14 +46,24 @@
 \ ******************************************************************************
 
  CODE% = &0E00          \ The address where the code will be run
+ ASSERT CODE% >= &0E00  \ Port: page &0D is off limits (docs/master-memory.md),
+                        \ except for the minimal NMI handler (see NMIH)
+
+ FDC = &FE28            \ Port: the BBC Master's 1770 disc controller: status
+                        \ (read) and command (write) register
 
  LOAD% = &0E00          \ The address where the code will be loaded
 
  N% = 67                \ N% is set to the number of bytes in the VDU table, so
                         \ we can loop through them below
 
- S% = &2C6C             \ The address of the main entry point workspace in the
-                        \ main game code
+ INCLUDE "3-assembled-output/game-addresses.asm"     \ Port: S%, the main entry point in
+                                        \ the game code (was S% = &2C6C),
+                                        \ and SBANK, the ROMSEL value to run
+                                        \ it with, from the game's symbols
+
+ HOMEBANK = 4           \ Port: Elite's home bank, the sideways RAM bank that is
+                        \ paged in while the game runs (bank 6 in the original)
 
  VIA = &FE00            \ Memory-mapped space for accessing internal hardware,
                         \ such as the video ULA, 6845 CRTC and 6522 VIAs (also
@@ -110,6 +120,10 @@ ENDIF
 .T
 
  SKIP 1                 \ Temporary storage, used in a number of places
+
+.LEN
+
+ SKIP 2                 \ Port: the number of bytes left to copy (FTAB)
 
  ORG &00F4              \ Set the assembly address to &00F4
 
@@ -279,6 +293,14 @@ ENDIF
 
 .ENTRY
 
+ ASSERT ENTRY = &0E43   \ Port: the execution address that elite-disc.asm gives
+                        \ M128Elt
+
+ JSR CHKRAM             \ Port: first of all, check that sideways RAM banks 4
+                        \ to 7, which the port's memory map uses, are all
+                        \ RAM (before the screen mode, palette or ACCCON are
+                        \ changed, so that the message can be seen)
+
  LDA #16                \ Call OSBYTE with A = 16 and X = 0 to set the ADC to
  LDX #0                 \ sample no channels from the joystick/Bitstik
  JSR OSBYTE
@@ -385,109 +407,83 @@ ENDIF
  LDX #0                 \ flashing colours
  JSR OSB
 
- LDX #LO(MESS1)         \ Set (Y X) to point to MESS1 ("L.BDATA FFFF1300")
- LDY #HI(MESS1)
 
- JSR OSCLI              \ Call OSCLI to run the OS command in MESS1, which
-                        \ loads the BDATA file to address &1300-&54FF, appending
-                        \ &FFFF to the address to make sure it loads in the main
-                        \ BBC Master rather than getting passed across the Tube
-                        \ to the Second Processor, if one is fitted
+                        \ Port: load the game's files other than BCODE, one at a
+                        \ time, to &1300 (below &3000, so it is visible when
+                        \ ACCCON X is set), then copy each one to where it
+                        \ belongs, as listed in FTAB: shadow RAM, or a sideways
+                        \ RAM bank (with ANDY when ROMSEL bit 7 is set)
 
- LDA #6                 \ Set the RAM copy of the currently selected paged ROM
- STA LATCH              \ to 6, so it matches the paged ROM selection latch at
-                        \ SHEILA &30 that we are about to set
+ LDX #0                 \ X = offset of the FTAB entry
 
- LDA VIA+&30            \ Set bits 0-3 of the ROM Select latch at SHEILA &30 to
- AND #%11110000         \ 6, to switch sideways RAM bank 6 into &8000-&BFFF in
- ORA #6                 \ main memory
+.LDF
+
+ STX YY                 \ Save the entry's offset
+
+ LDA FTAB+1,X           \ Fetch the high byte of the entry's OSCLI command,
+ BEQ LDEND              \ which is zero at the end of the table
+
+ TAY                    \ Run the command in (Y X), which loads the file at
+ LDA FTAB,X             \ &1300
+ TAX
+ JSR OSCLI
+
+ SEI                    \ No interrupts while ROMSEL and ACCCON are changed
+
+ LDX YY                 \ Page in the file's destination: ROMSEL (and its RAM
+ LDA FTAB+2,X           \ copy in &F4) and ACCCON
+ STA LATCH
  STA VIA+&30
+ LDA FTAB+3,X
+ STA VIA+&34
 
- LDA #%10101010         \ Set A and location &8000 to %10101010
- STA &8000
-
- LSR A                  \ Shift A and location &8000 right
- LSR &8000
-
- CMP &8000              \ If A matches location &8000 (i.e. both now contain
- BEQ OK                 \ %01010101) then jump to OK, as ROM bank 6 is writable
-                        \ and does indeed contain sideways RAM rather than a
-                        \ paged ROM, which is what we need for running the game
-
- BRK                    \ Otherwise we can't run the game, so terminate the
-                        \ loader with the following error message
-
- EQUB 0                 \ Error number
-
- EQUB 22, 7             \ Switch to mode 7 and clear the screen
-
- EQUS "ELITE needs RAM in slot #6"
-
- EQUB 0                 \ End of error message
-
-.OK
-
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
-
-                        \ We now want to copy &F pages of memory (&F00 bytes)
-                        \ from &1300-&21FF to &7000-&7EFF in screen memory
-
- LDX #&F                \ Set a page counter in X to copy &F pages
-
- LDA #&13               \ Set ZP(1 0) = &1300
+ STZ ZP                 \ ZP(1 0) = &1300, the source
+ LDA #&13
  STA ZP+1
- STZ ZP
 
- STZ P                  \ Set P(1 0) = &7000
- LDA #&70
+ LDA FTAB+4,X           \ P(1 0) = the destination
+ STA P
+ LDA FTAB+5,X
  STA P+1
 
- LDY #0                 \ Set Y = 0 to act as a byte counter within each page
+ LDA FTAB+6,X           \ LEN(1 0) = the number of bytes (non-zero)
+ STA LEN
+ LDA FTAB+7,X
+ STA LEN+1
 
-.MPL1
+.LDC
 
- LDA (ZP),Y             \ Copy the Y-th byte of the memory block at ZP(1 0) to
- STA (P),Y              \ the Y-th byte of the memory block at P(1 0)
+ LDA (ZP)               \ Copy a byte
+ STA (P)
 
- DEY                    \ Decrement the byte counter
+ INC ZP                 \ Next source byte
+ BNE P%+4
+ INC ZP+1
 
- BNE MPL1               \ Loop back to copy the next byte until we have copied a
-                        \ whole page of 256 bytes
+ INC P                  \ Next destination byte
+ BNE P%+4
+ INC P+1
 
- INC ZP+1               \ Increment the high bytes of both ZP(1 0) and P(1 0)
- INC P+1                \ so we copy the next page in memory
+ LDA LEN                \ Count it off LEN(1 0)
+ BNE P%+4
+ DEC LEN+1
+ DEC LEN
+ LDA LEN
+ ORA LEN+1
+ BNE LDC
 
- DEX                    \ Decrement the page counter
+ LDA #%00001001         \ Main RAM back at &3000-&7FFF (ACCCON as the game has
+ STA VIA+&34            \ it)
 
- BNE MPL1               \ Loop back to copy the next page until we have done all
-                        \ &F of them
+ CLI
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA YY                 \ Next entry
+ CLC
+ ADC #8
+ TAX
+ BNE LDF
 
-                        \ We now want to copy &33 pages of memory (&3300 bytes)
-                        \ from &2200-&54FF to &7F00-&B1FF in main memory
-
- LDX #&33               \ Set a page counter in X to copy &33 pages
-
-.MPL2
-
- LDA (ZP),Y             \ Copy the Y-th byte of the memory block at ZP(1 0) to
- STA (P),Y              \ the Y-th byte of the memory block at P(1 0)
-
- DEY                    \ Decrement the byte counter
-
- BNE MPL2               \ Loop back to copy the next byte until we have copied a
-                        \ whole page of 256 bytes
-
- INC ZP+1               \ Increment the high bytes of both ZP(1 0) and P(1 0)
- INC P+1                \ so we copy the next page in memory
-
- DEX                    \ Decrement the page counter
-
- BNE MPL2               \ Loop back to copy the next page until we have done all
-                        \ &33 of them
+.LDEND
 
  CLI                    \ Enable interrupts
 
@@ -496,7 +492,7 @@ ENDIF
                         \ Compact release)
 
  JSR OSCLI              \ Call OSCLI to run the OS command in MESS2, which loads
-                        \ the BCODE/ELITE file to address &1300-&7F48, appending
+                        \ the BCODE/ELITE file to address &1300, appending
                         \ &FFFF to the address to make sure it loads in the main
                         \ BBC Master rather than getting passed across the Tube
                         \ to the Second Processor, if one is fitted
@@ -507,17 +503,369 @@ ENDIF
  JSR OSCLI              \ Call OSCLI to run the OS command in MESS3, which
                         \ changes the disc directory to E
 
- LDA #6                 \ Set the RAM copy of the currently selected paged ROM
- STA LATCH              \ to 6, so it matches the paged ROM selection latch at
-                        \ SHEILA &30 that we are about to set
+                        \ Port: that was the last disc access, so DFS is done
+                        \ with HAZEL: stash DFS's and the MOS's lasting bytes,
+                        \ as the game uses their places (DOSCLI puts them back
+                        \ for each disc command): &C2C0-&C2FF and &DFC0-&DFFF
+                        \ (ACCCON Y = 1 maps HAZEL at &C000-&DFFF), then copy
+                        \ HAZEL's contents (the game data) from their staging
+                        \ copy at &4000 into place
 
- LDA VIA+&30            \ Switch ROM bank 6 into memory by setting bits 0-3 of
- AND #%11110000         \ the ROM selection latch at SHEILA &30 to 6
- ORA #6
- STA VIA+&30
+ SEI
+ LDA #%00001001
+ STA VIA+&34
+
+ LDX #63
+.DFST
+ LDA &C2C0,X
+ STA DFSST,X
+ LDA &DFC0,X
+ STA DFSST+64,X
+ DEX
+ BPL DFST
+ STZ DFSST+128          \ (DFSIN: no disc command under way)
+
+ LDX #0
+ LDY #HI(HZLEN+255)     \ (whole pages)
+
+.HZC
+
+ LDA &4000,X
+ STA HZ_START,X
+ INX
+ BNE HZC
+ INC HZC+2
+ INC HZC+5
+ DEY
+ BNE HZC
+
+ ASSERT HZLEN <= &2000 AND LO(HZ_START) = 0  \ (HAZEL's staging copy at &4000)
+
+                        \ Port: make the 1770 quiet and replace the DFS's NMI
+                        \ handler at &0D00 with a minimal one (from the demo
+                        \ port's loader, 3d25f90). The DFS's handler uses &A0-
+                        \ &A7, which are the game's zero page (INWK) while the
+                        \ game runs, so a stray NMI after loading (seen on a
+                        \ real Master) would corrupt them, and could write the
+                        \ game's value at &A7 to the 1770's command register,
+                        \ which starts a command and raises more NMIs. The last
+                        \ disc access has finished, so with interrupts off:
+                        \ terminate whatever the 1770 is doing without an
+                        \ interrupt (Force Interrupt with no conditions, &D0,
+                        \ to its command register at &FE28), read its status
+                        \ to clear INTRQ, and install PHA : LDA &FE28 : PLA :
+                        \ RTI at &0D00, writing the RTI at &0D00 first, then
+                        \ the body at &0D01, then the PHA, so the code at &0D00
+                        \ is a complete handler at every step. These are the
+                        \ only writes to page &0D before the game starts (page
+                        \ &0D is otherwise off limits, docs/master-memory.md);
+                        \ DFS copies its own handler back at the start of each
+                        \ disc operation the game makes when docked
+
+ LDA #&D0               \ 1770 Force Interrupt, no conditions: terminate any
+ STA FDC                \ command and raise no interrupt
+
+ LDX #8                 \ Give the 1770 time to take the command (it needs a
+.NMIW                   \ few microseconds before its status is valid)
+ DEX
+ BNE NMIW
+
+ LDA FDC                \ Read the status register, which clears INTRQ
+
+ LDA #&40               \ &0D00 = RTI: a complete NMI handler on its own
+ STA &0D00
+
+ LDX #NMIHEND-NMIH-1    \ The rest of the handler at &0D01 (LDA &FE28 : PLA :
+.NMIC                   \ RTI), behind the RTI
+ LDA NMIH,X
+ STA &0D01,X
+ DEX
+ BPL NMIC
+
+ LDA #&48               \ And finally &0D00 = PHA, which completes the handler
+ STA &0D00
+
+                        \ Port: put the MOS's default back in the vectors at
+                        \ &0200-&0235 (from the demo port's loader, 538f3de). A
+                        \ ROM may have hooked one (the machine this was reported
+                        \ on hooks BYTEV through an extended vector), and a
+                        \ hook would then run on every call and could write its
+                        \ private workspace, a page of HAZEL (the table at
+                        \ &0DF0), which holds the game data. Kept: BRKV and IRQ1V
+                        \ (&0202-&0205) and WRCHV (&020E-&020F), which the game
+                        \ sets itself, and the filing system vectors FILEV to
+                        \ FSCV (&0212-&021F), which must stay the DFS's for the
+                        \ disc access the game makes when docked. MOS 3.20 and
+                        \ 3.50 hold the default table's length at &FFB6 and its
+                        \ address at &FFB7
+
+ LDA &FFB7              \ Point VRL's LDA at the default vector table
+ STA VRL+1
+ LDA &FFB8
+ STA VRL+2
+ LDY &FFB6              \ Y = the table's length
+
+.VRL1
+
+ DEY                    \ Next byte, from the top down
+ BMI VRL4
+
+ CPY #&02               \ Keep BRKV and IRQ1V (&0202-&0205)
+ BCC VRL
+ CPY #&06
+ BCC VRL1
+ CPY #&0E               \ Keep WRCHV (&020E-&020F)
+ BEQ VRL1
+ CPY #&0F
+ BEQ VRL1
+ CPY #&12               \ Keep the filing system vectors (&0212-&021F)
+ BCC VRL
+ CPY #&20
+ BCC VRL1
+
+.VRL
+
+ LDA &FFFF,Y            \ Copy the default (the address is set above)
+ STA &0200,Y
+ BRA VRL1
+
+.VRL4
+
+ CLI
+
+ LDA #SBANK             \ Set the RAM copy of the currently selected paged ROM
+ STA LATCH              \ to SBANK, the bank of the game's entry point S% (the
+                        \ cold area, ROMSEL &87, from build/game-addresses.asm),
+ STA VIA+&30            \ and page it in
 
  JMP S%                 \ Jump to the start of the main game code at S%, which
                         \ we just loaded in the BCODE/ELITE file
+
+.NMIH                   \ Port: the minimal NMI handler's body at &0D01, after
+
+ LDA FDC                \ the PHA at &0D00: acknowledge the 1770 (reading its
+ PLA                    \ status clears INTRQ) and return
+ RTI
+
+.NMIHEND
+
+\ ******************************************************************************
+\
+\       Name: CHKRAM
+\       Type: Subroutine
+\   Category: Loader
+\    Summary: Port: check that sideways banks 4 to 7 are RAM, or stop with an
+\             error
+\
+\ ******************************************************************************
+
+.CHKRAM
+
+                        \ On a Master whose links LK18/LK19 select the ROM
+                        \ sockets for banks 4/5 or 6/7 (to fit extra ROMs),
+                        \ loading into those banks writes into ROM without an
+                        \ error, so the game would start with banks missing.
+                        \ For each bank, invert the byte at &8000, check that
+                        \ it reads back inverted, then restore it and check it
+                        \ again (two patterns, so a floating bus or an empty
+                        \ socket can't pass). Interrupts are off, so the MOS
+                        \ doesn't page another ROM in while we look (and &F4
+                        \ is left alone)
+
+ SEI
+ LDX #7
+
+.CHK1
+
+ STX VIA+&30            \ Page in bank X
+ LDA &8000
+ EOR #&FF
+ STA &8000
+ CMP &8000
+ BNE CHKF               \ Not RAM: report it
+ EOR #&FF
+ STA &8000
+ CMP &8000
+ BNE CHKF
+ DEX
+ CPX #3
+ BNE CHK1
+
+ LDA LATCH              \ All four banks are RAM: page the MOS's choice back in
+ STA VIA+&30
+ CLI
+ RTS
+
+.CHKF
+
+ LDA LATCH              \ Bank X isn't RAM: page the MOS's choice back in, put
+ STA VIA+&30            \ the bank's number into the message and stop with it
+ CLI
+ TXA
+ ORA #'0'
+ STA CHKB
+
+ LDY #0                 \ Print the message in mode 7 with OSWRCH (not as a
+.CHK2                   \ BRK error: the boot may have no language to print
+ LDA CHKM,Y             \ it), then stop here for good
+ BEQ CHK3
+ JSR OSWRCH
+ INY
+ BNE CHK2
+.CHK3
+ JMP CHK3
+
+.CHKM
+
+ EQUB 22, 7             \ Switch to mode 7 and clear the screen
+
+ EQUS "ELITE needs sideways RAM in banks 4-7,"
+ EQUB 13, 10
+ EQUS "but bank "
+
+.CHKB
+
+ EQUS "? is not RAM."
+ EQUB 13, 10
+ EQUS "Set links LK18 and LK19 to RAM."
+ EQUB 13, 10
+
+ EQUB 0                 \ End of message
+
+\ ******************************************************************************
+\
+\       Name: FTAB
+\       Type: Variable
+\   Category: Loader
+\    Summary: Port: the files the loader copies into place
+\
+\ ------------------------------------------------------------------------------
+\
+\ Eight bytes per file: the OSCLI command that loads it to &1300, the ROMSEL
+\ and ACCCON values to copy it with, the destination, and the number of bytes
+\ (a multiple of 256). The table ends with a zero command address.
+\
+\ ******************************************************************************
+
+.FTAB
+
+ EQUW MESS1             \ BDATA: the dashboard image, to shadow RAM &7000-&7DFF
+ EQUB HOMEBANK, %00001111
+ EQUW &7000, &0E00
+
+ EQUW MESS4             \ BANK4: Elite's home bank
+ EQUB HOMEBANK, %00001001
+ EQUW &8000, &4000
+
+ EQUW MESS6             \ COLD7: the cold area, bank 7 from &8000 (the cold data,
+ EQUB 7, %00001001      \ QQ18 and the extended tokens, then the cold code)
+ EQUW &8000, C7LEN
+
+ EQUW MESS12            \ HAZEL: the game data, staged in main RAM at &4000 and
+ EQUB HOMEBANK, %00001001 \ copied to
+ EQUW &4000, HZLEN      \ HAZEL after the last disc access (see LDEND), as DFS
+                        \ uses HAZEL
+
+ EQUW MESS14            \ HICODE: the main code's run from &7000, main RAM
+ EQUB HOMEBANK, %00001001 \ &7000-&7FFF
+ EQUW &7000, HILEN
+
+ EQUW 0
+
+\ ******************************************************************************
+\
+\       Name: OSB
+\       Type: Subroutine
+\   Category: Utility routines
+\    Summary: A convenience routine for calling OSBYTE with Y = 0
+\
+\ ******************************************************************************
+
+.OSB
+
+ LDY #0                 \ Call OSBYTE with Y = 0, returning from the subroutine
+ JMP OSBYTE             \ using a tail call (so we can call OSB to call OSBYTE
+                        \ for when we know we want Y set to 0)
+
+\ ******************************************************************************
+\
+\       Name: MESS1
+\       Type: Variable
+\   Category: Loader
+\    Summary: The OS command string for loading the BDATA binary
+\
+\ ******************************************************************************
+
+.MESS1
+
+ EQUS "L.BDATA FFFF1300"    \ This is short for "*LOAD BDATA FFFF1300"
+ EQUB 13
+
+\ ******************************************************************************
+\
+\       Name: MESS2
+\       Type: Variable
+\   Category: Loader
+\    Summary: The OS command string for loading the main game code binary
+\
+\ ******************************************************************************
+
+.MESS2
+
+IF _SNG47
+
+ EQUS "L.BCODE FFFF", STR$~(BCODEAT)   \ This is short for "*LOAD BCODE
+ EQUB 13                \ FFFF1300" (Port: BCODE's address, from the build)
+
+ELIF _COMPACT
+
+ EQUS "L.ELITE FFFF1300"    \ This is short for "*LOAD ELITE FFFF1300"
+ EQUB 13
+
+ENDIF
+
+\ ******************************************************************************
+\
+\       Name: MESS3
+\       Type: Variable
+\   Category: Loader
+\    Summary: The OS command string for changing the disc directory to E
+\
+\ ******************************************************************************
+
+.MESS3
+
+ EQUS "DIR E"
+ EQUB 13
+
+.MESS4
+
+ EQUS "L.BANK4 FFFF1300"    \ Port: *LOAD BANK4 FFFF1300
+ EQUB 13
+
+.MESS6
+
+ EQUS "L.COLD7 FFFF1300"    \ Port: *LOAD COLD7 FFFF1300
+ EQUB 13
+
+.MESS12
+
+ EQUS "L.HAZEL FFFF1300"    \ Port: *LOAD HAZEL FFFF1300
+ EQUB 13
+
+.MESS14
+
+ EQUS "L.HICODE FFFF1300"   \ Port: *LOAD HICODE FFFF1300
+ EQUB 13
+
+.LOW_LOADER_END
+
+\ Port: Saturn's drawing code and tables come last, above &1300 if need be:
+\ they are used only before the first file is loaded to &1300, and everything
+\ the loader runs after that (FTAB, the OS command strings, the copies, the
+\ NMI handler and the vectors) is below &1300, asserted here
+
+ ASSERT LOW_LOADER_END <= &1300
 
 \ ******************************************************************************
 \
@@ -895,14 +1243,14 @@ ENDIF
 
 .DORND
 
- LDA RAND+1             \ r1´ = r1 + r3 + C
- TAX                    \ r3´ = r1
+ LDA RAND+1             \ r1Â´ = r1 + r3 + C
+ TAX                    \ r3Â´ = r1
  ADC RAND+3
  STA RAND+1
  STX RAND+3
 
- LDA RAND               \ X = r2´ = r0
- TAX                    \ A = r0´ = r0 + r2
+ LDA RAND               \ X = r2Â´ = r0
+ TAX                    \ A = r0Â´ = r0 + r2
  ADC RAND+2
  STA RAND
  STX RAND+2
@@ -1221,72 +1569,6 @@ ENDIF
  BNE LL6                \ Loop back to LL6 until we have done 8 loops
 
  RTS                    \ Return from the subroutine
-
-\ ******************************************************************************
-\
-\       Name: OSB
-\       Type: Subroutine
-\   Category: Utility routines
-\    Summary: A convenience routine for calling OSBYTE with Y = 0
-\
-\ ******************************************************************************
-
-.OSB
-
- LDY #0                 \ Call OSBYTE with Y = 0, returning from the subroutine
- JMP OSBYTE             \ using a tail call (so we can call OSB to call OSBYTE
-                        \ for when we know we want Y set to 0)
-
-\ ******************************************************************************
-\
-\       Name: MESS1
-\       Type: Variable
-\   Category: Loader
-\    Summary: The OS command string for loading the BDATA binary
-\
-\ ******************************************************************************
-
-.MESS1
-
- EQUS "L.BDATA FFFF1300"    \ This is short for "*LOAD BDATA FFFF1300"
- EQUB 13
-
-\ ******************************************************************************
-\
-\       Name: MESS2
-\       Type: Variable
-\   Category: Loader
-\    Summary: The OS command string for loading the main game code binary
-\
-\ ******************************************************************************
-
-.MESS2
-
-IF _SNG47
-
- EQUS "L.BCODE FFFF1300"    \ This is short for "*LOAD BCODE FFFF1300"
- EQUB 13
-
-ELIF _COMPACT
-
- EQUS "L.ELITE FFFF1300"    \ This is short for "*LOAD ELITE FFFF1300"
- EQUB 13
-
-ENDIF
-
-\ ******************************************************************************
-\
-\       Name: MESS3
-\       Type: Variable
-\   Category: Loader
-\    Summary: The OS command string for changing the disc directory to E
-\
-\ ******************************************************************************
-
-.MESS3
-
- EQUS "DIR E"
- EQUB 13
 
 \ ******************************************************************************
 \

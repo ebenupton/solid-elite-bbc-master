@@ -47,7 +47,7 @@
 
  CODE% = &1300          \ The address where the code will be run
 
- LOAD% = &1300          \ The address where the code will be loaded
+ LOAD% = CODE%          \ The address where the code will be loaded
 
  Q% = _MAX_COMMANDER    \ Set Q% to TRUE to max out the default commander, FALSE
                         \ for the standard default commander
@@ -260,59 +260,13 @@
                         \ commander files (&0E7E in the original), is defined
                         \ after WP, as it shares a location with LSX2 there
 
- HANGHEAP = &DE00       \ Port: the hangar's ship line heap, which LL9 writes
-                        \ while HAS1 draws a ship in the hangar (the original's
-                        \ &0B00 is in WP in the port), in HAZEL, which the
-                        \ game does not otherwise use; a whole page, as HAS1
-                        \ sets only the heap pointer's high byte, INWK+34
+                        \ Port: the game data's addresses (XX21, E%, KWL%, KWH%,
+                        \ QQ18, SNE, ACT, TKN1, RUPLA, RUGAL, RUTOK), constants
+                        \ here in the original, are elite-data.asm's own labels,
+                        \ as it is assembled in the same pass (elite-layout.asm)
 
- XX21 = &8000           \ The address of the ship blueprints lookup table, as
-                        \ set in elite-data.asm
-
- E% = &8042             \ The address of the default NEWB ship bytes, as set in
-                        \ elite-data.asm
-
- KWL% = &8063           \ The address of the kill tally fraction table, as set
-                        \ in elite-data.asm
-
- KWH% = &8084           \ The address of the kill tally integer table, as set in
-                        \ elite-data.asm
-
- QQ18 = &A000           \ The address of the text token table, as set in
-                        \ elite-data.asm
-
- SNE = &A3C0            \ The address of the sine lookup table, as set in
-                        \ elite-data.asm
-
- ACT = &A3E0            \ The address of the arctan lookup table, as set in
-                        \ elite-data.asm
-
- TKN1 = &A400           \ The address of the extended token table, as set in
-                        \ elite-data.asm
-
-IF _SNG47
-
- RUPLA = &AF48          \ The address of the extended system description system
-                        \ number table, as set in elite-data.asm
-
- RUGAL = &AF62          \ The address of the extended system description galaxy
-                        \ number table, as set in elite-data.asm
-
- RUTOK = &AF7C          \ The address of the extended system description token
-                        \ table, as set in elite-data.asm
-
-ELIF _COMPACT
-
- RUPLA = &AF43          \ The address of the extended system description system
-                        \ number table, as set in elite-data.asm
-
- RUGAL = &AF5D          \ The address of the extended system description galaxy
-                        \ number table, as set in elite-data.asm
-
- RUTOK = &AF77          \ The address of the extended system description token
-                        \ table, as set in elite-data.asm
-
-ENDIF
+ HOMEBANK = 4           \ Port: Elite's home bank, the sideways RAM bank that is
+                        \ paged in while the game runs (bank 6 in the original)
 
  VIA = &FE00            \ Memory-mapped space for accessing internal hardware,
                         \ such as the video ULA, 6845 CRTC and 6522 VIAs (also
@@ -1272,6 +1226,7 @@ ENDIF
                         \ holds the DFS's NMI routine, the extended vectors and
                         \ the ROM workspace table on a Master (see "Page &0D is
                         \ off limits" in docs/master-memory.md)
+
 \ ******************************************************************************
 \
 \       Name: WP
@@ -2860,6 +2815,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Loader
 \    Summary: Set the various vectors, interrupts and timers
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -3164,6 +3120,7 @@ ENDIF
 \   Category: Utility routines
 \    Summary: Copy the top part of zero page (&0090 to &00FF) into the buffer at
 \             &3000
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -3204,6 +3161,7 @@ ENDIF
 \   Category: Utility routines
 \    Summary: Release the NMI workspace (&00A0 to &00A7) so the MOS can use it
 \             and store the top part of zero page in the buffer at &3000
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -3231,6 +3189,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Swap zero page (&0090 to &00EF) with the buffer at &3000
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3271,10 +3230,12 @@ ENDIF
  LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
  STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
 
- LDA #6                 \ Set bits 0-3 of the ROM Select latch at SHEILA &30 to
- STA VIA+&30            \ 6, to switch sideways ROM bank 6 into &8000-&BFFF in
-                        \ main memory (we already confirmed that this bank
-                        \ contains RAM rather than ROM in the loader)
+                        \ Port: the original set the ROM Select latch to bank 6
+                        \ here, to page the game's data back in after disc
+                        \ access. getzp now runs in the cold area, so it leaves
+                        \ ROMSEL alone: the far call that reaches it pages the
+                        \ caller's bank back in, and NEWBRK pages Elite's home
+                        \ bank in itself before calling it
 
  RTS                    \ Return from the subroutine
 
@@ -3285,6 +3246,7 @@ ENDIF
 \   Category: Utility routines
 \    Summary: Claim the NMI workspace (&00A0 to &00A7) back from the MOS so the
 \             game can use it once again
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -3313,6 +3275,7 @@ ENDIF
 \   Category: Drawing pixels
 \    Summary: Lookup table for converting pixel y-coordinate to page number of
 \             screen address
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3518,6 +3481,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Display the current ship on the scanner
 \  Deep dive: The 3D scanner
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3850,6 +3814,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a one-segment line
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3887,6 +3852,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made single-pixel character row bytes for mode 1
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3908,6 +3874,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made double-pixel character row bytes for mode 1
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3929,6 +3896,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made single-pixel character row bytes for mode 2
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3967,6 +3935,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Calculate the line gradient in the form of deltas
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4071,6 +4040,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Line has a shallow gradient, step right along x-axis
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4226,6 +4196,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a shallow line going right and up or left and down
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4509,6 +4480,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a shallow line going right and down or left and up
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4823,6 +4795,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Line has a steep gradient, step up along y-axis
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4982,6 +4955,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a steep line going up and left or down and right
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -5558,6 +5532,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a steep line going up and right or down and left
 \  Deep dive: Elite's line-drawing algorithm
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6131,6 +6106,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a horizontal line from (X1, Y1) to (X2, Y1)
 \  Deep dive: Drawing colour pixels on the BBC Micro
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6424,6 +6400,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made character rows for the left end of a horizontal line
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6448,6 +6425,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made character rows for the right end of a horizontal line
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6472,6 +6450,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Lookup table for two-pixel mode 1 orange pixels for the sun
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6511,6 +6490,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (YY+1 SYL+Y) = (A P) + (S R) and draw stardust particle
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6563,6 +6543,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing pixels
 \    Summary: Draw a stardust particle relative to the screen centre
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6643,6 +6624,7 @@ ENDIF
 \   Category: Drawing pixels
 \    Summary: Draw a one-pixel dot, two-pixel dash or four-pixel square
 \  Deep dive: Drawing colour pixels on the BBC Micro
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6796,6 +6778,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: A four-colour mode 1 pixel byte that represents a dot's distance
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6827,6 +6810,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Draw a dash on the compass
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6884,6 +6868,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing pixels
 \    Summary: Draw a single-height dash on the dashboard
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7006,6 +6991,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Start up the E.C.M. (light up the indicator, start the countdown
 \             and make the E.C.M. sound)
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -7022,6 +7008,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Light up the E.C.M. indicator bulb ("E") on the dashboard
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -7071,6 +7058,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Light up the space station indicator ("S") on the dashboard
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7135,6 +7123,7 @@ ENDIF
 \       Type: Variable
 \   Category: Dashboard
 \    Summary: The bitmap definition for the space station indicator bulb
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7189,6 +7178,7 @@ ENDIF
 \       Type: Variable
 \   Category: Dashboard
 \    Summary: The character bitmap for the E.C.M. indicator bulb
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7243,6 +7233,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Draw a specific indicator in the dashboard's missile bar
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7393,6 +7384,8 @@ ENDIF
 \       Type: Subroutine
 \   Category: Ship hangar
 \    Summary: Display the ship hangar
+\             (Port: in the cold area, called through the stub HANGER)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7466,7 +7459,11 @@ ENDIF
  TAY                    \ screen, so Y is now the horizontal pixel row of the
                         \ line we want to draw to display the hangar floor
 
- LDA ylookup,Y          \ Look up the page number of the character row that
+ TYA                    \ Port (in the cold area, away from bank 4's ylookup):
+ LSR A                  \ A = ylookup(Y) = &40 + (Y DIV 8) * 2, the page number
+ LSR A                  \ of the character row that contains the pixel with
+ AND #%11111110         \ the y-coordinate in Y (at most &3E before the ORA)
+ ORA #&40               \
  STA SC+1               \ contains the pixel with the y-coordinate in Y, and
                         \ store it in the high byte of SC(1 0) at SC+1
 
@@ -7668,13 +7665,13 @@ ENDIF
 .HA3
 
  RTS                    \ Return from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: HAS2
 \       Type: Subroutine
 \   Category: Ship hangar
 \    Summary: Draw a hangar background line from left to right
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7752,6 +7749,7 @@ ENDIF
 \   Category: Ship hangar
 \    Summary: Draw a hangar background line from left to right, stopping when it
 \             bumps into existing on-screen content
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -7809,6 +7807,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Ship hangar
 \    Summary: Draw a hangar background line from right to left
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7868,6 +7867,7 @@ ENDIF
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (P R) = 256 * A / Q
 \  Deep dive: Shift-and-subtract division
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7942,7 +7942,7 @@ ENDIF
 
 .cls
 
- JSR TTX66              \ Call TTX66 to clear the top part of the screen and
+ JSR TTX66M             \ Call TTX66 to clear the top part of the screen and
                         \ draw a border box
 
  JMP RR4                \ Jump to RR4 to restore X and Y from the stack and A
@@ -8137,7 +8137,7 @@ ENDIF
                         \ screen (i.e. we need the pixel shape of this
                         \ character). The MOS ROM contains bitmap definitions
                         \ of the system's ASCII characters, starting from &C000
-                        \ for space (ASCII 32) and ending with the £ symbol
+                        \ for space (ASCII 32) and ending with the Â£ symbol
                         \ (ASCII 126)
                         \
                         \ There are definitions for 32 characters in each of the
@@ -8338,7 +8338,7 @@ ENDIF
 
 IF _SNG47
 
- JSR TTX66              \ Otherwise we are off the bottom of the screen, so
+ JSR TTX66M             \ Otherwise we are off the bottom of the screen, so
                         \ clear the screen and draw a border box
 
  LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
@@ -8353,7 +8353,7 @@ ELIF _COMPACT
  BPL P%-3               \ RETURN is pressed, looping indefinitely until it gets
                         \ tapped
 
- JSR TTX66              \ Call TTX66 to clear the screen
+ JSR TTX66M             \ Call TTX66 to clear the screen
 
 ENDIF
 
@@ -8515,13 +8515,13 @@ ENDIF
 
  JMP RR4                \ Jump to RR4 to restore the registers and return from
                         \ the subroutine using a tail call
-
 \ ******************************************************************************
 \
 \       Name: TTX66
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the top part of the screen and draw a border box
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8731,6 +8731,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the bottom three text rows of the space view
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -8839,6 +8840,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the dashboard: speed indicator
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8896,6 +8898,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the dashboard: pitch and roll indicators
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -8960,6 +8963,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the dashboard: four energy banks
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -9073,6 +9077,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the dashboard: shields, fuel, laser & cabin temp, altitude
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -9156,6 +9161,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Fetch the current dashboard colours for non-striped indicators, to
 \             support flashing
+\       Area: bank 4
 \
 \ ******************************************************************************
 
@@ -9178,6 +9184,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Fetch the current dashboard colours, to support flashing
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -9233,6 +9240,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update a bar-based indicator on the dashboard
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -9433,6 +9441,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the roll or pitch indicator on the dashboard
 \  Deep dive: The dashboard indicators
+\       Area: bank 4
 \
 \ ------------------------------------------------------------------------------
 \
@@ -9736,6 +9745,14 @@ ENDIF
 \ memory.
 \
 \ ******************************************************************************
+
+ FONTPAD% = -P% AND &FF \ Port: (the padding that ALIGN puts in, printed below)
+
+ ALIGN &100             \ Port: the font must start on a page boundary, as only
+                        \ its page number is used (FONT%), and log must too (FMLTU
+                        \ reads it by an operand whose low byte is the argument);
+                        \ the font is three pages, so the log tables after it are
+                        \ page aligned with it
 
  FONT% = HI(P%)         \ Set FONT% to the high byte of the font file address
 
@@ -10197,11 +10214,32 @@ NEXT
 
 \ ******************************************************************************
 \
+\ Port: the end of the main code's head, which is in main RAM below &3000: the
+\ low area (elite-low.asm, docs/memory-map.md), the blocks of this source
+\ tagged low and the port's own code and variables that must be low
+\
+\ ******************************************************************************
+
+ INCLUDE "1-source-files/main-sources/elite-low.asm"
+
+.HEAD_END%
+
+ PRINT "Main code below &3000: ", ~CODE%, "-", ~HEAD_END%-1, " free ", &3000-HEAD_END%, " (the font's alignment: ", FONTPAD%, " bytes of padding)"
+ ASSERT P% <= &3000     \ Port: everything up to here must be below &3000, as it
+                        \ is used while ACCCON X = 1 (shadow RAM at &3000-&7FFF),
+                        \ from interrupts or from MOS vectors with any ROM paged:
+                        \ the IRQ and sound code, CHPR and its font, the log
+                        \ tables (LOINQ), HANGFLAG (HANGER), ADDK (DIALS, PIX1),
+                        \ UP (CATF, FLH, COMC) and the low area (NEWBRK, the far
+                        \ calls)
+\ ******************************************************************************
+\
 \       Name: TGINT
 \       Type: Variable
 \   Category: Keyboard
 \    Summary: The keys used to toggle configuration settings when the game is
 \             paused
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -10219,6 +10257,7 @@ NEXT
 \       Type: Subroutine
 \   Category: Loader
 \    Summary: Move code, set up break handler and start the game
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -10245,6 +10284,7 @@ NEXT
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Unscramble the main code
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -10303,6 +10343,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Decrypt a multi-page block of memory
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -10380,6 +10421,7 @@ ENDIF
 \             mission progression
 \  Deep dive: The Constrictor mission
 \             The Thargoid Plans mission
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -12690,6 +12732,7 @@ ENDIF
 \    Summary: Print the captain's name during mission briefings
 \  Deep dive: Extended text tokens
 \             The Constrictor mission
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -12728,6 +12771,7 @@ ENDIF
 \    Summary: Print the location hint during the mission 1 briefing
 \  Deep dive: Extended text tokens
 \             The Constrictor mission
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -12765,6 +12809,7 @@ ENDIF
 \    Summary: Print an extended recursive token from the RUTOK token table
 \  Deep dive: Extended system descriptions
 \             Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -12816,6 +12861,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print an extended recursive token from the TKN1 token table
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -12964,6 +13010,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print an extended text token (1-255)
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13195,6 +13242,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to ALL CAPS when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13222,6 +13270,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to Sentence Case when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13250,6 +13299,7 @@ ENDIF
 \   Category: Text
 \    Summary: Tab to column 6 and start a new word when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13278,6 +13328,7 @@ ENDIF
 \   Category: Text
 \    Summary: Clear the screen and set the current view type to 1
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13305,6 +13356,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to lower case when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13333,6 +13385,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to standard tokens in Sentence Case
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13364,6 +13417,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13387,6 +13441,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to justified text when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13414,6 +13469,7 @@ ENDIF
 \   Category: Text
 \    Summary: Switch to left-aligned text when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13442,6 +13498,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print the selected system's adjective, e.g. Lavian for Lave
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13494,6 +13551,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print a random 1-8 letter word in Sentence Case
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -13539,6 +13597,7 @@ ENDIF
 \   Category: Text
 \    Summary: Capitalise the next letter
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13561,6 +13620,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Test whether a character is a vowel
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13605,6 +13665,13 @@ ENDIF
 \   Category: Text
 \    Summary: The extended token table for jump tokens 1-32 (DETOK)
 \  Deep dive: Extended text tokens
+\       Area: cold
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: DETOK jumps to these routines from the cold area, so those outside it
+\ are entered through their stubs (x4_name, which 2-build-files/streams.py generates:
+\ elite-layout.asm).
 \
 \ ******************************************************************************
 
@@ -13616,21 +13683,21 @@ ENDIF
  EQUW TT27              \ Token  4: Print the commander's name
  EQUW MT5               \ Token  5: Switch to extended tokens
  EQUW MT6               \ Token  6: Switch to standard tokens, in Sentence Case
- EQUW DASC              \ Token  7: Beep
+ EQUW x4_DASC           \ Token  7: Beep
  EQUW MT8               \ Token  8: Tab to column 6
  EQUW MT9               \ Token  9: Clear screen, tab to column 1, view type = 1
- EQUW DASC              \ Token 10: Line feed
+ EQUW x4_DASC           \ Token 10: Line feed
  EQUW NLIN4             \ Token 11: Draw box around title (line at pixel row 19)
- EQUW DASC              \ Token 12: Carriage return
+ EQUW x4_DASC           \ Token 12: Carriage return
  EQUW MT13              \ Token 13: Switch to lower case
  EQUW MT14              \ Token 14: Switch to justified text
  EQUW MT15              \ Token 15: Switch to left-aligned text
- EQUW MT16              \ Token 16: Print the character in DTW7 (drive number)
+ EQUW x4_MT16           \ Token 16: Print the character in DTW7 (drive number)
  EQUW MT17              \ Token 17: Print system name adjective in Sentence Case
  EQUW MT18              \ Token 18: Randomly print 1 to 4 two-letter tokens
  EQUW MT19              \ Token 19: Capitalise first letter of next word only
- EQUW DASC              \ Token 20: Unused
- EQUW CLYNS             \ Token 21: Clear the bottom few lines of the space view
+ EQUW x4_DASC           \ Token 20: Unused
+ EQUW x4_CLYNS          \ Token 21: Clear the bottom few lines of the space view
  EQUW PAUSE             \ Token 22: Display ship and wait for key press
  EQUW MT23              \ Token 23: Move to row 10, white text, set lower case
  EQUW PAUSE2            \ Token 24: Wait for a key press
@@ -13641,8 +13708,7 @@ ENDIF
  EQUW MT29              \ Token 29: Column 6, white text, lower case in words
  EQUW FILEPR            \ Token 30: Display currently selected media (disk/tape)
  EQUW OTHERFILEPR       \ Token 31: Display the non-selected media (disk/tape)
- EQUW DASC              \ Token 32: Unused
-
+ EQUW x4_DASC           \ Token 32: Unused
 \ ******************************************************************************
 \
 \       Name: TKN2
@@ -13650,6 +13716,7 @@ ENDIF
 \   Category: Text
 \    Summary: The extended two-letter token lookup table
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13680,6 +13747,7 @@ ENDIF
 \   Category: Text
 \    Summary: The two-letter token lookup table
 \  Deep dive: Printing text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -14167,6 +14235,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Flush the keyboard buffer
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -14187,6 +14256,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Print a title and draw a horizontal line at row 19 to box it in
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -14209,6 +14279,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a horizontal line at pixel row 19 to box in a title
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -14230,6 +14301,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a horizontal line at pixel row 23 to box in a title
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -14263,6 +14335,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a screen-wide horizontal line at the pixel row in A
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -15596,6 +15669,7 @@ ENDIF
 \   Category: Status
 \    Summary: Show the Status Mode screen (red key f8)
 \  Deep dive: Combat rank
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -15922,6 +15996,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print text followed by a newline and indent of 6 characters
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -16267,6 +16342,7 @@ ENDIF
 \   Category: Text
 \    Summary: A constant used when printing large numbers in BPRNT
 \  Deep dive: Printing decimal numbers
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -16295,6 +16371,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print an 8-bit number, left-padded to 3 digits, and optional point
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -16333,6 +16410,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a 16-bit number, left-padded to n digits, and optional point
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -16380,6 +16458,7 @@ ENDIF
 \    Summary: Print a 32-bit number, left-padded to a specific number of digits,
 \             with an optional decimal point
 \  Deep dive: Printing decimal numbers
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -17338,6 +17417,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Launch our escape pod
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -17444,6 +17524,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Search the galaxy for a system
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -17992,6 +18073,26 @@ ENDIF
 .HA1
 
  RTS                    \ Return from the subroutine
+\ ******************************************************************************
+\
+\ Port: the main code continues in main RAM at &7000 from here, and runs on
+\ through &8000 into bank 4 (docs/memory-map.md), at a routine that nothing
+\ falls into. The part from CODE%, below &4000, is saved as BCODE; the part
+\ from &7000 as HICODE and the rest, in bank 4, with the blocks tagged bank 4
+\ after it, as BANK4 (elite-layout.asm). Main RAM &4000-&6FFF is left for the
+\ filled renderer's second screen buffer
+\
+\ ******************************************************************************
+
+ PRINT "Main code: ", ~CODE%, "-", ~P%-1, " free ", &4000 - P%
+ ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is left free)
+ PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
+ SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
+
+ CLEAR &7000, &C000
+ ORG &7000
+
+.HI_RUN%
 \ ******************************************************************************
 \
 \       Name: TACTICS (Part 1 of 7)
@@ -19959,6 +20060,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Tactics
 \    Summary: Launch a ship straight ahead of us, below the laser sights
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20046,6 +20148,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Tactics
 \    Summary: Fire a missile from our ship
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20095,6 +20198,7 @@ ENDIF
 \    Summary: Make a ship or station hostile, and if this is a ship then enable
 \             the ship's AI and give it a kick of speed
 \  Deep dive: Aggression and hostility in ship tactics
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20132,7 +20236,7 @@ ENDIF
  LDY #32                \ Fetch the ship's byte #32 (AI flag)
  LDA (INF),Y
 
- BEQ HI1                \ If the AI flag is zero then this ship has no AI and
+ BEQ AN3                \ If the AI flag is zero then this ship has no AI and
                         \ zero aggression, so return from the subroutine (as
                         \ HI1 contains an RTS)
 
@@ -20177,6 +20281,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Tactics
 \    Summary: Display the "missile jammed" message
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20489,6 +20594,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing circles
 \    Summary: Make the hyperspace sound and draw the hyperspace tunnel
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20527,6 +20633,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing circles
 \    Summary: Make the launch sound and draw the launch tunnel
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -20552,6 +20659,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing circles
 \    Summary: Draw the launch or hyperspace tunnel
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23286,6 +23394,7 @@ ENDIF
 \    Summary: Print the system's extended description or a mission 1 directive
 \  Deep dive: Extended system descriptions
 \             Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23433,6 +23542,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Start mission 2
 \  Deep dive: The Thargoid Plans mission
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23455,6 +23565,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Missions
 \    Summary: Print an extended token and show the Status Mode screen
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23484,6 +23595,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Receive the briefing and plans for mission 2
 \  Deep dive: The Thargoid Plans mission
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23510,6 +23622,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Finish mission 2
 \  Deep dive: The Thargoid Plans mission
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23542,6 +23655,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Finish mission 1
 \  Deep dive: The Constrictor mission
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23581,6 +23695,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Start mission 3
 \  Deep dive: The Trumbles mission
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23612,6 +23727,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Start mission 1 and show the mission briefing
 \  Deep dive: The Constrictor mission
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23745,6 +23861,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Clear the screen, display "INCOMING MESSAGE" and wait for 2
 \             seconds
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23764,6 +23881,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Display a rotating ship, waiting until a key is pressed, then
 \             remove the ship from the screen
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23807,6 +23925,7 @@ ENDIF
 \    Summary: Move to row 10, switch to white text, and switch to lower case
 \             when printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23830,6 +23949,7 @@ ENDIF
 \    Summary: Move to row 6, switch to white text, and switch to lower case when
 \             printing extended tokens
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23851,6 +23971,7 @@ ENDIF
 \   Category: Missions
 \    Summary: Display a rotating ship at space coordinates (0, 120, 256) and
 \             scan the keyboard
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23891,6 +24012,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Wait until a key is pressed, ignoring any existing key press
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -23963,6 +24085,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Set the selected system to the current system
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -23992,6 +24115,7 @@ ENDIF
 \   Category: Text
 \    Summary: Lookup table for random tokens in the extended token table (0-37)
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24079,6 +24203,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Geometry)
 \    Summary: Scale the y-coordinate in A to 0.5 * A
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24108,6 +24233,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Geometry)
 \    Summary: Scale the y-coordinate in A (leave it unchanged)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24136,6 +24262,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Geometry)
 \    Summary: Scale the x-coordinate in A (leave it unchanged)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24162,6 +24289,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a vertical line from (A, GCYT) to (A, GCYB)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24186,6 +24314,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Work out if we have space for one tonne of cargo
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24236,6 +24365,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Work out if we have space for a specific amount of cargo
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24356,6 +24486,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Move the text cursor to a specific column
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24377,6 +24508,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Move the text cursor to a specific row
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24398,6 +24530,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Move the text cursor to the next row
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -24413,6 +24546,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the screen and set up a trading screen
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24461,6 +24595,7 @@ ENDIF
 \    Summary: Twist the selected system's seeds four times
 \  Deep dive: Twisting the system seeds
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24490,21 +24625,22 @@ ENDIF
 \    Summary: Twist the selected system's seeds
 \  Deep dive: Twisting the system seeds
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
 \ This routine twists the three 16-bit seeds in QQ15 once.
 \
 \ If we start with seeds s0, s1 and s2 and we want to work out their new values
-\ after we perform a twist (let's call the new values s0´, s1´ and s2´), then:
+\ after we perform a twist (let's call the new values s0Â´, s1Â´ and s2Â´), then:
 \
-\  s0´ = s1
-\  s1´ = s2
-\  s2´ = s0 + s1 + s2
+\  s0Â´ = s1
+\  s1Â´ = s2
+\  s2Â´ = s0 + s1 + s2
 \
 \ So given an existing set of seeds in s0, s1 and s2, we can get the new values
-\ s0´, s1´ and s2´ simply by doing the above sums. And if we want to do the
-\ above in-place without creating three new s´ variables, then we can do the
+\ s0Â´, s1Â´ and s2Â´ simply by doing the above sums. And if we want to do the
+\ above in-place without creating three new sÂ´ variables, then we can do the
 \ following:
 \
 \  tmp = s0 + s1
@@ -24556,6 +24692,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Print the distance to the selected system in light years
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24601,6 +24738,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a text token and a paragraph break
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24628,6 +24766,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a paragraph break
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24649,6 +24788,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Set Sentence Case and print a newline
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -24665,6 +24805,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a newline
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -24684,6 +24825,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Display "MAINLY " and jump to TT72
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24705,6 +24847,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a text token followed by a space
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -24734,6 +24877,7 @@ ENDIF
 \    Summary: Show the Data on System screen (red key f6)
 \  Deep dive: Generating system data
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25039,6 +25183,7 @@ ENDIF
 \    Summary: Calculate system data from the system seeds
 \  Deep dive: Generating system data
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25156,6 +25301,7 @@ ENDIF
 \   Category: Charts
 \    Summary: Show the Long-range Chart (red key f4)
 \  Deep dive: A sense of scale
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -25285,6 +25431,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a set of crosshairs
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25430,6 +25577,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing circles
 \    Summary: Draw a circle with crosshairs on a chart
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25536,6 +25684,7 @@ ENDIF
 \   Category: Drawing circles
 \    Summary: Draw a circle on a chart
 \  Deep dive: Drawing circles
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25583,6 +25732,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Show the Buy Cargo screen (red key f1)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25782,6 +25932,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Get a number from the keyboard
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -25945,6 +26096,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print an "ITEM?" error, make a beep and rejoin the TT210 routine
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -25968,6 +26120,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print the character in Q before returning to gnum
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -25988,6 +26141,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Show the Sell Cargo screen (red key f2)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -26018,6 +26172,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Show a list of current cargo in our hold, optionally to sell
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26233,6 +26388,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Show the Inventory screen (red key f9)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -26272,6 +26428,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Ask a question with a "Y/N?" prompt and return the response
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26329,6 +26486,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Move the crosshairs on a chart
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26399,6 +26557,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Draw a small set of crosshairs on a chart
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26450,6 +26609,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Move galactic coordinates by a signed delta
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26520,6 +26680,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Draw crosshairs on the Short-range Chart, with clipping
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26623,6 +26784,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Show the Short-range Chart (red key f5)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -26939,6 +27101,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Set the selected system's seeds to those of system 0
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -26969,6 +27132,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Set the current system to the nearest system to a point
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27276,6 +27440,7 @@ ENDIF
 \   Category: Flight
 \    Summary: Print a message to say there is no hyperspacing allowed inside the
 \             station
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27305,6 +27470,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Start the hyperspace process
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27445,6 +27611,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Start a hyperspace countdown
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27488,6 +27655,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Set the current system to the nearest system and return to hyp
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -27510,6 +27678,7 @@ ENDIF
 \    Summary: Perform a galactic hyperspace jump
 \  Deep dive: Twisting the system seeds
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27643,6 +27812,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Set the current system to the selected system
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27676,6 +27846,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Print the hyperspace countdown in the top-left of the screen
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27712,6 +27883,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print 16-bit number, left-padded to 5 digits, no point
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27741,6 +27913,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a 16-bit number, left-padded to 5 digits, and optional point
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27773,6 +27946,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Print an error when a system is out of hyperspace range
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27791,6 +27965,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a text token followed by a question mark
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27821,6 +27996,7 @@ ENDIF
 \    Summary: Print the name, price and availability of a market item
 \  Deep dive: Market item prices and availability
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -27973,6 +28149,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print the unit ("t", "kg" or "g") for a market item
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28004,6 +28181,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a space
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28026,6 +28204,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print "t" (for tonne) and a space
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -28046,6 +28225,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print "kg" (for kilograms)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -28063,6 +28243,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print "g" (for grams)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -28080,6 +28261,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Print the headers for the table of market prices
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28105,6 +28287,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Show the Market Price screen (red key f7)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -28160,6 +28343,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Market
 \    Summary: Calculate QQ19+3 = economy * |economic_factor|
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28224,6 +28408,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Process a jump to the system closest to (QQ9, QQ10)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28304,6 +28489,7 @@ ENDIF
 \    Summary: Calculate the availability of market items
 \  Deep dive: Market item prices and availability
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28409,6 +28595,7 @@ ENDIF
 \    Summary: Spawn a Thargoid ship and a Thargon companion
 \  Deep dive: Fixing ship positions
 \             Aggression and hostility in ship tactics
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -28438,6 +28625,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Process a mis-jump into witchspace
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28518,6 +28706,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Try to initiate a jump into hyperspace
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28619,6 +28808,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Launch from a station or show the front space view
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28694,6 +28884,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Display either the Long-range or Short-range Chart
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28728,6 +28919,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Subtract an amount of cash from the cash pot
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28785,6 +28977,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Add an amount of cash to the cash pot
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28834,6 +29027,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (Y X) = P * Q * 4
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28853,6 +29047,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (Y X) = (A P) * 4
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -28880,6 +29075,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Equipment
 \    Summary: Show the Equip Ship screen (red key f3)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29303,6 +29499,7 @@ ENDIF
 \   Category: Market
 \    Summary: Print the amount of money we have left in the cash pot, then make
 \             a short, high beep and delay for 1 second
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -29322,6 +29519,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Make a short, high beep and delay for 0.5 seconds
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -29338,6 +29536,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Equipment
 \    Summary: Subtract the price of equipment from the cash pot
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29379,6 +29578,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Equipment
 \    Summary: Return the price of a piece of equipment
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29430,6 +29630,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Equipment
 \    Summary: Print a menu of the four space views, for buying lasers
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29526,6 +29727,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Charts
 \    Summary: Select the closest system and redraw the chart crosshairs
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29558,6 +29760,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Equipment
 \    Summary: Install a new laser, processing a refund if applicable
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29656,6 +29859,7 @@ ENDIF
 \       Type: Variable
 \   Category: Equipment
 \    Summary: Equipment prices
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29715,6 +29919,7 @@ ENDIF
 \    Summary: Print the selected system name
 \  Deep dive: Generating system names
 \             Galaxy and system seeds
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29796,6 +30001,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Status
 \    Summary: Print the commander's name
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29835,6 +30041,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Print the current system name
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29896,6 +30103,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Print the current galaxy number
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29925,6 +30133,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Status
 \    Summary: Print fuel and cash levels
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -29961,6 +30170,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Status
 \    Summary: Print the current amount of cash
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30006,6 +30216,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a text token followed by a newline
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30028,6 +30239,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a text token followed by a colon
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30048,6 +30260,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a colon
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -30063,6 +30276,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print a text token
 \  Deep dive: Printing text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30188,6 +30402,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a letter in lower case
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30236,6 +30451,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a letter according to Sentence Case
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30303,6 +30519,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a recursive token in the range 128-145
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30330,6 +30547,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Tab to column 21 and print a colon
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30353,6 +30571,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a letter in lower case
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30407,6 +30626,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a character and switch to capitals
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30451,6 +30671,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a character
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30470,6 +30691,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a two-letter token or recursive token 0-95
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30530,6 +30752,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print a recursive token
 \  Deep dive: Printing text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -30670,6 +30893,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: An unused routine that swaps bytes in and out of zero page
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -30806,8 +31030,10 @@ ENDIF
  STA INWK+31
 
  AND #%00001000         \ If bit 3 of the ship's byte #31 is clear, then nothing
- BEQ TT48               \ is being drawn on-screen for this ship anyway, so
-                        \ return from the subroutine (as TT48 contains an RTS)
+ BNE P%+3               \ is being drawn on-screen for this ship anyway, so
+ RTS                    \ return from the subroutine (Port: the original
+                        \ branched to the RTS at TT48, which is now in the
+                        \ cold area)
 
  LDY #2                 \ Otherwise it's time to draw an explosion cloud, so
  LDA (XX19),Y           \ fetch byte #2 of the ship line heap into Y, which we
@@ -31128,7 +31354,6 @@ ENDIF
  SBC #0
 
  RTS                    \ Return from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: exlook
@@ -31168,6 +31393,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Universe
 \    Summary: Update the missile indicators, set up the planet data block
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -31201,6 +31427,7 @@ ENDIF
 \   Category: Universe
 \    Summary: Set up various aspects of arriving in a new system
 \  Deep dive: A sense of scale
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34924,6 +35151,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Wait until either "Y" or "N" is pressed
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34939,8 +35167,8 @@ ENDIF
                         \ the ASCII code in A and X
 
  CMP #'Y'               \ If "Y" was pressed, return from the subroutine with
- BEQ PL6                \ the C flag set (as the CMP sets the C flag, and PL6
-                        \ contains an RTS)
+ BNE P%+3               \ the C flag set (as the CMP sets the C flag; Port: the
+ RTS                    \ original branched to the RTS at PL6, in PLANET)
 
  CMP #'N'               \ If "N" was not pressed, loop back to keep scanning
  BNE YESNO              \ for key presses
@@ -35832,6 +36060,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Reset most variables
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -35903,6 +36132,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Reset a number of flight variables and workspaces
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -36143,6 +36373,7 @@ ENDIF
 \    Summary: Initialise the INWK workspace to a fairly aggressive ship
 \  Deep dive: Fixing ship positions
 \             Aggression and hostility in ship tactics
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37307,6 +37538,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Status
 \    Summary: Calculate how bad we have been
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37447,6 +37679,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Temporary storage for the stack pointer when jumping to the break
 \             handler at NEWBRK
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -37460,6 +37693,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: The standard BRKV handler for the game
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37476,10 +37710,17 @@ ENDIF
  TXS                    \ location stack, so that's back to the value it had
                         \ before we change it in the SVE routine
 
+ LDA #HOMEBANK          \ Port: page Elite's home bank in, as the MOS enters
+ STA &F4                \ BRKV with the ROM that raised the error paged in (the
+ STA VIA+&30            \ original's getzp did this, setting ROMSEL to bank 6)
+
  JSR getzp              \ Call getzp to restore the top part of zero page from
                         \ the buffer at &3000, as this will have been stored in
                         \ the buffer before performing the disc access that gave
                         \ the error we're processsing
+
+ JSR DOSNMI             \ Port: the minimal NMI handler back (DFS installed its
+                        \ own for the command that failed)
 
  STZ CATF               \ Set the CATF flag to 0, so the TT26 routine reverts to
                         \ standard formatting
@@ -37746,6 +37987,7 @@ ENDIF
 \   Category: Start and end
 \    Summary: Main entry point for the Elite game code
 \  Deep dive: Program flow of the main game loop
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37769,6 +38011,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Reset most of the game and restart from the title screen
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37793,6 +38036,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Show the "Load New Commander (Y/N)?" screen and start the game
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37850,6 +38094,7 @@ ENDIF
 \   Category: Start and end
 \    Summary: Show the "Press Fire or Space, Commander" screen and start the
 \             game
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37915,6 +38160,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Status
 \    Summary: Go to the docking bay (i.e. show the Status Mode screen)
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -37941,6 +38187,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Reset the current commander data block to the last saved commander
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38035,6 +38282,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Start and end
 \    Summary: Display a title screen with a rotating ship and prompt
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38239,6 +38487,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Calculate the checksum for the last saved commander data block
 \  Deep dive: Commander save files
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38295,6 +38544,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Calculate the third checksum for the last saved commander data
 \             block (Commodore 64 and Apple II versions only)
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38328,6 +38578,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Restore the default JAMESON commander
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38358,6 +38609,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Copy the last saved commander's name from INWK to NA%
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38391,6 +38643,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Copy the last saved commander's name from NA% to INWK
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38417,6 +38670,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Fetch the name of a commander file to save or load
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38490,6 +38744,7 @@ ENDIF
 \   Category: Text
 \    Summary: Fetch a line of text from the keyboard
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38641,6 +38896,7 @@ ENDIF
 \   Category: Text
 \    Summary: The OSWORD configuration block used to fetch a line of text from
 \             the keyboard
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38662,6 +38918,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Display the currently selected media (disk or tape)
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38682,6 +38939,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Display the non-selected media (disk or tape)
 \  Deep dive: Extended text tokens
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38701,6 +38959,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Reset the local bubble of universe and ship status
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38737,6 +38996,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Fetch the name of an ADFS directory on the Master Compact and
 \             change to that directory
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -38794,7 +39054,8 @@ IF _COMPACT
  LDX #LO(DIRI)          \ Set (Y X) to point to DIRI ("DIR <name entered>")
  LDY #HI(DIRI)
 
- JSR OSCLI              \ Call OSCLI to run the OS command in DIRI, which
+ JSR DOSCLI             \ (Port: through DOSCLI, the HAZEL and NMI glue)
+                        \ Call OSCLI to run the OS command in DIRI, which
                         \ changes the disc directory to the name entered
 
  JMP getzp              \ Call getzp to restore the top part of zero page from
@@ -38809,6 +39070,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Ask for a disc drive number and print a catalogue of that drive
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -38883,7 +39145,8 @@ ENDIF
                         \ DFS command for cataloguing that drive (*. being short
                         \ for *CAT)
 
- JSR OSCLI              \ Call OSCLI to execute the OS command at (Y X), which
+ JSR DOSCLI             \ (Port: through DOSCLI, the HAZEL and NMI glue)
+                        \ Call OSCLI to execute the OS command at (Y X), which
                         \ catalogues the disc
 
  JSR getzp              \ Call getzp to restore the top part of zero page from
@@ -38903,6 +39166,7 @@ ENDIF
 \   Category: Save and load
 \    Summary: Catalogue a disc, ask for a filename to delete, and delete the
 \             file
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39013,7 +39277,8 @@ ENDIF
  LDX #LO(DELI)          \ Set (Y X) to point to the OS command at DELI, which
  LDY #HI(DELI)          \ contains the DFS command for deleting this file
 
- JSR OSCLI              \ Call OSCLI to execute the OS command at (Y X), which
+ JSR DOSCLI             \ (Port: through DOSCLI, the HAZEL and NMI glue)
+                        \ Call OSCLI to execute the OS command at (Y X), which
                         \ deletes the file
 
  JSR getzp              \ Call getzp to restore the top part of zero page from
@@ -39030,6 +39295,7 @@ ENDIF
 \    Summary: Display the disk access menu and process saving of commander files
 \  Deep dive: Commander save files
 \             The competition code
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39262,6 +39528,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: Contains the length of the most recently entered commander name
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39275,6 +39542,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: Contains the length of the last saved commander name
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39288,6 +39556,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Get an ASCII disc drive number from the keyboard
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39336,6 +39605,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Load a commander file
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39398,6 +39668,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Disable the keyboard, set the SVN flag to 0, and return with A = 0
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39418,6 +39689,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Delay by iterating through 5 * 256 (1280) empty loops
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39438,6 +39710,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: The OS command string for cataloguing a disc
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39461,6 +39734,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: The OS command string for deleting a file
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39484,6 +39758,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: The OS command string for changing directory on the Master Compact
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39502,6 +39777,7 @@ ENDIF
 \       Type: Variable
 \   Category: Save and load
 \    Summary: The OS command string for saving a commander file
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39518,12 +39794,14 @@ ELIF _COMPACT
  EQUB 13
 
 ENDIF
+
 \ ******************************************************************************
 \
 \       Name: lodosc
 \       Type: Variable
 \   Category: Save and load
 \    Summary: The OS command string for loading a commander file
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -39540,12 +39818,14 @@ ELIF _COMPACT
  EQUB 13
 
 ENDIF
+
 \ ******************************************************************************
 \
 \       Name: wfile
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Save the commander file
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39672,18 +39952,21 @@ ENDIF
  LDX #LO(savosc)        \ Set (Y X) to point to the OS command at savosc, which
  LDY #HI(savosc)        \ contains the DFS command for saving the commander file
 
- JSR OSCLI              \ Call OSCLI to execute the OS command at (Y X), which
+ JSR DOSCLI             \ (Port: through DOSCLI, the HAZEL and NMI glue)
+                        \ Call OSCLI to execute the OS command at (Y X), which
                         \ saves the commander file
 
  JMP getzp              \ Call getzp to restore the top part of zero page from
                         \ the buffer at &3000 and return from the subroutine
                         \ using a tail call
+
 \ ******************************************************************************
 \
 \       Name: rfile
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Load the commander file
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -39787,7 +40070,8 @@ ENDIF
  LDY #HI(lodosc)        \ contains the DFS command for loading the commander
                         \ file
 
- JSR OSCLI              \ Call OSCLI to execute the OS command at (Y X), which
+ JSR DOSCLI             \ (Port: through DOSCLI, the HAZEL and NMI glue)
+                        \ Call OSCLI to execute the OS command at (Y X), which
                         \ loads the commander file
 
  JSR getzp              \ Call getzp to restore the top part of zero page from
@@ -40245,13 +40529,13 @@ ENDIF
 
  RTS                    \ This instruction has no effect as we already returned
                         \ from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: DKS3
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Toggle a configuration setting and emit a beep
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -40800,6 +41084,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Scan the keyboard until a key is pressed
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -40870,6 +41155,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Erase an old in-flight message and display a new one
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -40904,6 +41190,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Display an in-flight message
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -41015,6 +41302,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Print a text token, possibly followed by " DESTROYED"
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -41039,6 +41327,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Potentially lose cargo or equipment following damage
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -41113,6 +41402,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Display "E.C.M.SYSTEM DESTROYED" as an in-flight message
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -41130,6 +41420,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Flight
 \    Summary: Display "FUEL SCOOPS DESTROYED" as an in-flight message
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -41204,7 +41495,9 @@ ENDMACRO
 \       Type: Variable
 \   Category: Market
 \    Summary: Market prices table
+\             (Port: in the cold area, as only cold code reads it)
 \  Deep dive: Market item prices and availability
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -47240,9 +47533,9 @@ ENDMACRO
  LDY VIEW               \ Fetch the laser power for our new view
  LDA LASER,Y
 
- BEQ LO2                \ If it is zero (i.e. there is no laser fitted to this
-                        \ view), jump to LO2 to return from the subroutine (as
-                        \ LO2 contains an RTS)
+ BEQ SIG2               \ If it is zero (i.e. there is no laser fitted to this
+                        \ view), jump to SIG2 to return from the subroutine (as
+                        \ SIG2 contains an RTS)
 
  LDY #0                 \ Set Y to 0, to represent a pulse laser
 
@@ -47287,6 +47580,9 @@ ENDMACRO
                         \ laser crosshairs, leaving a gap in the middle, and
                         \ return from the subroutine using a tail call
 
+.SIG2
+
+ RTS                    \ Return from the subroutine (no laser on this view)
 \ ******************************************************************************
 \
 \       Name: sightcol
@@ -47370,6 +47666,7 @@ ENDMACRO
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the screen and set the current view type
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -47399,6 +47696,7 @@ ENDMACRO
 \   Category: Drawing the screen
 \    Summary: Clear the top part of the screen, draw a border box and configure
 \             the specified view
+\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -48546,6 +48844,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Save and load
 \    Summary: Set the standard BRKV handler for the game
+\       Area: cold
 \
 \ ******************************************************************************
 
@@ -48572,6 +48871,168 @@ ENDIF
 
 \ ******************************************************************************
 \
+\       Name: DOSCLI
+\       Type: Subroutine
+\   Category: Save and load
+\    Summary: Port: OSCLI for the disc commands, with HAZEL's stash and the NMI
+\             glue (docs/master-memory.md)
+\       Area: cold
+\
+\ ------------------------------------------------------------------------------
+\
+\ DFS and the MOS overwrite HAZEL's &C000-&C2FF, the DFS and ADFS private
+\ pages &D900-&DAFF, &DC00 up to the command's end and &DF00-&DFFF during a
+\ disc command, and keep their own lasting state in &C2C0-&C2FF and
+\ &DFDA-&DFDB (docs/master-memory.md); a third-party ROM may write its own
+\ page of HAZEL too. So the whole of HAZEL is stashed in main RAM
+\ &4000-&5FFF, which is not on show, for the command and copied back
+\ afterwards. DFS's and the MOS's lasting bytes (&C2C0-&C2FF, and &DFC0-&DFFF: the MOS's FSCV copy
+\ at &DFDA-&DFDB, and the ACCCON its error path puts back from &DFDC when
+\ &DFDD is non-zero) live in DFSST while the game runs (the loader takes
+\ them after its last disc access): they go back before the command and are
+\ stashed again after it (or after its error, through DOSNMI), as *DIR and
+\ *DRIVE change them. Before the command the catalogue cache is invalidated
+\ too (&FF to &C282, &C287 and &C28B-&C28E: re-read the catalogue, restore
+\ the head), as with the drive motor still on DFS would otherwise trust a
+\ cache the game has overwritten (and could write a catalogue built from
+\ it). Nothing that runs during the command (the IRQ handler, the printing
+\ of the catalogue through CHPR) reads HAZEL. DFS copies its own NMI routine to &0D00 for the command; afterwards
+\ the 1770 is quietened (Force Interrupt) and the minimal handler the loader
+\ installed goes back (a stray NMI would otherwise run DFS's handler with
+\ the game's zero page at &A0-&A7). The error path (BRKV, NEWBRK) does the
+\ same through DOSNMI. The MOS reads the command from a copy at &6000
+\ (DOSBUF, after HAZEL's stash), as the commands' strings (CTLI, DELI,
+\ savosc, lodosc) are in the cold area, which is not paged in while the
+\ MOS and DFS run the command.
+\
+\ ******************************************************************************
+
+DOSBUF = &6000          \ the command's copy, after HAZEL's stash
+
+.DOSCLI
+
+ PHA                    \ Stash HAZEL at &4000 (A and the command's address
+ PHX                    \ in Y X are kept)
+ PHY
+ LDX #&C0
+ LDY #&40
+ JSR dosmv
+
+ PLY                    \ Copy the command, to its CR, from (Y X) to DOSBUF,
+ PLX                    \ after HAZEL's stash (ACCCON X = 0, as dosmv left it),
+ STX dosc0+1            \ where the MOS reads it whatever ROM is paged in (the
+ STY dosc0+2            \ commands' strings are in the cold area, with the code
+ LDX #0                 \ that builds them)
+.dosc0
+ LDA &FFFF,X            \ (patched)
+ STA DOSBUF,X
+ INX
+ CMP #13
+ BNE dosc0
+
+ LDX #63                \ Put back DFS's and the MOS's lasting bytes
+.dosc1
+ LDA DFSST,X
+ STA &C2C0,X
+ LDA DFSST+64,X
+ STA &DFC0,X
+ DEX
+ BPL dosc1
+
+ LDA #&FF               \ Invalidate DFS's catalogue cache and drive state
+ STA &C282
+ STA &C287
+ STA &C28B
+ STA &C28C
+ STA &C28D
+ STA &C28E
+ STA DFSIN              \ (a disc command is under way)
+ PLA
+
+ LDX #LO(DOSBUF)        \ The command, from its copy at DOSBUF
+ LDY #HI(DOSBUF)
+ JSR OSCLI
+
+                        \ Fall through into DOSNMI to put the minimal NMI
+                        \ handler back
+
+.DOSNMI
+
+ PHP                    \ Keep the flags and A (X and Y are not changed)
+ PHA
+ SEI
+
+ LDA #&D0               \ 1770 Force Interrupt, no conditions: terminate any
+ STA &FE28              \ command and raise no interrupt
+
+ LDA #8                 \ Give the 1770 time to take the command
+.dosn1
+ DEC A
+ BNE dosn1
+
+ LDA &FE28              \ Read the status register, which clears INTRQ
+
+ LDA #&40               \ &0D00 = RTI, then the body at &0D01 (LDA &FE28 :
+ STA &0D00              \ PLA : RTI), then &0D00 = PHA, so &0D00 holds a
+ LDA #&AD               \ complete handler at every step (page &0D is otherwise
+ STA &0D01              \ off limits, docs/master-memory.md)
+ LDA #&28
+ STA &0D02
+ LDA #&FE
+ STA &0D03
+ LDA #&68
+ STA &0D04
+ LDA #&40
+ STA &0D05
+ LDA #&48
+ STA &0D00
+
+.DOSNMI_END
+
+ BIT DFSIN              \ After a disc command (or its error), stash DFS's
+ BPL dosn3              \ lasting bytes again (the command may have changed
+ PHX                    \ them: *DIR, *DRIVE), then put HAZEL back from
+ PHY                    \ &4000
+ LDX #63
+.dosn2
+ LDA &C2C0,X
+ STA DFSST,X
+ LDA &DFC0,X
+ STA DFSST+64,X
+ DEX
+ BPL dosn2
+ LDX #&40
+ LDY #&C0
+ JSR dosmv
+ STZ DFSIN
+ PLY
+ PLX
+.dosn3
+
+ PLA
+ PLP
+ RTS
+
+.dosmv                  \ Copy the 32 pages (8K) from page X on to page Y on,
+ LDA #4                 \ with ACCCON X = 0 (&4000-&5FFF is main RAM)
+ TRB VIA+&34
+ STX dosm1+2
+ STY dosm2+2
+ LDY #32
+ LDX #0
+.dosm1
+ LDA &C000,X            \ (patched)
+.dosm2
+ STA &4000,X            \ (patched)
+ INX
+ BNE dosm1
+ INC dosm1+2
+ INC dosm2+2
+ DEY
+ BNE dosm1
+ RTS
+\ ******************************************************************************
+\
 \       Name: NMIpissoff
 \       Type: Subroutine
 \   Category: Loader
@@ -48596,6 +49057,8 @@ ENDIF
 \    Summary: Denotes the end of the main game code, from ELITE A to ELITE H
 \
 \ ******************************************************************************
+
+
 
 .F%
 
@@ -48631,17 +49094,3 @@ ENDIF
 
  PRINT "S.ELTH ", ~CODE_H%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD_H%
 \SAVE "3-assembled-output/ELTH.bin", CODE_G%, P%, LOAD%
-
-\ ******************************************************************************
-\
-\ Save BCODE.unprot.bin
-\
-\ ******************************************************************************
-
- PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
- SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
-
- PRINT "Addresses for the scramble routines in elite-checksum.py"
- PRINT "F% = ", ~F%
- PRINT "G% = ", ~G%
- PRINT "NA2% = ", ~NA2%
