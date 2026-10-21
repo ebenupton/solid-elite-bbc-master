@@ -11149,7 +11149,9 @@ ENDIF
  AND #%10100000         \ exploding?) and bit 7 (has ship been killed?) from
                         \ ship byte #31 into A
 
- JSR MAS4               \ Or this value with x_hi, y_hi and z_hi
+ ORA INWK+1             \ Or this value with x_hi, y_hi and z_hi (MAS4 inlined)
+ ORA INWK+4
+ ORA INWK+7
 
  BNE MA65               \ If this value is non-zero, then either the ship is
                         \ far away (i.e. has a non-zero high byte in at least
