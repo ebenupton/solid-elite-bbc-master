@@ -2525,8 +2525,10 @@ ENDIF
 
  LDA SFXFQ,Y            \ Set A = SFXFQ+Y
 
- BVC P%+3               \ If the V flag is set, double the value in A
- ASL A
+                        \ Port: BVC P%+3 : ASL A (if the V flag is set, double
+                        \ the value in A) removed (unreachable: NOISE clears V
+                        \ and nothing on the way here sets it; SOUS9's other
+                        \ callers are commented out in the original)
 
  STA SOFRQ,X            \ Store A in SOFRQ+X
 
@@ -2538,7 +2540,6 @@ ENDIF
  SEC                    \ Set the C flag
 
  RTS                    \ Return from the subroutine
-
 \ ******************************************************************************
 \
 \       Name: SOINT
@@ -3962,9 +3963,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.HLOIN22
-
- JMP HLOIN3             \ This instruction doesn't appear to be used anywhere
+                        \ Port: HLOIN22 (JMP HLOIN3) removed (unreachable: "This
+                        \ instruction doesn't appear to be used anywhere")
 
                         \ In the BBC Micro cassette and disc versions of Elite,
                         \ LL30 and LOIN are synonyms for the same routine,
@@ -9683,43 +9683,8 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
-IF _MATCH_ORIGINAL_BINARIES
-
- IF _SNG47
-
-  EQUB &41, &23, &6D, &65, &6D, &3A, &53, &54   \ These bytes appear to be
-  EQUB &41, &6C, &61, &74, &63, &68, &3A, &52   \ unused and just contain random
-  EQUB &54, &53, &0D, &13, &74, &09, &5C, &2E   \ workspace noise left over from
-  EQUB &2E, &2E, &2E, &0D, &18, &60, &05, &20   \ the BBC Micro assembly process
-  EQUB &0D, &1A, &F4, &21, &5C, &2E, &2E, &2E
-  EQUB &2E, &2E, &2E, &2E, &2E, &2E, &2E, &42
-  EQUB &61, &79, &20, &56, &69, &65, &77, &2E
-  EQUB &2E, &2E, &2E, &2E, &2E, &2E, &2E, &2E
-  EQUB &2E, &0D, &1A, &FE, &05, &20, &0D, &1B
-  EQUB &08, &11, &2E, &48, &41
-
- ELIF _COMPACT
-
-  EQUB &2B, &26, &33    \ These bytes appear to be unused and just contain
-                        \ random workspace noise left over from the BBC Micro
-                        \ assembly process
-
- ENDIF
-
-ELSE
-
- IF _SNG47
-
-  SKIP 77               \ These bytes appear to be unused
-
- ELIF _COMPACT
-
-  SKIP 3                \ These bytes appear to be unused
-
- ENDIF
-
-ENDIF
-
+                        \ Port: the workspace noise that followed (77 bytes in
+                        \ SNG47, which "appear to be unused") is gone
 \ ******************************************************************************
 \
 \       Name: FONT%
@@ -9938,91 +9903,6 @@ ENDIF
   EQUB HI(INT(2^((I% / 2 + 128) / 16) + 0.5))
 
  NEXT
-
-\ ******************************************************************************
-\
-\       Name: SCTBX1
-\       Type: Variable
-\   Category: Drawing the screen
-\    Summary: Lookup table for converting a pixel x-coordinate to the bit number
-\             within the pixel row byte that corresponds to this pixel
-\
-\ ------------------------------------------------------------------------------
-\
-\ This routine is not used in this version of Elite. It is left over from the
-\ Apple II version.
-\
-\ ******************************************************************************
-
-.SCTBX1
-
-FOR I%, 0, 255
-
- EQUB (I% + 8) MOD 7
-
-NEXT
-
-\ ******************************************************************************
-\
-\       Name: SCTBX2
-\       Type: Variable
-\   Category: Drawing the screen
-\    Summary: Lookup table for converting a pixel x-coordinate to the byte
-\             number in the pixel row that corresponds to this pixel
-\
-\ ------------------------------------------------------------------------------
-\
-\ This routine is not used in this version of Elite. It is left over from the
-\ Apple II version.
-\
-\ ******************************************************************************
-
-.SCTBX2
-
-FOR I%, 0, 255
-
- EQUB (I% + 8) DIV 7
-
-NEXT
-
-\ ******************************************************************************
-\
-\       Name: wtable
-\       Type: Variable
-\   Category: Save and load
-\    Summary: 6-bit to 7-bit nibble conversion table
-\
-\ ------------------------------------------------------------------------------
-\
-\ This table is not used in this version of Elite. It is left over from the
-\ Apple II version.
-\
-\ ******************************************************************************
-
-.wtable
-
- EQUD &9B9A9796         \ NIBL     DFB $96,$97,$9A
- EQUD &A69F9E9D         \          DFB $9B,$9D,$9E
- EQUD &ADACABA7         \          DFB $9F,$A6,$A7
- EQUD &B3B2AFAE         \          DFB $AB,$AC,$AD
- EQUD &B7B6B5B4         \          DFB $AE,$AF,$B2
- EQUD &BCBBBAB9         \          DFB $B3,$B4,$B5
- EQUD &CBBFBEBD         \          DFB $B6,$B7,$B9
- EQUD &D3CFCECD         \          DFB $BA,$BB,$BC
- EQUD &DAD9D7D6         \          DFB $BD,$BE,$BF
- EQUD &DEDDDCDB         \          DFB $CB,$CD,$CE
- EQUD &E7E6E5DF         \          DFB $CF,$D3,$D6
- EQUD &ECEBEAE9         \          DFB $D7,$D9,$DA
- EQUD &F2EFEEED         \          DFB $DB,$DC,$DD
- EQUD &F6F5F4F3         \          DFB $DE,$DF,$E5
- EQUD &FBFAF9F7         \          DFB $E6,$E7,$E9
- EQUD &FFFEFDFC         \          DFB $EA,$EB,$EC
-                        \          DFB $ED,$EE,$EF
-                        \          DFB $F2,$F3,$F4
-                        \          DFB $F5,$F6,$F7
-                        \          DFB $F9,$FA,$FB
-                        \          DFB $FC,$FD,$FE
-                        \          DFB $FF
 
 \ ******************************************************************************
 \
@@ -10261,9 +10141,8 @@ NEXT
 \
 \ ******************************************************************************
 
- RTS                    \ This byte appears to be unused, but it might be a
-                        \ hangover from the cassette version, where this byte is
-                        \ used for a checksum
+                        \ Port: the RTS here is removed (unreachable: "This
+                        \ byte appears to be unused")
 
 .S%
 
@@ -10311,31 +10190,14 @@ NEXT
  LDX #KEY1              \ Set X = KEY1 as the decryption seed (the value used to
                         \ encrypt the code, which is done in elite-checksum.py)
 
-IF _REMOVE_CHECKSUMS
-
  NOP                    \ If we have disabled checksums, skip the call to DEEORS
  NOP                    \ and return from the subroutine to skip the second call
  RTS                    \ below
 
-ELSE
-
- JSR DEEORS             \ Call DEEORS to decrypt between DOENTRY and F%
-
-ENDIF
-
- LDA #LO(XX21-1)        \ Set FRIN(1 0) = XX21-1 as the low address of the
- STA FRIN               \ decryption block
- LDA #HI(XX21-1)
- STA FRIN+1
-
- LDA #&B1               \ Set (A Y) = &B1FF as the high address of the
- LDY #&FF               \ decryption block
-
- LDX #KEY2              \ Set X = KEY2 as the decryption seed (the value used to
-                        \ encrypt the code, which is done in elite-checksum.py)
-
-                        \ Fall through into DEEORS to decrypt between XX21 and
-                        \ &B1FF
+                        \ Port: the rest is removed (unreachable: the port is
+                        \ always built with _REMOVE_CHECKSUMS, so DEEOR returns
+                        \ above): the ELSE's JSR DEEORS, and the second block's
+                        \ set-up (XX21-1 to &B1FF, KEY2) that fell into DEEORS
 
 \ ******************************************************************************
 \
@@ -10357,46 +10219,10 @@ ENDIF
 \
 \ ******************************************************************************
 
-.DEEORS
-
- STX T                  \ Store the decryption seed in T as our starting point
-
- STA SC+1               \ Set SC(1 0) = (A 0) to point to the start of page A,
- LDA #0                 \ so we can use SC(1 0) + Y as our pointer to the next
- STA SC                 \ byte to decrypt
-
-.DEEORL
-
- LDA (SC),Y             \ Set A to the Y-th byte of SC(1 0)
-
- SEC                    \ Set A = A - T
- SBC T
-
- STA (SC),Y             \ Update the Y-th byte of SC to the new value in A
-
- STA T                  \ Update T with the new value in A
-
- TYA                    \ Set A to the current byte index in Y
-
- BNE P%+4               \ If A <> 0 then decrement the high byte of SC(1 0) to
- DEC SC+1               \ point to the previous page
-
- DEY                    \ Decrement the byte pointer
-
- CPY FRIN               \ Loop back to decrypt the next byte, until Y = the low
- BNE DEEORL             \ byte of FRIN(1 0), at which point we have decrypted a
-                        \ whole page
-
- LDA SC+1               \ Check whether SC(1 0) matches FRIN(1 0) and loop back
- CMP FRIN+1             \ to decrypt the next byte until it does, at which point
- BNE DEEORL             \ we have decrypted the whole block
-
- RTS                    \ Return from the subroutine
-
- EQUB &B7, &AA          \ These bytes appear to be unused, though there is a
- EQUB &45, &23          \ comment in the original source that says "red
-                        \ herring", so this would appear to be a red herring
-                        \ aimed at confusing any crackers
+                        \ Port: removed (unreachable without the copy
+                        \ protection): DEEORS and DEEORL, and the four unused
+                        \ "red herring" bytes after them (EQUB &B7, &AA, &45,
+                        \ &23)
 
 \ ******************************************************************************
 \
@@ -13707,8 +13533,11 @@ ENDIF
  EQUW MT28              \ Token 28: Print mission 1 location hint (220-221)
  EQUW MT29              \ Token 29: Column 6, white text, lower case in words
  EQUW FILEPR            \ Token 30: Display currently selected media (disk/tape)
- EQUW OTHERFILEPR       \ Token 31: Display the non-selected media (disk/tape)
+ EQUW x4_DASC           \ Token 31: Display the non-selected media (disk/tape)
+                        \ (Port: unused, as no token has control code 31, so
+                        \ DASC as for 20 and 32; OTHERFILEPR is removed)
  EQUW x4_DASC           \ Token 32: Unused
+
 \ ******************************************************************************
 \
 \       Name: TKN2
@@ -21931,16 +21760,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.MUT3
-
- LDX ALP1               \ Set P = ALP1, though this gets overwritten by the
- STX P                  \ following, so this has no effect
-
-                        \ Fall through into MUT2 to do the following:
-                        \
-                        \   (S R) = XX(1 0)
-                        \   (A P) = Q * A
-
+                        \ Port: removed (unreachable: MUT3 is never called in
+                        \ SNG47)
 \ ******************************************************************************
 \
 \       Name: MUT2
@@ -24298,15 +24119,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.DVLOIN
-
- STA X1                 \ Draw a vertical line from (A, GCYT) to (A, GCYB)
- STA X2
- LDA #GCYT
- STA Y1
- LDA #GCYB
- STA Y2
- JMP LOIN
+                        \ Port: removed (unreachable: DVLOIN has no caller in
+                        \ SNG47)
 
 \ ******************************************************************************
 \
@@ -24534,11 +24348,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.INCYC
-
- INC YC                 \ Move the text cursor to the next row
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (unreachable: INCYC has no caller in
+                        \ SNG47)
 
 \ ******************************************************************************
 \
@@ -26444,41 +26255,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.TT214
-
-\.TT214                 \ These instructions are commented out in the original
-\                       \ source
-\PHA
-\JSR TT162
-\PLA
-
-.TT221
-
- JSR TT27               \ Print the text token in A
-
- LDA #206               \ Print extended token 206 ("{all caps}(Y/N)?")
- JSR DETOK
-
- JSR TT217              \ Scan the keyboard until a key is pressed, and return
-                        \ the key's ASCII code in A and X
-
- ORA #%00100000         \ Set bit 5 in the value of the key pressed, which
-                        \ converts it to lower case
-
- CMP #'y'               \ If "y" was pressed, jump to TT218
- BEQ TT218
-
- LDA #'n'               \ Otherwise jump to TT26 to print "n" and return from
- JMP TT26               \ the subroutine using a tail call (so all other
-                        \ responses apart from "y" indicate a no)
-
-.TT218
-
- JSR TT26               \ Print the character in A, i.e. print "y"
-
- SEC                    \ Set the C flag to indicate a "yes" response
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (unreachable: TT214, TT221 and TT218
+                        \ have no caller in SNG47)
 
 \ ******************************************************************************
 \
@@ -28443,8 +28221,8 @@ ENDIF
 
 .hyp1
 
- JSR TT111              \ Select the system closest to galactic coordinates
-                        \ (QQ9, QQ10)
+                        \ Port: JSR TT111 removed (unreachable: hyp1 is only
+                        \ ever called as hyp1+3)
 
  JSR jmp                \ Set the current system to the selected system
 
@@ -28775,8 +28553,9 @@ ENDIF
                         \ (QQ9, QQ10), but we don't need to do this as the
                         \ crosshairs will already be on a system by this point
 
- JSR hyp1+3             \ Jump straight to the system at (QQ9, QQ10) without
-                        \ first calculating which system is closest
+ JSR hyp1               \ Jump straight to the system at (QQ9, QQ10) without
+                        \ first calculating which system is closest (Port:
+                        \ hyp1+3 in the original, as hyp1's JSR TT111 is gone)
 
  JSR RES2               \ Reset a number of flight variables and workspaces
 
@@ -30897,23 +30676,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.SWAPPZERO
-
- LDX #K3+1              \ This routine starts copying zero page from the byte
-                        \ after K3 and up, using X as an index
-
-.SWPZL
-
- LDA ZP,X               \ These instructions have no effect, as they simply swap
- LDY ZP,X               \ a byte with itself
- STA ZP,X
- STY ZP,X
-
- INX                    \ Increment the loop counter
-
- BNE SWPZL              \ Loop back for the next byte
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (unreachable: SWAPPZERO has no caller in
+                        \ SNG47)
 
 \ ******************************************************************************
 \
@@ -36009,50 +35773,7 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
-\ ******************************************************************************
-\
-\       Name: NUMBOR
-\       Type: Subroutine
-\   Category: Text
-\    Summary: An unused routine that prints a number in hexadecimal
-\
-\ ------------------------------------------------------------------------------
-\
-\ Arguments:
-\
-\   A                   The number to print
-\
-\ ******************************************************************************
-
-.NUMBOR
-
- PHA                    \ Store A on the stack so we can grab the low nibble
-                        \ from it later
-
- LSR A                  \ Shift A right so that it contains the high nibble
- LSR A                  \ of the original argument
- LSR A
- LSR A
-
- JSR DIDGIT             \ Call DIDGIT below to print 0-F for the high nibble
-
- PLA                    \ Restore A from the stack
-
- AND #%00001111         \ Extract the low nibble and fall through into DIDGIT
-                        \ to print 0-F for the low nibble
-
-.DIDGIT
-
- CMP #10                \ If A >= 10, skip the next three instructions
- BCS P%+7
-
- ADC #'0'               \ A < 10, so print the number in A as a digit 0-9 and
- JMP CHPR               \ return from the subroutine using a tail call
-
-.DIDGIT2
-
- ADC #'6'               \ A >= 10, so print the number in A as a digit A-F and
- JMP CHPR               \ return from the subroutine using a tail call
+\ Port: NUMBOR (with DIDGIT and DIDGIT2) removed: nothing calls it
 
 \ ******************************************************************************
 \
@@ -38943,15 +38664,10 @@ ENDIF
 \
 \ ******************************************************************************
 
-.OTHERFILEPR
-
- LDA #2                 \ Print extended token 2 - DISK, i.e. token 2 or 3 (as
- SEC                    \ DISK can be 0 or &FF). In other versions of the game,
- SBC DISK               \ such as the Commodore 64 version, token 2 is "disk"
- JMP DETOK              \ and token 3 is "tape", so this displays the other,
-                        \ non-selected media, but this system is unused in the
-                        \ Master version and tokens 2 and 3 contain different
-                        \ text
+                        \ Port: removed (unreachable: its only reference was
+                        \ JMTB's entry for control code 31, which no extended
+                        \ token contains, so this system is unused in the Master
+                        \ version)
 
 \ ******************************************************************************
 \
@@ -39677,11 +39393,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.backtonormal
-
- RTS                    \ Return from the subroutine, as backtonormal does
-                        \ nothing in this version of Elite (it is left over from
-                        \ the 6502 Second Processor version)
+                        \ Port: removed (unreachable: backtonormal has no caller
+                        \ in SNG47)
 
 \ ******************************************************************************
 \
@@ -39698,11 +39411,8 @@ ENDIF
 \
 \ ******************************************************************************
 
-.CLDELAY
-
- RTS                    \ Return from the subroutine, as CLDELAY does nothing in
-                        \ this version of Elite (it is left over from the 6502
-                        \ Second Processor version)
+                        \ Port: removed (unreachable: CLDELAY has no caller in
+                        \ SNG47)
 
 \ ******************************************************************************
 \
@@ -40097,8 +39807,9 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
- RTS                    \ This instruction has no effect as we already returned
-                        \ from the subroutine
+                        \ Port: the RTS that followed is removed (unreachable:
+                        \ "This instruction has no effect")
+
 \ ******************************************************************************
 \
 \       Name: SPS1
@@ -40527,8 +40238,8 @@ ENDIF
  JMP BOOP               \ Call the BOOP routine to make a long, low beep, and
                         \ return from the subroutine using a tail call
 
- RTS                    \ This instruction has no effect as we already returned
-                        \ from the subroutine
+                        \ Port: the RTS that followed is removed (unreachable:
+                        \ "This instruction has no effect")
 \ ******************************************************************************
 \
 \       Name: DKS3
@@ -42260,51 +41971,11 @@ ENDMACRO
 \.LL28                  \ These instructions are commented out in the original
 \CMP Q                  \ source
 
- BCS LL2                \ If the subtraction fitted into one byte and didn't
-                        \ underflow, then log(A) - log(Q) < 256, so we jump to
-                        \ LL2 to return a result of 255
-
- LDX #254               \ Otherwise set the result in R to 254
- STX R
-
-.LL31
-
- ASL A                  \ Shift A to the left
-
- BCS LL29               \ If bit 7 of A was set, then jump straight to the
-                        \ subtraction
-
- CMP Q                  \ If A < Q, skip the following subtraction
- BCC P%+4
-
- SBC Q                  \ A >= Q, so set A = A - Q
-
- ROL R                  \ Rotate the counter in R to the left, and catch the
-                        \ result bit into bit 0 (which will be a 0 if we didn't
-                        \ do the subtraction, or 1 if we did)
-
- BCS LL31               \ If we still have set bits in R, loop back to LL31 to
-                        \ do the next iteration of 7
-
- RTS                    \ R left with remainder of division
-
-.LL29
-
- SBC Q                  \ A >= Q, so set A = A - Q
-
- SEC                    \ Set the C flag to rotate into the result in R
-
- ROL R                  \ Rotate the counter in R to the left, and catch the
-                        \ result bit into bit 0 (which will be a 0 if we didn't
-                        \ do the subtraction, or 1 if we did)
-
- BCS LL31               \ If we still have set bits in R, loop back to LL31 to
-                        \ do the next iteration of 7
-
- LDA R                  \ Set A to the remainder in R
-
- RTS                    \ Return from the subroutine with R containing the
-                        \ remainder of the division
+                        \ Port: removed (unreachable in SNG47 too): the old
+                        \ shift-and-subtract division left after LLfix's RTS,
+                        \ BCS LL2 : LDX #254 : STX R, LL31 and LL29 (the "other
+                        \ entry point" LL31 above is only ever inlined, as in
+                        \ DVID3B2's LL31 copy, never called)
 
 .LL2
 
@@ -47589,6 +47260,7 @@ ENDMACRO
 \       Type: Variable
 \   Category: Drawing lines
 \    Summary: Colours for the crosshair sights on the different laser types
+\             (Port: the unused beamcol table that followed it is gone)
 \
 \ ******************************************************************************
 
@@ -47601,22 +47273,6 @@ ENDMACRO
  EQUB CYAN              \ Military lasers have cyan sights
 
  EQUB YELLOW            \ Mining lasers have yellow sights
-
-\ ******************************************************************************
-\
-\       Name: beamcol
-\       Type: Variable
-\   Category: Drawing lines
-\    Summary: An unused table of laser colours
-\
-\ ******************************************************************************
-
-.beamcol
-
- EQUB WHITE             \ These bytes appear to be unused - perhaps they were
- EQUB WHITE             \ going to be used to set different colours of laser
- EQUB WHITE             \ beam for the different lasers?
- EQUB WHITE
 
 \ ******************************************************************************
 \
@@ -48650,7 +48306,7 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine contains an RTS so we can return from the SFRMIS subroutine with
+\ This routine contains an RTS so we can return from a subroutine with
 \ a branch instruction.
 \
 \ It also contains the DEMON label, which is left over from the 6502 Second
@@ -48659,11 +48315,10 @@ ENDIF
 \
 \ ******************************************************************************
 
-.yetanotherrts
-
-.DEMON
-
- RTS                    \ Return from the subroutine
+                        \ Port: removed (unreachable: TT171, which fell through
+                        \ into it, is not assembled for SNG47, and the port's
+                        \ SFRMIS returns with its own RTS instead of BCC
+                        \ yetanotherrts)
 
 \ ******************************************************************************
 \
@@ -48715,20 +48370,10 @@ ENDIF
                         \ but this is ignored as the hostile flags means we
                         \ are the target
 
-IF _SNG47
-
- BCC yetanotherrts      \ The C flag will be set if the call to SFS1-2 was a
-                        \ success, so if it's clear, jump to yetanotherrts to
-                        \ return from the subroutine (as yetanotherrts contains
-                        \ an RTS)
-
-ELIF _COMPACT
-
- BCC TT17X-1            \ The C flag will be set if the call to SFS1-2 was a
-                        \ success, so if it's clear, jump to TT17X-1 to return
-                        \ from the subroutine (as TT17X-1 contains an RTS)
-
-ENDIF
+ BCS P%+3               \ The C flag will be set if the call to SFS1-2 was a
+ RTS                    \ success, so if it's clear, return from the
+                        \ subroutine (Port: the original branches to an RTS
+                        \ elsewhere)
 
  LDA #120               \ Print recursive token 120 ("INCOMING MISSILE") as an
  JSR MESS               \ in-flight message
@@ -49040,14 +48685,8 @@ DOSBUF = &6000          \ the command's copy, after HAZEL's stash
 \
 \ ******************************************************************************
 
-IF _SNG47
-
-.NMIpissoff
-
- CLI                    \ These instructions are never reached and have no
- RTI                    \ effect
-
-ENDIF
+                        \ Port: removed (it was never reached and nothing
+                        \ refers to it)
 
 \ ******************************************************************************
 \
