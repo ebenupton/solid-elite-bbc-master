@@ -87,7 +87,21 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mboot.mjs` | Boots a build to the title screen and checks every image that the loader installs. |
 | `mtrace.mjs` | Traces chosen routines and variables over chosen iterations (`mcompare.mjs --trace`). |
 | `profile.mjs` | Profiles cycles by PC over exactly the gate's run, with `--pagex` for page-crossing cycles. |
-| `test_raster.py`, `raster_model.py` | The filled renderer's rasteriser (banks 5 and ANDY) on py65, against a pixel-exact model of every primitive: polygons, lines, discs, stars, the dirty-row repair. It also checks that nothing outside the screen, the rasteriser's own memory and its zero page is written. `--quick` runs in the gate; the full run takes longer. |
+| `test_raster.py`, `raster_model.py` | The filled renderer's rasteriser (banks 5 and ANDY) and the meridian window (bank 7) on py65, against a pixel-exact model of every primitive: polygons, lines, discs, stars, the dirty-row repair, the beach ball's rows (`merid`, `beachball`). It also checks that nothing outside the screen, the rasteriser's own memory and its zero page is written. `--quick` runs in the gate; the full run takes longer. |
+| `planet_analytic.py` | The reference model of the beach ball's boundaries, from the Demonstration Disc port: per row, where each great circle's projected ellipse crosses it, in floating point or exactly as the 6502 code's integer arithmetic. `test_raster.py` checks the meridian window against it. |
 | `mlight.mjs` | Records what the lighting (`L_REC`) was given and wrote for every ship drawn, for `2-build-files/lightcheck.py` to check against the model. |
 | `mhangar.mjs` | Screenshots of the hangar in chosen configurations, for `2-build-files/hangarinks.py`. |
 | `verify.sh` | The gate. |
+
+### Replay tools
+
+The tools in `beachball/` replay a session that
+[elite-agent](https://github.com/8bitkick/elite-agent) played, read for
+read, on a build, headless. They import the development tree's agentplay
+library (`agentplay/lib.mjs`, `session.mjs` and `styles.mjs`, which drive
+elite-agent's sessions), which is not part of this repository: copy it
+into `6-harness/agentplay` to run them.
+
+| File | What it does |
+|---|---|
+| `beachball/beachshot.mjs` | Finds the frames that draw a beach ball planet in a replayed session, records the meridian window's inputs, and screenshots chosen frames (`--dump` writes each frame's inputs and the disc layer's rows, to check against `planet_analytic.py`). |
