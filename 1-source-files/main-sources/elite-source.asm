@@ -7231,7 +7231,7 @@ ENDIF
 
                         \ Port: removed (unreachable: its only caller was
                         \ HANGER, removed as the renderer draws the hangar; the
-                        \ floor's rows are a table, HFY, gfx-hangar-hz.asm)
+                        \ floor's rows are a table, HFY, gfx-hangar6.asm)
 
 \ ******************************************************************************
 \

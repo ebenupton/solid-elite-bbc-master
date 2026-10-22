@@ -25749,26 +25749,8 @@ End macro FACE
      DDE3   1F
      DDE4   1F
 .HZDATA_END%
-.HFY
-     DDE5   6A
-     DDE6   6B
-     DDE7   6D
-     DDE8   6E
-     DDE9   70
-     DDEA   72
-     DDEB   75
-     DDEC   7A
-     DDED   80
-     DDEE   8B
-     DDEF   A1
-.HPWL
-     DDF0   08
-     DDF1   88
-.HPWH
-     DDF2   31
-     DDF3   41
 .HZ_END
-HAZEL: game data &C000-&DDE4 , the hangar's tables to &DDF3 , free 268  (+ 256 at &DF00, the MOS's)
+HAZEL: game data &C000-&DDE4 , free 283  (+ 256 at &DF00, the MOS's)
 Saving file '3-assembled-output/HZDATA.bin'
 Saving file '3-assembled-output/HAZEL.bin'
 .COLD_START%
@@ -42761,10 +42743,12 @@ NA2% = &3630
      1CC0
 .R_WR
      1D00
-.WS_GAP
+.F_DSS
      1DC0
+.WS_GAP
+     1DD5
 .WS_END
-Shared workspace: &E00 -&1DBF  (free 5 , 30 , 70  and 108  to the main code at &1E2C )
+Shared workspace: &E00 -&1DD4  (free 5 , 30 , 70  and 87  to the main code at &1E2C )
 .r_start
 .R_BDN0
      9000
@@ -54171,7 +54155,7 @@ Saving file '3-assembled-output/RASTA.bin'
      848B   A2 14      LDX #&14
 .fdi1
      848D   9D D0 0F   STA &0FD0,X
-     8490   9D E5 BF   STA &BFE5,X
+     8490   9D C0 1D   STA &1DC0,X
      8493   CA         DEX
      8494   10 F7      BPL &848D
      8496   60         RTS
@@ -61811,11 +61795,11 @@ Saving file '3-assembled-output/RASTA.bin'
      AF7A   0C 34 FE   TSB &FE34
      AF7D   A0 14      LDY #&14
 .fus1
-     AF7F   B9 E5 BF   LDA &BFE5,Y
+     AF7F   B9 C0 1D   LDA &1DC0,Y
      AF82   F0 57      BEQ &AFDB
      AF84   8D F1 83   STA &83F1
      AF87   A9 00      LDA #&00
-     AF89   99 E5 BF   STA &BFE5,Y
+     AF89   99 C0 1D   STA &1DC0,Y
      AF8C   8C E4 AF   STY &AFE4
      AF8F   B9 D0 BF   LDA &BFD0,Y
      AF92   4A         LSR A
@@ -61888,14 +61872,14 @@ Saving file '3-assembled-output/RASTA.bin'
      B003   B0 02      BCS &B007
      B005   A9 03      LDA #&03
 .fdz1
-     B007   99 E5 BF   STA &BFE5,Y
+     B007   99 C0 1D   STA &1DC0,Y
 .fdz9
      B00A   60         RTS
 .fdzo
      B00B   C0 15      CPY #&15
      B00D   B0 05      BCS &B014
      B00F   A9 00      LDA #&00
-     B011   99 E5 BF   STA &BFE5,Y
+     B011   99 C0 1D   STA &1DC0,Y
 .fdzo9
      B014   38         SEC
      B015   60         RTS
@@ -62013,11 +61997,11 @@ Saving file '3-assembled-output/RASTA.bin'
      B0DC   10 F7      BPL &B0D5
      B0DE   A9 F0      LDA #&F0
      B0E0   8D C2 90   STA &90C2
-     B0E3   A9 DD      LDA #&DD
+     B0E3   A9 BF      LDA #&BF
      B0E5   8D C3 90   STA &90C3
      B0E8   A9 F2      LDA #&F2
      B0EA   8D B9 90   STA &90B9
-     B0ED   A9 DD      LDA #&DD
+     B0ED   A9 BF      LDA #&BF
      B0EF   8D BA 90   STA &90BA
      B0F2   64 E0      STZ &E0
      B0F4   A9 FF      LDA #&FF
@@ -62025,11 +62009,11 @@ Saving file '3-assembled-output/RASTA.bin'
      B0F8   A2 00      LDX #&00
      B0FA   20 B8 90   JSR &90B8
      B0FD   A9 10      LDA #&10
-     B0FF   AC E5 DD   LDY &DDE5
+     B0FF   AC E5 BF   LDY &BFE5
      B102   20 4F B1   JSR &B14F
      B105   A2 01      LDX #&01
      B107   20 B8 90   JSR &90B8
-     B10A   AD E5 DD   LDA &DDE5
+     B10A   AD E5 BF   LDA &BFE5
      B10D   A0 C0      LDY #&C0
      B10F   20 4F B1   JSR &B14F
      B112   A9 00      LDA #&00
@@ -62043,7 +62027,7 @@ Saving file '3-assembled-output/RASTA.bin'
      B125   A2 0A      LDX #&0A
 .fhb2
      B127   86 DE      STX &DE
-     B129   BD E5 DD   LDA &DDE5,X
+     B129   BD E5 BF   LDA &BFE5,X
      B12C   A8         TAY
      B12D   C8         INY
      B12E   20 4F B1   JSR &B14F
@@ -62056,7 +62040,7 @@ Saving file '3-assembled-output/RASTA.bin'
 .fhb3
      B13C   85 E0      STA &E0
      B13E   AA         TAX
-     B13F   AC E5 DD   LDY &DDE5
+     B13F   AC E5 BF   LDY &BFE5
      B142   20 2C 8D   JSR &8D2C
      B145   A5 E0      LDA &E0
      B147   38         SEC
@@ -62120,7 +62104,7 @@ Saving file '3-assembled-output/RASTA.bin'
      B3D7   A2 14      LDX #&14
 .fin1
      B3D9   9D D0 0F   STA &0FD0,X
-     B3DC   9D E5 BF   STA &BFE5,X
+     B3DC   9D C0 1D   STA &1DC0,X
      B3DF   CA         DEX
      B3E0   10 F7      BPL &B3D9
      B3E2   20 6E 82   JSR &826E
@@ -62141,10 +62125,26 @@ Saving file '3-assembled-output/RASTA.bin'
      BFBB
 .F_DSY
      BFD0
-.F_DSS
-     BFE5
+.HFY
+     BFE5   6A
+     BFE6   6B
+     BFE7   6D
+     BFE8   6E
+     BFE9   70
+     BFEA   72
+     BFEB   75
+     BFEC   7A
+     BFED   80
+     BFEE   8B
+     BFEF   A1
+.HPWL
+     BFF0   08
+     BFF1   88
+.HPWH
+     BFF2   31
+     BFF3   41
 .B6_END
-Bank 6: frame layer &8000-&B172 , data &B173 -&BFF9  free 6 
+Bank 6: frame layer &8000-&B172 , data &B173 -&BFF3  free 12 
 Saving file '3-assembled-output/BANK6.bin'
 .ZP
      0070
@@ -62525,12 +62525,12 @@ Saving file '3-assembled-output/BANK6.bin'
      10B3   06
      10B4   09
      10B5   00 80
-     10B7   FA 3F
+     10B7   F4 3F
      10B9   5E 11
      10BB   04
      10BC   09
      10BD   00 40
-     10BF   F4 1D
+     10BF   E5 1D
      10C1   6F 11
      10C3   04
      10C4   09

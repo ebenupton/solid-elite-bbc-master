@@ -62,7 +62,7 @@ FILES = {"../../3-assembled-output/elite-source-run.asm": "main", "../../3-assem
          "gfx-raster.asm": "bank5", "gfx-raster_disc.asm": "bank5d", "gfx-raster_poly.asm": "bank5a",
          "gfx-raster_line.asm": "bank5a", "gfx-raster_lcold.asm": "bank5",
          "gfx-frame.asm": "bank6", "gfx-faces.asm": "bank6", "gfx-light6.asm": "bank6", "gfx-light.asm": "bank6", "gfx-finit.asm": "bank6",
-         "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar-hz.asm": "hazel", "gfx-flare.asm": "bank5",
+         "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar6.asm": "bank6", "gfx-flare.asm": "bank5",
          "gfx-merid.asm": "bank7m",
          "gfx-raster_kept.asm": "bank5d", "gfx-kept7.asm": "bank7m", "gfx-kept-hz.asm": "hazel"}
 # the copies of elite-source.asm that 2-build-files/streams.py writes, one per area

@@ -1,8 +1,8 @@
 \ ******************************************************************************
 \
-\ gfx-hangar-hz.asm - the hangar's tables (gfx-hangar.asm), in HAZEL after
-\ the game data (elite-layout.asm): read by f_hback in bank 6, which has no
-\ room
+\ gfx-hangar6.asm - the hangar's tables (gfx-hangar.asm), at the end of bank
+\ 6's image (elite-gfx.asm), where f_hback reads them (HAZEL's until the
+\ directly drawn stars' sizes, F_DSS, moved to the shared workspace)
 \
 \ ******************************************************************************
 

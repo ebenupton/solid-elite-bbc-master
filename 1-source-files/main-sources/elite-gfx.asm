@@ -95,6 +95,9 @@ ALIGN &100
                             \ it is pending this frame (R_INIT clears it)
 .DFSST2 SKIP 64         \ (DFSST's second half: &DFC0-&DFFF)
 .R_WR       SKIP 192        \ (raster_vars.asm; whole in a page)
+.F_DSS      SKIP NDSTAR     \ the directly drawn stars' sizes (bank 6's: 0 = none,
+                            \ cleared with R_SS by F_INIT and f_direct0)
+ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
 .WS_GAP                     \ (free to the main code)
 SKIP CODE% - P%
 .WS_END
@@ -162,9 +165,10 @@ ASSERT F_ST = F_TM + &300
 .F_SHR0 SKIP 24
 .F_SHR1 SKIP 24
 .F_DSX  SKIP NDSTAR     \ the stars drawn directly (gfx-frame_cold.asm's F_DSTAR,
-.F_DSY  SKIP NDSTAR     \ f_unstar): x and y
-.F_DSS  SKIP NDSTAR     \ and their sizes (0 = none: cleared with R_SS, F_INIT
-                        \ and f_direct0)
+.F_DSY  SKIP NDSTAR     \ f_unstar): x and y (their sizes, F_DSS, in the shared
+                        \ workspace)
+ INCLUDE "1-source-files/main-sources/gfx-hangar6.asm"   \ the hangar's tables (f_hback; data
+                        \ before them stays at its place)
 .B6_END
 PRINT "Bank 6: frame layer &8000-", ~B6_CODE_END-1, ", data ", ~F_HW, "-", ~B6_END-1, " free ", &C000-B6_END
 ASSERT B6_END <= &C000

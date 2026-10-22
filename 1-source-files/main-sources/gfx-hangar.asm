@@ -17,7 +17,7 @@
 \ before (no test, no cost).
 \
 \ The background: the back wall a darker tan and the floor a light tan, each
-\ a flat 2x2 dither (HPWL, HPWH in HAZEL, gfx-hangar-hz.asm), with HANGER's
+\ a flat 2x2 dither (HPWL, HPWH at the end of bank 6, gfx-hangar6.asm), with HANGER's
 \ lines over them in black: the floor's at y = #Y + 130 DIV Q for Q = 2 to
 \ 12, from x = 2 to 253, and the wall's every 8 pixels, x = 8 to 248, from
 \ the top to the floor's furthest line. The wall starts below the view's
