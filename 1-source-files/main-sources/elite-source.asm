@@ -9280,17 +9280,15 @@ ENDIF
 
 .HEAD_END%              \ Port: the end of the head, where the run starts (M%)
 
- PRINT "Low area: ", ~CODE%, "-", ~HEAD_START%-1, " (to ", ~LOW_END%-1, " used with ACCCON X set); head: ", ~HEAD_START%, "-", ~HEAD_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-HEAD_END%
+ PRINT "Low area: ", ~CODE%, "-", ~HEAD_START%-1, "; head: ", ~HEAD_START%, "-", ~HEAD_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-HEAD_END%
  ASSERT HEAD_END% <= &3000  \ Port: the low area and the head must be below
                         \ &3000: they are used while ACCCON X = 1 (shadow RAM at
                         \ &3000-&7FFF), from interrupts or from MOS vectors with
-                        \ any ROM paged: the low area's first part, to LOW_END%
-                        \ (NEWBRK, the far calls, the renderer's glue), the IRQ
-                        \ and sound code, CHPR and its font, the log tables
-                        \ (LOINQ), HANGFLAG (HANGER), ADDK (DIALS, PIX1) and UP
-                        \ (CATF, FLH, COMC); the low area's second part (the
-                        \ G_ stubs and the hooks, called from game code only)
-                        \ lies between them, so it is below &3000 too
+                        \ any ROM paged: the low area (NEWBRK, the far calls,
+                        \ the renderer's glue and hooks), the IRQ and sound
+                        \ code, CHPR and its font, the log tables (LOINQ),
+                        \ HANGFLAG (HANGER), ADDK (DIALS, PIX1) and UP (CATF,
+                        \ FLH, COMC)
 
 \ ******************************************************************************
 \

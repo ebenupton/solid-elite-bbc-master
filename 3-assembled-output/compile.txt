@@ -1068,7 +1068,6 @@ WP workspace from &841 to &CCE inclusive
 .hv2
      2277   1C 34 FE   TRB &FE34
      227A   60         RTS
-.LOW_END%
 .gback
      227B   A9 04      LDA #&04
      227D   85 F4      STA &F4
@@ -2872,7 +2871,7 @@ WP workspace from &841 to &CCE inclusive
      2F21   07
 UP workspace from &2F00 to &2F21 inclusive
 .HEAD_END%
-Low area: &1E2C -&25DB  (to &227A  used with ACCCON X set); head: &25DC -&2F21  (the font's alignment: 0  bytes of padding); free below &3000: 222 
+Low area: &1E2C -&25DB ; head: &25DC -&2F21  (the font's alignment: 0  bytes of padding); free below &3000: 222 
 .G%
      2F22
 .DOENTRY
