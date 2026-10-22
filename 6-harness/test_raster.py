@@ -6,8 +6,9 @@ reference, py65 65C02, the write guard and every test), pointed at the Master fi
 
   * the wrapper assembles the renderer's shared workspace as elite-gfx.asm lays it
     out in main RAM (one block, from its first ORG to WS_END: gfx-raster_scr.asm, the
-    per-call scratch, with R_NDISCL page aligned; gfx-raster_vars.asm at its fixed base, as the
-    laser-sight rows must not cross a page; R_WL, R_WR, R_NDN, the stars), and the
+    per-call inputs, with R_NDISCL page aligned, which the polygon edge tables share with
+    R_NDISCR; gfx-raster_vars.asm at its fixed base, as the laser-sight rows must not cross
+    a page; R_WL, R_WR, R_NDN, KF, the stars), and the
     rasteriser as elite-gfx.asm does: bank 5 (gfx-raster.asm, the shared region, at
     &9000, then R_LINE's cold part gfx-raster_lcold.asm; gfx-raster_disc.asm, the disc
     window, at &8000) and ANDY (gfx-raster_poly.asm and gfx-raster_line.asm, the
@@ -43,13 +44,14 @@ tr.SRCV = os.path.join(MS, 'gfx-raster_vars.asm')
 tr.SRC7 = os.path.join(MS, 'gfx-raster7.asm')
 GFX = os.path.join(MS, 'elite-gfx.asm')
 tr.HZ = 0xDF00
+tr.NSTARS = int(re.search(r'^\s*NOST\s*=\s*(\d+)', open(os.path.join(MS, 'elite-source.asm')).read(), re.M).group(1)) + 1   # (NDSTAR: the star arrays' size)
 
 
 def gfx_constants():
     """elite-gfx.asm's constants (MCB, banks, sizes), defined before its first ORG or CLEAR"""
     out = ['HOMEBANK = 4']
-    # the shared workspace's F_DSS is NDSTAR (elite-gfx.asm) long, from Elite's NOST
-    # (elite-source.asm), and it ends at the main code's start, CODE% (WS_TOP)
+    # the shared workspace's star arrays are NDSTAR (elite-gfx.asm) long, from Elite's
+    # NOST (elite-source.asm), and it ends at the main code's start, CODE% (WS_END)
     src = open(os.path.join(MS, 'elite-source.asm')).read()
     out.append('NOST = %s' % re.search(r'^\s*NOST\s*=\s*(\d+)', src, re.M).group(1))
     out.append('CODE%% = %s' % re.search(r'^\s*CODE%\s*=\s*(&[0-9A-Fa-f]+)', src, re.M).group(1))
@@ -93,11 +95,12 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 # the meridian window (gfx-merid.asm: bank 7 after the cold area; here at MTEST),
 # with the game's symbols it reads: INWK, K3, K4 and MCNT at their places in
 # Master Elite's zero page (K3 and K4 are in &10-&28, which PM_HOOK saves and
-# uses: it must read them first), PM_OK, PM_R, PS_VALID below the workspace, the
+# uses: it must read them first), PM_OK, PM_R, PS_VALID below the workspace (at
+# &0C00: the workspace starts at &0E00), the
 # quarter squares at &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
+MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0C00, PM_R=0x0C01, PS_VALID=0x0C02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
 # bank 7 after the meridian window): their variables (in the low area in the

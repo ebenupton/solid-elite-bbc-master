@@ -259,16 +259,16 @@
   INY
   STY r_yend
   \ this buffer's dirty row range
-  LDX r_buf
+  LDX R_PRBUF
   LDA r_ystart
-  CMP r_dyt,X
+  CMP R_PRDYT,X
   BCS d1
-  STA r_dyt,X
+  STA R_PRDYT,X
 .d1
   LDA r_ylast
-  CMP r_dyb,X
+  CMP R_PRDYB,X
   BCC d2
-  STA r_dyb,X
+  STA R_PRDYB,X
 .d2
   BIT KMODE               \ K mode: the kept rows' pass (gfx-raster_kept.asm)
   BPL d3

@@ -548,10 +548,10 @@ ENDIF
  LDA &C2C0,X
  STA DFSST,X
  LDA &DFC0,X
- STA DFSST+64,X
+ STA DFSST2,X
  DEX
  BPL DFST
- STZ DFSST+128          \ (DFSIN: no disc command under way)
+ STZ DFSIN              \ (no disc command under way)
 
  LDX #0
  LDY #HI(HZLEN+255)     \ (whole pages)

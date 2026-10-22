@@ -10,10 +10,10 @@
 #   ...
 #   \       Area: cold
 #
-# No Area field: the main code's run (main RAM from CODE%, then bank 4 where
-# main RAM ends). "Area: low": main RAM below &3000, at the end of the run's
-# head (what the MOS enters with any ROM paged, but whose original place is
-# later in the run). "Area: bank 4": bank 4, after the run (code that runs
+# No Area field: the main code's run (main RAM from the head, after the low
+# area at CODE%, then bank 4 where main RAM ends). "Area: low": main RAM below
+# &3000, first in the low area, before the head (what the MOS enters with any
+# ROM paged, but whose original place is later in the run). "Area: bank 4": bank 4, after the run (code that runs
 # with ACCCON X set, which hides main RAM at &3000-&7FFF, and the tables it
 # reads). "Area: cold": the cold area, sideways RAM bank 7. A block runs from its
 # header to the next header (or to a separator line of stars, which starts an

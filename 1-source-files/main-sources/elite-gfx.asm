@@ -48,55 +48,59 @@ NDSTAR = NOST+1         \ stars 1..NOSTM (Master port: NOSTM <= NOST = 20)
 
 \ The shared workspace: the state that the rasteriser's two banks, the frame
 \ layer, the game's hooks and the IRQ handler share, in one block in main
-\ RAM below the main code (CODE%) and below &3000, where all of them see it,
-\ above page &0D (off limits, docs/master-memory.md). Variables only (the renderer initialises
-\ them: R_INIT, F_INIT), except DFSST, which the loader fills (from &0400,
-\ as the loader itself is here). The arrays keep their low bytes from HAZEL,
-\ where their page crossings were measured: raster_vars at a fixed place
-\ (the rows of the laser sights' scan in R_DIRTYR0/1 must not cross a page,
-\ gfx-frame.asm's f_sight2), R_NDISCL page aligned (gfx-raster_scr.asm)
+\ RAM from &0E00 (above page &0D, off limits, docs/master-memory.md) to the
+\ main code (CODE%), below &3000, where all of them see it. Variables only
+\ (the renderer initialises them: R_INIT, F_INIT), except DFSST and DFSST2,
+\ which the loader fills (from &0400, as the loader itself is here). Each
+\ array's page crossings are as they were measured, or fewer: raster_vars
+\ at a fixed place, moved only by whole pages (the rows of the laser sights'
+\ scan in R_DIRTYR0/1 must not cross a page, gfx-frame.asm's f_sight2),
+\ R_NDISCL page aligned (gfx-raster_scr.asm), the other row arrays from a
+\ low byte of &40 or less or whole in a page (KF, R_WR), the star arrays
+\ whole in a page. The polygon edge tables share the new disc spans' places
+\ (R_PTA = R_NDISCR, R_PTB = R_NDISCL: gfx-raster_scr.asm)
 
-ORG &0E40               \ (from here to WS_END: test_raster.py assembles it too)
+ORG &0E00               \ (from here to WS_END: test_raster.py assembles it too)
 .WS_START
 .R_NDN      SKIP 192        \ (raster_vars.asm: boundaries per disc row, 0..4)
-INCLUDE "1-source-files/main-sources/gfx-raster_scr.asm"
-ASSERT LO(R_NDISCL) = 0
-.DFSST  SKIP 128        \ DFS's and the MOS's lasting bytes in HAZEL, &C2C0-&C2FF
-                        \ and &DFC0-&DFFF (the MOS's FSCV copy at &DFDA-&DFDB, the
-                        \ ACCCON its error path puts back at &DFDC-&DFDD), while
-                        \ the game uses those places: put back for each disc
-                        \ command (DOSCLI; the loader takes them first)
-.DFSIN  SKIP 1          \ bit 7: a disc command is under way (DOSCLI, DOSNMI)
-ASSERT DFSIN = DFSST + 128      \ (the loader clears it)
-ASSERT P% <= &1240
-ORG &1240
+INCLUDE "1-source-files/main-sources/gfx-raster_scr.asm"   \ the vertices (&0EC0), R_NDISCL (&0F00) ...
+.R_SS       SKIP NDSTAR     \ star size 1..3 (raster_vars.asm: the stars)
+.R_SX       SKIP NDSTAR
+.DFSIN      SKIP 1          \ bit 7: a disc command is under way (DOSCLI, DOSNMI)
+ASSERT HI(R_SS) = HI(R_SX + NDSTAR - 1)
+ASSERT P% <= &1000
+ORG &1000
 .R_WL       SKIP 192        \ this frame's written extents (empty: R=0)
-.R_SS       SKIP 24         \ star size 1..3 (raster_vars.asm: the stars)
-.F_DSS      SKIP NDSTAR     \ the directly drawn stars' sizes (0 = none; see
-                            \ F_DSX): cleared with R_SS (F_INIT, f_direct0)
-ASSERT F_DSS = R_SS + 24
+.DFSST  SKIP 64         \ DFS's and the MOS's lasting bytes in HAZEL, &C2C0-&C2FF
+                        \ (here) and &DFC0-&DFFF (DFSST2: the MOS's FSCV copy
+                        \ at &DFDA-&DFDB, the ACCCON its error path puts back at
+                        \ &DFDC-&DFDD), while the game uses those places: put
+                        \ back for each disc command (DOSCLI; the loader takes
+                        \ them first)
+.R_SY       SKIP NDSTAR
 RVOFF = &182            \ R_DIRTYR0's offset in raster_vars (asserted below)
-RVBASE = &14B5 - RVOFF
+RVBASE = &12B5 - RVOFF  \ (&14B5 when it was measured: two pages lower)
 ASSERT P% <= RVBASE
 SKIP RVBASE - P%
 INCLUDE "1-source-files/main-sources/gfx-raster_vars.asm"
 ASSERT R_DIRTYR0 = RVBASE + RVOFF
-.R_SX       SKIP 24         \ (raster_vars.asm: the stars)
-.R_SY       SKIP 24
+R_PTA = R_NDISCR        \ the polygon edge tables (gfx-raster_scr.asm)
+R_PTB = R_NDISCL
+ASSERT LO(R_PTA) <> LO(R_PTB) AND LO(R_PTA) + 191 < 256   \ (k_pre tells them apart)
+.R_SN       SKIP 1          \ star count 0..NDSTAR
+.R_SCOL     SKIP 1          \ star colour byte (R_INIT: &FF)
+ALIGN &100
 .KF         SKIP 192        \ the kept solid rows (gfx-raster_kept.asm), per row:
                             \ bit b set if the row is kept in buffer b, bit 7 if
                             \ it is pending this frame (R_INIT clears it)
-ASSERT HI(KF) = HI(KF + 191)    \ (KF,Y: no page crossing)
-.WS_GAP                     \ (free to WS_TOP)
-WS_TOP = CODE% - 2 - 192   \ the rest ends at the main code (asserted below)
-ASSERT P% <= WS_TOP
-ORG WS_TOP
-.R_SN       SKIP 1          \ star count 0..24
-.R_SCOL     SKIP 1          \ star colour byte (R_INIT: &FF)
+.DFSST2 SKIP 64         \ (DFSST's second half: &DFC0-&DFFF)
 .R_WR       SKIP 192        \ (raster_vars.asm; whole in a page)
+.WS_GAP                     \ (free to the main code)
+SKIP CODE% - P%
 .WS_END
-PRINT "Shared workspace: ", ~WS_START, "-", ~WS_END-1, " (free ", WS_START-&0E00, " below it, ", &1240-DFSIN-1, ", ", RVBASE-F_DSS-NDSTAR, " and ", WS_TOP-WS_GAP, " in it)"
-ASSERT WS_START >= &0E00 AND WS_END = CODE%    \ (one block, ending where the main code starts)
+PRINT "Shared workspace: ", ~WS_START, "-", ~WS_GAP-1, " (free ", &1000-DFSIN-1, ", ", RVBASE-R_SY-NDSTAR, ", ", KF-R_SCOL-1, " and ", CODE%-WS_GAP, " to the main code at ", ~CODE%, ")"
+ASSERT WS_END = CODE%   \ (one block, ending where the main code starts)
+ASSERT HI(KF) = HI(KF + 191)    \ (KF,Y: no page crossing)
 ASSERT HI(R_WR) = HI(R_WR + 191)
 
 CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables,
@@ -158,8 +162,9 @@ ASSERT F_ST = F_TM + &300
 .F_SHR0 SKIP 24
 .F_SHR1 SKIP 24
 .F_DSX  SKIP NDSTAR     \ the stars drawn directly (gfx-frame_cold.asm's F_DSTAR,
-.F_DSY  SKIP NDSTAR     \ f_unstar): x and y (F_DSS, their sizes, in the
-                        \ shared workspace after R_SS, cleared with it)
+.F_DSY  SKIP NDSTAR     \ f_unstar): x and y
+.F_DSS  SKIP NDSTAR     \ and their sizes (0 = none: cleared with R_SS, F_INIT
+                        \ and f_direct0)
 .B6_END
 PRINT "Bank 6: frame layer &8000-", ~B6_CODE_END-1, ", data ", ~F_HW, "-", ~B6_END-1, " free ", &C000-B6_END
 ASSERT B6_END <= &C000

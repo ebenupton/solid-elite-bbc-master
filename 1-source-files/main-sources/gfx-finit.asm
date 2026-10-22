@@ -42,9 +42,10 @@
  STA F_NLINE
  STA F_NDOT
  STA F_PLON
- LDX #23+NDSTAR         \ (and F_DSS after it: no direct-mode stars noted)
+ LDX #NDSTAR-1          \ no stars recorded, no direct-mode stars noted
 .fin1
  STA R_SS,X
+ STA F_DSS,X
  DEX
  BPL fin1
  JSR f_tmclear

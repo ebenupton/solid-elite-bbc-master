@@ -18,7 +18,7 @@
 #
 #   * 3-assembled-output/game-addresses.asm: the addresses and lengths that
 #     the loader (elite-loader.asm) needs from the game: the entry point S%
-#     and its bank, where BCODE loads, the HAZEL image, DFSST and the cold
+#     and its bank, where BCODE loads, the HAZEL image, DOSCLI's stash (DFSST, DFSST2, DFSIN) and the cold
 #     area's length (and with the renderer, the lengths of its images,
 #     G_INIT, and where the meridian window goes)
 #
@@ -83,6 +83,9 @@ with open(OUT + "game-addresses.asm", "w") as f:
     f.write(" HZLEN = &%04X\n" % (sy["HZ_END"] - sy["HZ_START"]))
     f.write(" BCODEAT = &%s\n" % bcode)
     f.write(" DFSST = &%04X\n" % sy["DFSST"])
+    if "DFSST2" in sy:                  # DOSCLI's stash, in two halves
+        f.write(" DFSST2 = &%04X\n" % sy["DFSST2"])
+        f.write(" DFSIN = &%04X\n" % sy["DFSIN"])
     f.write(" C7LEN = &%04X\n" % (sy["COLD_END%"] - 0x8000))
     f.write(" HILEN = &1000\n")
     if "B5_END" in sy:

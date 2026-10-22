@@ -297,18 +297,13 @@ r_xclip = R_PXC
 r_cr1 = R_PCR1
 r_tb = R_PTB
 
-\ the API arrays live in raster_vars.asm, and so does the state both banks
-\ (5 and 7) need
-r_buf = R_PRBUF         \ current buffer
-r_dyt = R_PRDYT         \ per buffer: rows that may have a dirty extent
-r_dyb = R_PRDYB
-r_dst = R_PRDST         \ per buffer: rows of its disc
-r_dsb = R_PRDSB
-r_scnt = R_PRSCNT       \ per buffer: star records
-r_ecnt = R_PRECNT       \ per buffer: star records erased, not yet in WL
-r_wt = R_PRWT           \ rows of WL/WR that may be non-empty
-r_wb = R_PRWB
-r_bmode = R_PRBMODE     \ per buffer: its rows may hold boundaries
+\ the API arrays live in raster_vars.asm; the rasteriser's private state,
+\ R_PRBUF (the current buffer), R_PRDYT/R_PRDYB (per buffer: rows that may
+\ have a dirty extent), R_PRDST/R_PRDSB (per buffer: rows of its disc),
+\ R_PRSCNT (per buffer: star records), R_PRECNT (per buffer: star records
+\ erased, not yet in WL), R_PRWT/R_PRWB (rows of WL/WR that may be non-empty)
+\ and R_PRBMODE (per buffer: its rows may hold boundaries), is at the end of
+\ the shared region (gfx-raster_lcold.asm)
 r_dl = R_DIRTYL0
 r_dr = R_DIRTYR0
 r_sl = R_DISCL0
@@ -330,11 +325,11 @@ r_bdx3 = R_BDX30
 .R_SETBUF
 {
   AND #1
-  CMP r_buf
+  CMP R_PRBUF
   BNE go
   RTS
 .go
-  STA r_buf
+  STA R_PRBUF
   TAX
   LDA r_sbh_dl,X          \ group r_dl
   STA r_pt408+2
@@ -812,10 +807,6 @@ R_ENDPAGE 11
 .r_s1k SKIP 48          \ buffer 1: star's first pixel
 R_ENDPAGE 12
 \ overlay: R_DISCROWS rows
-r_nt = R_PRNT           \ (HAZEL: bank 7's r7_crep reads them)
-r_nb = R_PRNB
-r_lo = R_PRLO
-r_hi = R_PRHI
 r_oL = r_ov + 4
 r_oR = r_ov + 5
 r_dL = r_ov + 6
@@ -830,8 +821,6 @@ r_dcol = r_ov + 14
 r_ba = r_ov + 15
 r_bb = r_ov + 16
 r_tl = r_ov + 17
-r_dya = R_PRDYA
-r_dyz = R_PRDYZ
 r_fe = r_ov + 20
 r_fo = r_ov + 21
 r_bv = r_ov + 22        \ boundaries: new (4), then old (4) at r_bv+4
@@ -867,14 +856,14 @@ R_ENDPAGE 13
   BCS out
 .ok2
   TYA                     \ extend the buffer's row range by row Y
-  LDY r_buf
-  CMP r_dyt,Y
+  LDY R_PRBUF
+  CMP R_PRDYT,Y
   BCS n3
-  STA r_dyt,Y
+  STA R_PRDYT,Y
 .n3
-  CMP r_dyb,Y
+  CMP R_PRDYB,Y
   BCC n4
-  STA r_dyb,Y
+  STA R_PRDYB,Y
 .n4
   TAY                     \ Y = row again
   JMP r_pset              \ tail call
@@ -1029,15 +1018,15 @@ R_ENDPAGE 17
   BCC n2
 .^r_pt08 STA r_dr,Y
 .n2
-  LDX r_buf
+  LDX R_PRBUF
   TYA
-  CMP r_dyt,X
+  CMP R_PRDYT,X
   BCS n3
-  STA r_dyt,X
+  STA R_PRDYT,X
 .n3
-  CMP r_dyb,X
+  CMP R_PRDYB,X
   BCC n4
-  STA r_dyb,X
+  STA R_PRDYB,X
 .n4
   RTS
 }
@@ -1092,13 +1081,13 @@ R_ENDPAGE 20
 .^r_pt48 STA r_dl,Y
   LDA #0
 .^r_pt49 STA r_dr,Y
-  CPY r_wt
+  CPY R_PRWT
   BCS w1
-  STY r_wt
+  STY R_PRWT
 .w1
-  CPY r_wb
+  CPY R_PRWB
   BCC w2
-  STY r_wb
+  STY R_PRWB
 .w2
   LDX R_XL
   JMP r_spc
@@ -1139,20 +1128,20 @@ R_ENDPAGE 21
 }
 R_ENDPAGE 22
 .r_run23 R_RUN 23
-.r_crep5                  \ R_DISCROWS: r7_crep (returns X = r_buf)
+.r_crep5                  \ R_DISCROWS: r7_crep (returns X = R_PRBUF)
   STZ R_PRCWB
-  LDA r_dyz
-  CMP r_dya
+  LDA R_PRDYZ
+  CMP R_PRDYA
   BCC c4                  \ (no dirty rows)
   JSR r7_crep             \ bankcheck: ok (only R_DISCROWS calls r_crep5)
 .c4
-  LDX r_buf
+  LDX R_PRBUF
   RTS
-.r_cwb5                   \ R_DISCROWS: the repair's rows into r_wt..r_wb
+.r_cwb5                   \ R_DISCROWS: the repair's rows into R_PRWT..R_PRWB
   LDA R_PRCWB             \ (the disc rows' code assumes rows go upwards)
-  CMP r_wb
+  CMP R_PRWB
   BCC c5
-  STA r_wb
+  STA R_PRWB
 .c5
   RTS
 \ r_bcols: Y = row: r_cA, r_cB = colour A, B bytes of the row (keeps X, Y)
@@ -1181,10 +1170,10 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
 \ ============================================================================
 .R_STARERASE
 {
-  LDX r_buf
-  LDA r_scnt,X
+  LDX R_PRBUF
+  LDA R_PRSCNT,X
   STA r_k
-  STZ r_scnt,X
+  STZ R_PRSCNT,X
   LDX #0
   CPX r_k
   BCS edone
@@ -1224,9 +1213,9 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
 
 {
 .sdone
-  LDX r_buf
+  LDX R_PRBUF
   LDA r_k
-  STA r_scnt,X
+  STA R_PRSCNT,X
   RTS
 .slow
   STX RZ_SA               \ (X = x, Y = y on every branch here)

@@ -421,9 +421,10 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  TSB &FE34              \ ACCCON D = 1: show shadow RAM (X as it is)
  CLI
  JSR f_tmclear          \ (A = 0; X only, so Y is kept)
- LDX #23+NDSTAR         \ the stars will be re-recorded too (and F_DSS
-.fdi1                   \ after R_SS: no direct-mode stars noted)
+ LDX #NDSTAR-1          \ the stars will be re-recorded too (and no
+.fdi1                   \ direct-mode stars noted: F_DSS)
  STA R_SS,X
+ STA F_DSS,X
  DEX
  BPL fdi1
  RTS

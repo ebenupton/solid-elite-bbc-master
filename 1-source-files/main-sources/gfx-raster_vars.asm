@@ -26,23 +26,6 @@
 .R_NDX1     SKIP 192        \ colour; values <= NDISCL or > NDISCR are allowed
 .R_NDX2     SKIP 192
 .R_NDX3     SKIP 192
-\ private to raster.asm / raster7.asm: their shared state
-.R_PRBUF    SKIP 1
-.R_PRDYT    SKIP 2
-.R_PRDYB    SKIP 2
-.R_PRDST    SKIP 2
-.R_PRDSB    SKIP 2
-.R_PRSCNT   SKIP 2
-.R_PRECNT   SKIP 2
-.R_PRWT     SKIP 1
-.R_PRWB     SKIP 1
-.R_PRBMODE  SKIP 2
-.R_PRNT     SKIP 1          \ R_DISCROWS' scalars (here so bank 7 can see them)
-.R_PRNB     SKIP 1
-.R_PRLO     SKIP 1
-.R_PRHI     SKIP 1
-.R_PRDYA    SKIP 1
-.R_PRDYZ    SKIP 1
-.R_PRCWB    SKIP 1
-
+\ (the rasteriser's private state, R_PRBUF..R_PRCWB, is in bank 5's shared
+\ region: gfx-raster_lcold.asm's end)
 ASSERT R_DIRTYL1 = R_DIRTYL0 + &300

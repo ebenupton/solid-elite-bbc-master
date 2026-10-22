@@ -325,8 +325,8 @@
  SEC
  RTS
 
-\ (F_DSS, F_DSX, F_DSY: the noted stars' sizes (0 = none), x and y, in HAZEL,
-\ elite-gfx.asm)
+\ (F_DSS, F_DSX, F_DSY: the noted stars' sizes (0 = none), x and y, in bank
+\ 6's state, elite-gfx.asm)
 
 \ f_sgs: f_sight2's rare case, out of line (frame.asm's fsg2 loop found bit 7
 \ set in rows SGY-SGOUT+Y or SGY-SGOUT-1+Y, Y = 1-41 odd): f_wcov with A = X =
