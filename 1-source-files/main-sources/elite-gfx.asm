@@ -83,6 +83,10 @@ INCLUDE "1-source-files/main-sources/gfx-raster_vars.asm"
 ASSERT R_DIRTYR0 = RVBASE + RVOFF
 .R_SX       SKIP 24         \ (raster_vars.asm: the stars)
 .R_SY       SKIP 24
+.KF         SKIP 192        \ the kept solid rows (gfx-raster_kept.asm), per row:
+                            \ bit b set if the row is kept in buffer b, bit 7 if
+                            \ it is pending this frame (R_INIT clears it)
+ASSERT HI(KF) = HI(KF + 191)    \ (KF,Y: no page crossing)
 .WS_GAP                     \ (free to WS_TOP)
 WS_TOP = CODE% - 2 - 192   \ the rest ends at the main code (asserted below)
 ASSERT P% <= WS_TOP

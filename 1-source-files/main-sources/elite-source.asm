@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1EDC          \ The address where the code will be run (Port: the
+ CODE% = &1FDC          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; its low byte is chosen so that the
                         \ font, at its place after ADDK, starts a page with no
@@ -9274,14 +9274,17 @@ ENDIF
 
 .HEAD_END%
 
- PRINT "Main code below &3000: ", ~CODE%, "-", ~HEAD_END%-1, " free ", &3000-HEAD_END%, " (the font's alignment: ", FONTPAD%, " bytes of padding)"
- ASSERT P% <= &3000     \ Port: everything up to here must be below &3000, as it
-                        \ is used while ACCCON X = 1 (shadow RAM at &3000-&7FFF),
-                        \ from interrupts or from MOS vectors with any ROM paged:
-                        \ the IRQ and sound code, CHPR and its font, the log
-                        \ tables (LOINQ), HANGFLAG (HANGER), ADDK (DIALS, PIX1),
-                        \ UP (CATF, FLH, COMC) and the low area (NEWBRK, the far
-                        \ calls, the renderer's glue)
+ PRINT "Main code below &3000: ", ~CODE%, "-", ~LOW_END%-1, " free ", &3000-LOW_END%, " (the font's alignment: ", FONTPAD%, " bytes of padding); the low area's game-context part to ", ~HEAD_END%-1
+ ASSERT LOW_END% <= &3000   \ Port: everything up to LOW_END% (elite-low.asm) must
+                        \ be below &3000, as it is used while ACCCON X = 1
+                        \ (shadow RAM at &3000-&7FFF), from interrupts or from
+                        \ MOS vectors with any ROM paged: the IRQ and sound
+                        \ code, CHPR and its font, the log tables (LOINQ),
+                        \ HANGFLAG (HANGER), ADDK (DIALS, PIX1), UP (CATF, FLH,
+                        \ COMC) and the low area's first part (NEWBRK, the far
+                        \ calls, the renderer's glue); after it, the G_ stubs
+                        \ and the hooks, called from game code only (ACCCON X
+                        \ clear), may cross &3000
 
 \ ******************************************************************************
 \
@@ -17303,6 +17306,29 @@ ENDIF
 
 \ ******************************************************************************
 \
+\ Port: the main code continues in main RAM at &7000 from here, after the high
+\ code (elite-hi.asm), and runs on through &8000 into bank 4
+\ (docs/memory-map.md), at a routine that nothing falls into. The part from
+\ CODE%, below screen buffer 0 (main RAM &4000-&6FFF), is saved as BCODE; the
+\ part from &7000 as HICODE and the rest, in bank 4, with the blocks tagged
+\ bank 4 after it, as BANK4 (elite-layout.asm)
+\
+\ ******************************************************************************
+
+ PRINT "Main code: ", ~CODE%, "-", ~P%-1, " free ", &4000 - P%
+ ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is screen buffer 0)
+ PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
+ SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
+
+ CLEAR &7000, &C000
+ ORG &7000
+
+ INCLUDE "1-source-files/main-sources/elite-hi.asm"             \ the quarter squares
+
+.HI_RUN%
+
+\ ******************************************************************************
+\
 \ ELITE C FILE
 \
 \ ******************************************************************************
@@ -17725,28 +17751,6 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
-\ ******************************************************************************
-\
-\ Port: the main code continues in main RAM at &7000 from here, after the high
-\ code (elite-hi.asm), and runs on through &8000 into bank 4
-\ (docs/memory-map.md), at a routine that nothing falls into. The part from
-\ CODE%, below screen buffer 0 (main RAM &4000-&6FFF), is saved as BCODE; the
-\ part from &7000 as HICODE and the rest, in bank 4, with the blocks tagged
-\ bank 4 after it, as BANK4 (elite-layout.asm)
-\
-\ ******************************************************************************
-
- PRINT "Main code: ", ~CODE%, "-", ~P%-1, " free ", &4000 - P%
- ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is screen buffer 0)
- PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
- SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
-
- CLEAR &7000, &C000
- ORG &7000
-
- INCLUDE "1-source-files/main-sources/elite-hi.asm"             \ the quarter squares
-
-.HI_RUN%
 
 \ ******************************************************************************
 \

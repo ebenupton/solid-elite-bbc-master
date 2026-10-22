@@ -100,9 +100,10 @@ MTEST = 0xA000
 MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
-# bank 7 after the meridian window): their state (KF and the variables, in the
-# low area and HAZEL in the game) and the low area's thunk from the polygon
-# window to bank 7 and k_setbuf7 (gfx-tramp.asm's), here at HZ
+# bank 7 after the meridian window): their variables (in the low area in the
+# game; KF is in the shared workspace, as in the game) and the low area's
+# thunk from the polygon window to bank 7 and k_setbuf7 (gfx-tramp.asm's),
+# here at HZ
 KEPT7 = os.path.join(MS, 'gfx-kept7.asm')
 KEPT = os.path.exists(KEPT7)
 MERIDBANK = 7
@@ -114,7 +115,6 @@ SGOUT = 20
 .KPLO EQUB &FF
 .KPHI EQUB 0
 .KREC EQUB 0
-.KF SKIP 192
 .T_KPRE
  LDX #MERIDBANK
  STX &F4

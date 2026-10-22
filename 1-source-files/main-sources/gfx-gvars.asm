@@ -46,4 +46,4 @@
 .KON     EQUB 0         \ K mode frames in a row (to 3)
 .KSKIP   EQUB 0         \ frames K mode sits out (T_KFRAME)
                         \ (KF, per row: bit b, kept in buffer b; bit 7,
-                        \ pending: in HAZEL, elite-layout.asm)
+                        \ pending: in the shared workspace, elite-gfx.asm)

@@ -1,10 +1,11 @@
 \ ******************************************************************************
 \
 \ elite-low.asm - the low area, at the end of the main code's head, in main
-\ RAM below &3000 (docs/memory-map.md)
+\ RAM (docs/memory-map.md)
 \
 \ Port: INCLUDEd by elite-source.asm after UP, before HEAD_END%. What is here
-\ is visible whatever is paged at &8000-&BFFF and whatever ACCCON X is, so
+\ up to LOW_END% is below &3000, so it is visible whatever is paged at
+\ &8000-&BFFF and whatever ACCCON X is, so
 \ the IRQ handler, the MOS vectors (entered with any ROM paged) and code that
 \ runs with ACCCON X set can use it:
 \
@@ -20,10 +21,10 @@
 \     the renderer's banks share, with their initial values (gfx-gvars.asm),
 \     the trampolines from the frame layer into the rasteriser
 \     (gfx-tramp.asm), the hooks that CHPR (WRCHV: any ROM paged, ACCCON X
-\     set) and IRQ1 call (gfx-lowhooks.asm), and, needing only game context
-\     but outside the banks they page, the G_ stubs that page the frame layer
-\     in (gfx-gstubs.asm) and the hooks in Elite's drawing code
-\     (gfx-hooks.asm).
+\     set) and IRQ1 call (gfx-lowhooks.asm); then, after LOW_END%, needing
+\     only game context (ACCCON X clear, so they may cross &3000) but outside
+\     the banks they page, the G_ stubs that page the frame layer in
+\     (gfx-gstubs.asm) and the hooks in Elite's drawing code (gfx-hooks.asm).
 \
 \ ******************************************************************************
 
@@ -34,5 +35,8 @@
  INCLUDE "1-source-files/main-sources/gfx-gvars.asm"            \ the renderer's glue: shared variables,
  INCLUDE "1-source-files/main-sources/gfx-tramp.asm"            \ the trampolines into the rasteriser,
  INCLUDE "1-source-files/main-sources/gfx-lowhooks.asm"         \ the text map's and the IRQ's hooks
+
+.LOW_END%                               \ (below &3000: elite-source.asm)
+
  INCLUDE "1-source-files/main-sources/gfx-gstubs.asm"           \ the stubs that page the frame layer in
  INCLUDE "1-source-files/main-sources/gfx-hooks.asm"            \ the hooks in Elite's drawing code
