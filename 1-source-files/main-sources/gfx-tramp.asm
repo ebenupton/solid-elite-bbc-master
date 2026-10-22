@@ -86,8 +86,8 @@
  STA &F4
  STA &FE30
  JSR PM_MERID
- LDA #&80 + MERIDHOLD   \ (the rows are for PM_HOOK's last constants; they
- STA PS_VALID           \ may be kept MERIDHOLD frames)
+ LDA #&80               \ (the rows are for PM_HOOK's last constants)
+ STA PS_VALID
  JMP tback
 .tmer9
  RTS

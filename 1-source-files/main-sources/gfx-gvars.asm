@@ -30,8 +30,7 @@
                         \ constants (H_CIRC clears it)
 .PM_R    EQUB 0         \ the planet's radius this frame (H_CIRC; PM_HOOK)
 .PS_VALID EQUB 0        \ bit 7: the disc layer's arrays hold the beach ball's
-                        \ rows for PM_HOOK's last constants, which may be kept
-                        \ (bits 0-6) more frames (T_MERID sets it, PM_HOOK
-                        \ counts it down, H_CIRC clears it for a crater planet)
+                        \ rows for PM_HOOK's last constants (T_MERID sets it,
+                        \ H_CIRC clears it for a crater planet)
 .GWARP   EQUB 0         \ bit 7: TT66 is an in-system jump's (WARP sets it,
                         \ F_DIRECT clears it)

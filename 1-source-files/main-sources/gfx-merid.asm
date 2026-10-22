@@ -20,9 +20,12 @@
 \
 \   * PM_HOOK, in game context: the per-frame constants of both circles,
 \     from the planet's orientation vectors (INWK), its centre (K3, K4) and
-\     radius (PM_R, which H_CIRC records); PM_OK is set (&80), or, when the
-\     disc layer's arrays still hold rows that may be kept, PM_OK = &C0 and
-\     nothing is computed (PS_VALID, MERIDHOLD). Called by G_MERHOOK
+\     radius (PM_R, which H_CIRC records); PM_OK is set (&80). The
+\     orientation is taken one frame in MERIDHOLD + 1 (the spin shows in
+\     steps); in between only what depends on the radius and centre is
+\     computed, or nothing, when they are as they were and the disc layer's
+\     arrays still hold the rows (PS_VALID): then PM_OK = &C0, and T_MERID
+\     skips PM_MERID. Called by G_MERHOOK
 \     (gfx-gstubs.asm) from H_MERID, in place of PL9's equator and meridian.
 \     Elite's state is not touched: the workspace is here, Elite's
 \     zero page &10-&28 is saved and restored, and A, X, Y and the flags are
@@ -51,30 +54,46 @@ pmi_s = &27             \ (&27-&28)
  PHA
  PHX
  PHY
- LDA PS_VALID           \ the disc layer's arrays hold the rows for this
- BPL phk5               \ centre and radius, and they may be kept another
- AND #&7F               \ frame (the planet spins by 1/16 radian an
- BEQ phk5               \ iteration: MERIDHOLD frames in MERIDHOLD + 1 show
- LDA K3                 \ the last orientation while the planet stays put)?
+ LDA PM_SPIN            \ the planet spins by 1/16 radian an iteration (in
+ BEQ phk8               \ roll and pitch): its orientation is taken one frame
+ LDA pm_mc              \ in MERIDHOLD + 1 (PM_SPIN counts the frames held),
+ DEC A                  \ while each frame draws this beach ball (MCNT, the
+ CMP MCNT               \ main loop's counter, one less than last time)
+ BNE phk8
+ DEC PM_SPIN            \ the orientation is held
+ LDA MCNT
+ STA pm_mc
+ BIT PS_VALID           \ and when the centre and radius are as they were too,
+ BPL phk6               \ the rows in the disc layer's arrays are kept
+ LDA K3
  CMP PM_CX
- BNE phk5
+ BNE phk6
  LDA K3+1
  CMP PM_CX+1
- BNE phk5
+ BNE phk6
  LDA K4
  CMP PM_CY
- BNE phk5
+ BNE phk6
  LDA K4+1
  CMP PM_CY+1
- BNE phk5
+ BNE phk6
  LDA PM_R
  CMP pm_rs
- BNE phk5
- DEC PS_VALID           \ yes: no constants, and T_MERID skips PM_MERID
- LDA #&C0
+ BNE phk6
+ LDA #&C0               \ (T_MERID skips PM_MERID)
  STA PM_OK
- BNE phk7               \ (always)
-.phk5
+ JMP phk7
+.phk8
+ LDA #MERIDHOLD         \ a new orientation
+ STA PM_SPIN
+ LDA MCNT
+ STA pm_mc
+ SEC                    \ (C: the orientation's constants are computed)
+ BCS phk11
+.phk6
+ CLC                    \ (C clear: the held orientation's constants are used)
+.phk11
+ ROR pm_new             \ (bit 7)
  LDA PM_R
  STA pm_rs
  LDX #24
@@ -101,16 +120,18 @@ pmi_s = &27             \ (&27-&28)
  STA pm_r2
  LDA pm_p+1
  STA pm_r2+1
- LDX #0                 \ roofv
- JSR pm_setup
+ LDX #MCB-1             \ roofv's circle: PM_BLK1 and its orientation's terms
+ LDY #pm_oc1-pm_oc      \ (pm_oc1)
+ JSR phk_c
  LDX #MCB-1
 .phk1
  LDA pm_blk,X
  STA PM_BLK1,X
  DEX
  BPL phk1
- LDX #6                 \ sidev
- JSR pm_setup
+ LDX #MCB-1             \ sidev's: PM_BLK2, pm_oc2
+ LDY #pm_oc2-pm_oc
+ JSR phk_c2
  LDX #MCB-1
 .phk2
  LDA pm_blk,X
@@ -131,6 +152,56 @@ pmi_s = &27             \ (&27-&28)
  PLA
  PLP
  RTS
+
+\ phk_c (roofv, PM_BLK1), phk_c2 (sidev, PM_BLK2): one circle's constants into
+\ pm_blk. A new orientation: all of them (pm_setup), and its terms t, v and
+\ the signs (pm_tq, pm_v, pm_sx, pm_sy) are kept at pm_oc + Y. A held one:
+\ the circle's last block and terms, then only what depends on the radius
+\ and the centre (pm_radius). X = MCB - 1, Y = the terms' offset.
+
+.phk_c2
+ BIT pm_new
+ BPL phc2
+ LDX #6
+ BNE phc5               \ (always)
+.phc2
+ LDA PM_BLK2,X
+ STA pm_blk,X
+ DEX
+ BPL phc2
+ BMI phc3               \ (always)
+.phk_c
+ BIT pm_new
+ BPL phc1
+ LDX #0
+.phc5
+ STY pm_ocy
+ JSR pm_setup
+ LDY pm_ocy
+ LDX #0
+.phc6
+ LDA pm_tq,X
+ STA pm_oc,Y
+ INY
+ INX
+ CPX #6
+ BNE phc6
+ RTS
+.phc1
+ LDA PM_BLK1,X
+ STA pm_blk,X
+ DEX
+ BPL phc1
+.phc3
+ LDX #0
+.phc4
+ LDA pm_oc,Y
+ STA pm_tq,X
+ INY
+ INX
+ CPX #6
+ BNE phc4
+ JMP pm_radius
 
 \ pm_setup: the constants of the circle with normal INWK+15+X (roofv 0, sidev 6)
 \ into pm_blk
@@ -310,6 +381,7 @@ pmi_s = &27             \ (&27-&28)
  INC pm_K2+3
 .pms8
 .pms9
+.pm_radius             \ (phk_c: the constants that depend on the radius and centre)
  JSR pms_r2              \ K0 = r^2 t
  JSR pms_bt
  JSR pm_mul16
@@ -822,14 +894,21 @@ pmi_s = &27             \ (&27-&28)
                         \ centre)
 .pm_eu  EQUB 0
 .pm_o   EQUB 0
-.pm_sx  EQUB 0          \ bit 7: mx < 0 (after negating m if mz < 0)
-.pm_sy  EQUB 0          \ bit 7: my' < 0
 .pm_f   EQUB 0          \ floor(|w|)
 .pm_m   SKIP 6          \ |mx|, |my|, |mz| >> 3
 .pm_sg  SKIP 6          \ their signs (by 2)
 .pm_nz  SKIP 6          \ &80 if non-zero (by 2)
-.pm_tq  EQUW 0          \ mz^2 / rho2, 0.16
-.pm_v   EQUW 0          \ mx^2 / (mx^2 + my^2), 0.16
+.pm_tq  EQUW 0          \ mz^2 / rho2, 0.16        } a circle's orientation's
+.pm_v   EQUW 0          \ mx^2 / (mx^2 + my^2), 0.16 } terms (6 bytes, in this
+.pm_sx  EQUB 0          \ bit 7: mx < 0 (after negating m if mz < 0)
+.pm_sy  EQUB 0          \ bit 7: my' < 0           } order: phk_c)
+.pm_oc
+.pm_oc1 SKIP 6          \ roofv's, kept while the orientation is held
+.pm_oc2 SKIP 6          \ sidev's
+.pm_ocy EQUB 0
+.pm_new EQUB 0          \ bit 7: a new orientation this frame
+.pm_mc  EQUB 0          \ MCNT when the constants were last made or kept
+.PM_SPIN EQUB 0         \ frames the orientation may still be held
 .pm_ulo EQUW 0
 .pm_P                   \ 4-byte operands
 .pm_X2  SKIP 4

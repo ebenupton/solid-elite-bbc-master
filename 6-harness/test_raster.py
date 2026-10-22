@@ -96,7 +96,7 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 # quarter squares at &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x40, K3=0x70, K4=0x72, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, QSL=0x7000, QSH=0x7200)
+MG = dict(INWK=0x40, K3=0x70, K4=0x72, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x74, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 DATAM = b''
 WINDOWS = os.path.exists(os.path.join(MS, 'gfx-raster_poly.asm'))
@@ -408,7 +408,7 @@ def _smag(v):
     return m & 255, (m >> 8) | (0x80 if v < 0 else 0)
 
 
-def merid_rows(self, vecs, cx, cy, r, spans):
+def merid_rows(self, vecs, cx, cy, r, spans, held=False):
     """PM_HOOK (game context) then PM_MERID (frame) on the machine, for the
     planet with orientation vecs (nosev, roofv, sidev), centre (cx, cy) and
     radius r over the disc rows spans {y: (l, r)}; checked against the model
@@ -426,7 +426,11 @@ def merid_rows(self, vecs, cx, cy, r, spans):
         mem[MG[nm] + 1] = (v >> 8) & 255
     mem[MG['PM_R']] = r
     mem[MG['PM_OK']] = 0
-    mem[MG['PS_VALID']] = 0            # (nothing kept: the constants are computed)
+    mem[MG['PS_VALID']] = 0            # (no rows kept)
+    if held:                           # the orientation held: the last frame drew it
+        mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
+    else:                              # a new orientation (PM_SPIN = 0)
+        m.page(7); mem[m.syms['PM_SPIN']] = 0; m.page(5)
     zp = mem[0x10:0x29]
     a0, x0, y0 = self.rnd.randrange(256), self.rnd.randrange(256), self.rnd.randrange(256)
     m.guard = False
@@ -487,24 +491,33 @@ def test_merid(self, n):
         cy = rnd.randrange(-r // 2, 192 + r // 2)
         rows, c1, c2 = self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r))
         self.stat('merid_hook', c1)
-        m, mem = self.m, self.m.mem          # the kept rows: same centre and radius,
-        keep = rnd.randrange(3)               # PS_VALID = &80 + frames left
-        mem[MG['PS_VALID']] = 0x80 + keep
-        moved = rnd.random() < 0.3
-        if moved:
-            mem[MG[rnd.choice(('K3', 'K4'))] + rnd.randrange(2)] ^= 1 << rnd.randrange(8)
+        self.stat('merid_rows', (len(rows), c2))
+        # the same planet next frame (orientation held): a new radius and
+        # centre (the radius terms only, still exact), or the same (rows kept)
+        m, mem = self.m, self.m.mem
+        r0, cx0, cy0 = r, cx, cy
+        if rnd.random() < 0.6:
+            r = max(6, min(250, r + rnd.randrange(-3, 4)))
+            cx += rnd.randrange(-3, 4)
+            cy += rnd.randrange(-3, 4)
+        same = (r, cx, cy) == (r0, cx0, cy0)
+        mem[MG['PS_VALID']] = 0x80
+        mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
+        for nm, v in (('K3', cx), ('K4', cy)):
+            mem[MG[nm]] = v & 255
+            mem[MG[nm] + 1] = (v >> 8) & 255
+        mem[MG['PM_R']] = r
         mem[MG['PM_OK']] = 0
         zp = mem[0x10:0x29]
         m.guard = False
         m.call(m.syms['PM_HOOK'], a=1, x=2, y=3, bank=7)
         mpu = m.mpu
         if (mpu.a, mpu.x, mpu.y) != (1, 2, 3) or mem[0x10:0x29] != zp:
-            raise AssertionError('PM_HOOK (kept rows) did not keep A, X, Y and zero page')
-        want = (0x80, 0x80 + keep) if (moved or keep == 0) else (0xC0, 0x80 + keep - 1)
-        if (mem[MG['PM_OK']], mem[MG['PS_VALID']]) != want:
-            raise AssertionError('PM_HOOK kept rows: PM_OK, PS_VALID = %02X, %02X, not %02X, %02X'
-                                 % (mem[MG['PM_OK']], mem[MG['PS_VALID']], *want))
-        self.stat('merid_rows', (len(rows), c2))
+            raise AssertionError('PM_HOOK (held) did not keep A, X, Y and zero page')
+        if mem[MG['PM_OK']] != (0xC0 if same else 0x80):
+            raise AssertionError('PM_HOOK held: PM_OK = %02X (same %s)' % (mem[MG['PM_OK']], same))
+        if not same:                     # the held orientation's rows, against the model
+            self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True)
     h = self.stats['merid_hook']
     rr = self.stats['merid_rows']
     return 'PM_HOOK %d..%d cycles, PM_MERID %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
