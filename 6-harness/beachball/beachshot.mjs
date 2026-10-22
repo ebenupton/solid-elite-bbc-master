@@ -20,7 +20,7 @@ import { COMMANDERS } from "../agentplay/styles.mjs";
 import { parseArgs } from "../args.mjs";
 import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "fs";
 
-const a = parseArgs({ log: "value", out: "value", cand: "value", csyms: "value", from: "value", to: "value", shots: "value" });
+const a = parseArgs({ log: "value", out: "value", cand: "value", csyms: "value", from: "value", to: "value", shots: "value", dump: "flag" });
 if (!a.log || !a.out || !a.cand || !a.csyms) { console.error("--log, --out, --cand and --csyms are required"); process.exit(2); }
 const OUT = a.out;
 mkdirSync(OUT, { recursive: true });
@@ -66,6 +66,26 @@ const s16 = (lo, hi) => { const v = lo | hi << 8; return v >= 32768 ? v - 65536 
 const HF = sy.hframe + 7;
 writeFileSync(`${OUT}/scan.jsonl`, "");
 let shootAt = null, nrec = 0;
+// --dump: at each PM_HOOK (entry: the planet's INWK, K3, K4, PM_R; return: PM_OK,
+// whether the orientation was new) and after each frame's R_DISCROWS call... the
+// disc layer's request (R_NDT/NDB, spans, R_NDN, R_NDX0-3, R_NDP), to DIR/dump.jsonl
+const DUMP = a.dump ? `${OUT}/dump.jsonl` : null;
+if (DUMP) writeFileSync(DUMP, "");
+let hookIn = null;
+const rd = (n, k = 1) => Array.from({ length: k }, (_, i) => ram[sy[n] + i]);
+const zp = (ad, k) => Array.from({ length: k }, (_, i) => ram[ad + i]);
+if (DUMP) cpu.debugInstruction.add(pc => {
+    if (cand.iter < FROM) return false;
+    if (pc === sy.PM_HOOK && (cpu.romsel & 15) === 7) hookIn = { it: cand.iter, inwk: zp(sy.INWK, 36), k3: zp(sy.K3, 2), k4: zp(sy.K4, 2), r: ram[sy.PM_R] };
+    if (pc === sy.T_DISCROWS && hookIn) {
+        const ndt = ram[sy.R_NDT], ndb = ram[sy.R_NDB];
+        const row = (n) => Array.from({ length: 192 }, (_, y) => ram[sy[n] + y]);
+        appendFileSync(DUMP, JSON.stringify({ ...hookIn, ok: ram[sy.PM_OK], neworient: sy.pm_new !== undefined ? b7("pm_new") >> 7 : 1, ndf: ram[sy.R_NDF], ndt, ndb,
+            ndl: row("R_NDISCL"), ndr: row("R_NDISCR"), ndn: row("R_NDN"), ndp: row("R_NDP"), ndx: [0, 1, 2, 3].map(k => row("R_NDX" + k)) }) + "\n");
+        hookIn = null;
+    }
+    return false;
+});
 cpu.debugInstruction.add(pc => {
     if (pc === HF && cand.iter >= FROM && ram[sy.QQ11] === 0 && ram[sy.PM_OK] & 0x80) {
         const r = { it: cand.iter, r: ram[sy.PM_R], cx: s16(b7("PM_CX"), b7("PM_CX", 1)), cy: s16(b7("PM_CY"), b7("PM_CY", 1)) };

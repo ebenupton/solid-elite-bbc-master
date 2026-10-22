@@ -476,6 +476,7 @@ pmi_s = &27             \ (&27-&28)
  BEQ P%+5
  INC pm_kw
  \ thresholds: P1 = cy - cl + 1, P2 = cy + f + 1, N1 = cy + cl, N2 = cy - f
+ \ (cy from PM_CY: K4 is in Elite's &10-&28, the workspace here)
  \ pos (my' >= 0): (uP, uM) = (P1, P2) if mx >= 0, else (P2, P1)
  \ neg: (uP, uM) = (N1, N2) if mx >= 0, else (N2, N1); each clamped to 0..192
 .pm_centre              \ (phk_c: the constants that depend on the centre)
@@ -483,21 +484,21 @@ pmi_s = &27             \ (&27-&28)
  BMI pms20
  LDA #0
  STA pm_neg
- LDA K4              \ P1
+ LDA PM_CY            \ P1
  SEC
  SBC pm_kw
  STA pm_tt
- LDA K4+1
+ LDA PM_CY+1
  SBC #0
  STA pm_tt+1
  LDA #1
  JSR pms_clamp
  STA pm_tt+2
- LDA K4              \ P2
+ LDA PM_CY            \ P2
  CLC
  ADC pm_f
  STA pm_tt
- LDA K4+1
+ LDA PM_CY+1
  ADC #0
  STA pm_tt+1
  LDA #1
@@ -505,21 +506,21 @@ pmi_s = &27             \ (&27-&28)
 .pms20
  LDA #1
  STA pm_neg
- LDA K4              \ N1
+ LDA PM_CY            \ N1
  CLC
  ADC pm_kw
  STA pm_tt
- LDA K4+1
+ LDA PM_CY+1
  ADC #0
  STA pm_tt+1
  LDA #0
  JSR pms_clamp
  STA pm_tt+2
- LDA K4              \ N2
+ LDA PM_CY            \ N2
  SEC
  SBC pm_f
  STA pm_tt
- LDA K4+1
+ LDA PM_CY+1
  SBC #0
  STA pm_tt+1
  LDA #0

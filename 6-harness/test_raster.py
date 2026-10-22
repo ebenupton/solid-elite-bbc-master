@@ -91,12 +91,13 @@ LINE7 = not os.path.exists(LINEA)                  # (before: R_LINE in bank 7, 
 
 SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, while they exist)
 # the meridian window (gfx-merid.asm: bank 7 after the cold area; here at MTEST),
-# with the game's symbols it reads at test places: INWK and K3, K4 in zero page
-# (outside the renderer's &06-&28), PM_OK and PM_R below the workspace, the
+# with the game's symbols it reads: INWK, K3, K4 and MCNT at their places in
+# Master Elite's zero page (K3 and K4 are in &10-&28, which PM_HOOK saves and
+# uses: it must read them first), PM_OK, PM_R, PS_VALID below the workspace, the
 # quarter squares at &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x40, K3=0x70, K4=0x72, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x74, QSL=0x7000, QSH=0x7200)
+MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 DATAM = b''
 WINDOWS = os.path.exists(os.path.join(MS, 'gfx-raster_poly.asm'))
