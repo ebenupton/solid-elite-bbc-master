@@ -1,8 +1,8 @@
 \ ******************************************************************************
 \
 \ elite-gfx.asm - the filled renderer's memory: its shared workspace in main
-\ RAM, its glue in HAZEL, banks 5 and 6 and ANDY, and the meridian window in
-\ bank 7
+\ RAM (its glue is in the low area, elite-low.asm), banks 5 and 6 and ANDY,
+\ and the meridian window in bank 7
 \ (docs/memory-map.md)
 \
 \ INCLUDEd at the end of elite-source.asm (after the game's code, so that the
@@ -149,7 +149,7 @@ INCLUDE "1-source-files/main-sources/gfx-light6.asm"   \ the lighting tables (an
 INCLUDE "1-source-files/main-sources/gfx-light.asm"    \ the lighting's L_SUN and L_REC
 INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
 INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 5)
-INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are in HAZEL)
+INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are at bank 6's end)
 .B6_CODE_END
 .F_HW   SKIP 256        \ planet half-widths
 .F_HW2  SKIP 256        \ sun half-widths

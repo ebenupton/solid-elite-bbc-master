@@ -129,13 +129,13 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E40-&1EDB`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call scratch, the dirty extents, the disc rows' boundaries and the stars. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST`, `DOSCLI`'s stash, is here too |
+| The shared workspace | main `&0E00-&1E2B`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | The glue | the low area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-lowhooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the lens flare, and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, `gfx-light.asm`), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
-| The hangar's tables | HAZEL, after the game data | the floor's rows and the tans |
+| The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
 | The meridian window | bank 7 after the cold area, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
