@@ -5,11 +5,12 @@ A port of Acornsoft's BBC Master Elite with solid, sunlit ships instead of wiref
 What's new:
 
 * **Solid ships, lit by the sun.** Every ship, the space station and the cargo are drawn with filled, dithered faces, shaded by the direction of the sun.
-* **Planets and suns as discs.** Planets are solid, with their craters and meridians drawn over them; suns are solid discs with a lens flare when you look towards them.
+* **Planets and suns as discs.** Planets are solid. Meridian planets, Lave's among them, are beach balls: two great circles projected exactly onto the disc, splitting it into land and sea, and spinning as the original's planets do. Crater planets have their craters drawn over them. Suns are solid discs with a lens flare when you look towards them.
 * **Flicker-free, double-buffered flight.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades.
 * **A new dashboard** in the same palette, redrawing only what changes, split cleanly from the space view by a raster-timed interrupt.
+* **Kept solid rows when docking.** Close to the space station, screen rows that one face fills from edge to edge are kept from frame to frame instead of being erased and filled again, which makes the last seconds of docking up to 27% faster in single frames.
 * **A solid hangar** when you dock, and the Constrictor turning in solid in the mission briefing.
-* **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. Even with all the extra drawing, the game runs about 23% faster in flight than the original (17.24 against 13.97 main-loop iterations a second); the same speed-ups with the original wireframe graphics run 28% faster.
+* **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. With the original wireframe graphics they make the game 28% faster in flight. With all the extra drawing, the game runs at 86% of the original's speed in the gate's flight run (11.98 against 13.97 main-loop iterations a second). Most of the gap is the spinning beach-ball planet, which is on screen for about half of that run; with plain disc planets the port ran 23% faster than the original (17.24).
 * **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's.
 
 **To play it**, download [solid-elite-bbc-master.ssd](solid-elite-bbc-master.ssd) and run it on a BBC Master 128, or in an emulator set to a Master 128 (for example [jsbeeb](https://bbc.xania.org/?model=Master) or [b2](https://github.com/tom-seddon/b2)): load the disc and press SHIFT-BREAK. It is the current build of this branch, rebuilt with every change (`make` writes it).
@@ -41,11 +42,12 @@ The copyright position is unchanged from Mark's repository: the original game an
 
 ## The port
 
-The port is a series of commits on top of Mark's source, in three parts:
+The port is a series of commits on top of Mark's source, in four parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM banks 4 and 7, and HAZEL, freeing main RAM `&4000-&6FFF`, banks 5 and 6 and ANDY for a renderer. The game is still the original, iteration for iteration and pixel for pixel.
 2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
 3. **The filled renderer.** Filled ships lit by the sun, disc planets and suns, a double-buffered CMYK screen, a lens flare, a filled hangar and the briefing's ship: 17.24 flight iterations per emulated second (1.234 times the original).
+4. **Beach balls, kept rows and a tidier map.** Meridian planets drawn as beach balls by a meridian window in bank 7, one small step per commit; kept solid rows for close-up docking; then a smaller shared workspace, one low area below `&3000`, HAZEL holding only the game's data, and the quarter-square tables named as such. The gate's flight run gives 11.98 iterations per emulated second (0.857 times the original), the beach ball costing most of the difference.
 
 Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. Every commit was checked this way. See [docs/README.md](docs/README.md) for the details.
 

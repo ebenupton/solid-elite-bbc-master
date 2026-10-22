@@ -347,9 +347,14 @@ tables.
 
 ## Speed
 
-The gate's run gives 17.24 flight iterations per emulated second, against
-SNG47's 13.97 (1.234 times). With the speed-ups of the port's second part
-and the original's wireframe drawing it is 17.86. So the renderer, net of
-the wireframe drawing it replaces, costs about 4,022 cycles a flight iteration
-(115,992 against 111,970). The big planet and the space station close up are the
-slowest views, as their discs and faces cover most of the screen.
+The gate's run gives 11.98 flight iterations per emulated second, against
+SNG47's 13.97 (0.857 times), at 166,950 cycles a flight iteration. With the
+speed-ups of the port's second part and the original's wireframe drawing it
+is 17.86, and with plain disc planets in place of the beach ball the
+renderer ran at 17.24 (115,992 cycles). So most of the cost is the beach
+ball: its geometry and its two-colour disc rows, every frame that a
+meridian planet is on screen, which is about half the gate's run, as the
+pilot starts at Lave. Flight with no beach ball on screen runs as fast as
+before. The big planet and the space station close up are the slowest
+views, as their discs and faces cover most of the screen; the kept solid
+rows speed up the station's last seconds.

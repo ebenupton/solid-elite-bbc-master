@@ -1,7 +1,7 @@
 # BBC Master Elite: the port
 
 This branch is a series of changes to Mark Moxon's annotated source for BBC
-Master Elite (the Acornsoft SNG47 release), in three parts:
+Master Elite (the Acornsoft SNG47 release), in four parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM
    banks 4 and 7, and HAZEL. This leaves main RAM `&4000-&6FFF` and banks 5
@@ -17,6 +17,15 @@ Master Elite (the Acornsoft SNG47 release), in three parts:
    buffered in one CMYK palette, and there are a lens flare, a filled hangar
    and the briefing's ship. This runs at 17.24 flight iterations per emulated
    second (1.234 times SNG47).
+4. **Beach balls, kept rows and the layout's last changes**
+   ([renderer.md](renderer.md), [memory-map.md](memory-map.md)). Meridian
+   planets are beach balls again, drawn by a meridian window in bank 7, and
+   close-up docking keeps the rows that the station fills. The shared
+   workspace shrinks by two pages, the low area comes before the head, and
+   HAZEL holds only the game's data. This runs at 11.98 flight iterations
+   per emulated second (0.857 times SNG47): a big spinning beach ball costs
+   more than the original's half ellipses, and the gate's pilot starts at
+   Lave, whose planet is one.
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -36,7 +45,8 @@ and the binaries to `3-assembled-output`. It also reports whether each game
 binary still matches the original's. The disc needs a BBC Master 128 with
 sideways RAM in banks 4 to 7 (links LK18 and LK19 set to RAM), and boots
 with SHIFT-BREAK. The tracked outputs in `3-assembled-output` and
-`5-compiled-game-discs` are refreshed at the end of each part. The Master
+`5-compiled-game-discs` are refreshed at the end of each of the first three
+parts, and with every commit of the fourth. The Master
 Compact files there are the original's, as the port is the SNG47 variant
 only.
 
@@ -60,6 +70,7 @@ encrypt=no`.
 | End of part 1: the memory map | 13.95 | 0.999 | 143,347 |
 | End of part 2: the speed-ups (the original's wireframe) | 17.86 | 1.278 | 111,970 |
 | End of part 3: the filled renderer | 17.24 | 1.234 | 115,992 |
+| End of part 4: beach balls and kept rows | 11.98 | 0.857 | 166,950 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never
