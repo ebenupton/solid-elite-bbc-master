@@ -26,5 +26,8 @@
 .GSUNR   EQUB 0         \ the sun's radius this frame
 .GSTASH  EQUB 0         \ bit 7: a disc command has stashed HAZEL in buffer 0
                         \ (DOSCLI), which the next space-mode frame clears
+.PM_OK   EQUB 0         \ bit 7: PM_HOOK has computed this frame's beach ball
+                        \ constants (H_CIRC clears it)
+.PM_R    EQUB 0         \ the planet's radius this frame (H_CIRC; PM_HOOK)
 .GWARP   EQUB 0         \ bit 7: TT66 is an in-system jump's (WARP sets it,
                         \ F_DIRECT clears it)

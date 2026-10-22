@@ -2777,19 +2777,19 @@ F_NPT = P%-1            \ only caller, reloads Y on every path
  CMP R_NDB
  BEQ P%+4
  BCS fnb9
- LDA F_NCV
- BEQ fnb9
  LDA #1
- STA R_NDF
- LDA F_PLT              \ colour B: green land on a meridian planet, a dark
- CMP #128               \ crater otherwise
- BNE fbd1
+ BIT PM_OK              \ a beach ball (PM_HOOK ran this frame): the
+ BPL fbd1               \ boundaries from the meridian window
+ STA R_NDF              \ (gfx-merid.asm), colour B green land
  LDA #&5F
  STA R_DBE
  LDA #&AF
  STA R_DBO
- JMP f_nobounds         \ (the meridians are not drawn: a plain disc)
+ JMP T_MERID
 .fbd1
+ LDX F_NCV              \ else a crater's curves (only a crater planet's are
+ BEQ fnb9               \ recorded), colour B a dark crater
+ STA R_NDF
  JSR f_zerobounds
  LDA #&50
  STA R_DBE

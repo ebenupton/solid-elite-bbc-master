@@ -79,6 +79,13 @@
  JSR R_MARKDIRTY
  JMP tback
 
+.T_MERID                \ (the meridian window's row loop, gfx-merid.asm: bank 7)
+ LDA #MERIDBANK
+ STA &F4
+ STA &FE30
+ JSR PM_MERID
+ JMP tback
+
 .T_POLY                 \ (R_POLY is in the rasteriser's polygon window, ANDY)
  STA tA
  LDA #RASTPOLY

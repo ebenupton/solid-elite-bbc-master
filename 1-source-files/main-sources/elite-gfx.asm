@@ -1,7 +1,8 @@
 \ ******************************************************************************
 \
 \ elite-gfx.asm - the filled renderer's memory: its shared workspace in main
-\ RAM, its glue in HAZEL, banks 5 and 6 and ANDY
+\ RAM, its glue in HAZEL, banks 5 and 6 and ANDY, and the meridian window in
+\ bank 7
 \ (docs/memory-map.md)
 \
 \ INCLUDEd at the end of elite-source.asm (after the game's code, so that the
@@ -22,6 +23,8 @@
 \                    gfx-raster_line.asm)
 \   build/BANK6.bin  sideways RAM bank 6: the frame layer (gfx-frame.asm),
 \                    the ship faces and colours (gfx-faces.asm) and its state
+\   build/MERID.bin  sideways RAM bank 7 after the cold area: the meridian
+\                    window, the beach ball planet's boundaries (gfx-merid.asm)
 \
 \ ******************************************************************************
 
@@ -33,6 +36,8 @@ RASTBANK = 5            \ the rasteriser: bank 5, its disc window (&8000-&8FFF) 
 RASTPOLY = &85          \ the shared region (&9000-&BFFF); ANDY over bank 5, its
                         \ polygon window
 GFXBANK = 6
+MERIDBANK = 7           \ the meridian window (gfx-merid.asm): bank 7, after the
+                        \ cold area
 ELITEBANK = HOMEBANK
 
 NDSTAR = NOST+1         \ stars 1..NOSTM (Master port: NOSTM <= NOST = 20)
@@ -99,6 +104,15 @@ INCLUDE "1-source-files/main-sources/gfx-raster_disc.asm"
 ASSERT B5LO_END <= &9000
 PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", &9000-B5LO_END, "), shared &9000-", ~B5_END-1, " free ", &C000-B5_END, " (+ ", r_tables-r_tfree, " at ", ~r_tfree, ")"
 SAVE "3-assembled-output/BANK5.bin", &8000, B5_END, &8000
+
+CLEAR COLD_END%, &C000  \ bank 7 after the cold area (ROMSEL MERIDBANK): the
+ORG COLD_END%           \ meridian window, the beach ball planet's boundaries
+.MERID_START
+INCLUDE "1-source-files/main-sources/gfx-merid.asm"
+.MERID_END
+ASSERT MERID_END <= &C000
+PRINT "Bank 7: meridian window ", ~MERID_START, "-", ~MERID_END-1, ", bank 7 free ", &C000-MERID_END
+SAVE "3-assembled-output/MERID.bin", MERID_START, MERID_END, MERID_START
 
 CLEAR &8000, &9000      \ ANDY (ROMSEL &85): the rasteriser's polygon window
 ORG &8000

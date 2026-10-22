@@ -32,7 +32,9 @@
 #    paged in, refers to neither (but for lines marked bankcheck: ok);
 #    bank6: the frame layer, the
 #    faces, the lighting tables, frame_cold and the flare's bank 6 part,
-#    bank5 also the lens flare and R_LINE's cold part, gfx-raster_lcold.asm) are reached
+#    bank5 also the lens flare and R_LINE's cold part, gfx-raster_lcold.asm;
+#    bank7m: the meridian window, gfx-merid.asm, in bank 7 after the cold
+#    area, which only the stubs page in) are reached
 #    from other areas only through the stubs in GLUE files (G_ stubs, T_
 #    trampolines, the low area's hooks) or as addresses (#LO/#HI); their
 #    code calls main RAM and HAZEL code directly but nothing in another bank,
@@ -60,12 +62,13 @@ FILES = {"../../3-assembled-output/elite-source-run.asm": "main", "../../3-assem
          "gfx-raster.asm": "bank5", "gfx-raster_disc.asm": "bank5d", "gfx-raster_poly.asm": "bank5a",
          "gfx-raster_line.asm": "bank5a", "gfx-raster_lcold.asm": "bank5",
          "gfx-frame.asm": "bank6", "gfx-faces.asm": "bank6", "gfx-light6.asm": "bank6", "gfx-light.asm": "bank6", "gfx-finit.asm": "bank6",
-         "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar-hz.asm": "hazel", "gfx-flare.asm": "bank5"}
+         "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar-hz.asm": "hazel", "gfx-flare.asm": "bank5",
+         "gfx-merid.asm": "bank7m"}
 # the copies of elite-source.asm that 2-build-files/streams.py writes, one per area
 # (their line numbers are elite-source.asm's)
 SHOW = {"../../3-assembled-output/elite-source-%s.asm" % a: "elite-source.asm" for a in ("run", "low", "bank4", "cold")}
 SHOW.update({"../../3-assembled-output/elite-data-%s.asm" % a: "elite-data.asm" for a in ("hot", "cold")})
-RENDER = ("bank5", "bank5d", "bank5a", "bank6")
+RENDER = ("bank5", "bank5d", "bank5a", "bank6", "bank7m")
 # the rasteriser's bank 5: its shared region (bank5, &9000-&BFFF) is seen with
 # either window, the disc window (bank5d, ROMSEL 5) or the polygon window
 # (bank5a, ANDY, ROMSEL &85), which are never paged in together

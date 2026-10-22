@@ -32837,6 +32837,10 @@ ENDIF
  CMP #6                 \ too small to show a meridian, so jump to PL20 to
  BCC PL20               \ return from the subroutine
 
+ JSR H_MERID            \ Port: in record mode, the renderer's beach ball
+                        \ replaces the meridians, and H_MERID returns from PL9
+                        \ (gfx-hooks.asm)
+
  LDA INWK+14            \ Set P = -nosev_z_hi
  EOR #%10000000
  STA P

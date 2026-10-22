@@ -43,6 +43,7 @@ IF _SNG47
  PUTFILE "3-assembled-output/BDATA.bin", "BDATA", &000000, &000000
  PUTFILE "3-assembled-output/BANK4.bin", "BANK4", &000000, &000000
  PUTFILE "3-assembled-output/COLD7.bin", "COLD7", &000000, &000000
+ PUTFILE "3-assembled-output/MERID.bin", "MERID", &000000, &000000
  PUTFILE "3-assembled-output/BCODE.bin", "BCODE", &000000, &000000
  PUTFILE "3-assembled-output/BANK5.bin", "BANK5", &000000, &000000
  PUTFILE "3-assembled-output/BANK6.bin", "BANK6", &000000, &000000

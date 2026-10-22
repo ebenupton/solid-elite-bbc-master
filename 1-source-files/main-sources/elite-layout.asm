@@ -113,7 +113,7 @@
 
 .COLD_END%
 
- PRINT "Bank 7 cold: &8000-", ~COLD_END%-1, " free ", &C000-COLD_END%
+ PRINT "Bank 7 cold: &8000-", ~COLD_END%-1, " (the meridian window follows: elite-gfx.asm)"
  ASSERT COLD_END% <= &C000
  SAVE "3-assembled-output/COLD7.bin", &8000, COLD_END%, &8000
 
@@ -122,4 +122,5 @@
  PRINT "G% = ", ~G%
  PRINT "NA2% = ", ~NA2%
 
- INCLUDE "1-source-files/main-sources/elite-gfx.asm"      \ Port: the filled renderer (HAZEL, banks 5 and 6, ANDY)
+ INCLUDE "1-source-files/main-sources/elite-gfx.asm"      \ Port: the filled renderer (main RAM, banks 5 and 6,
+                                  \ ANDY, and its meridian window in bank 7)

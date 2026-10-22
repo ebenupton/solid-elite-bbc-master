@@ -801,6 +801,10 @@ ENDIF
  EQUB 7, %00001001      \ QQ18 and the extended tokens, then the cold code)
  EQUW &8000, C7LEN
 
+ EQUW MESS7             \ MERID: the renderer's meridian window, bank 7 after
+ EQUB 7, %00001001      \ the cold area
+ EQUW M7AT, M7LEN
+
  EQUW MESS8             \ RASTA: the rasteriser's polygon window, ANDY
  EQUB &85, %00001001    \ (ROMSEL bit 7: ANDY over bank 5's &8000-&8FFF)
  EQUW &8000, RALEN
@@ -898,6 +902,11 @@ ENDIF
 .MESS6
 
  EQUS "L.COLD7 FFFF1300"    \ Port: *LOAD COLD7 FFFF1300
+ EQUB 13
+
+.MESS7
+
+ EQUS "L.MERID FFFF1300"    \ Port: *LOAD MERID FFFF1300
  EQUB 13
 
 .MESS8

@@ -124,6 +124,13 @@
  JSR F_PCURVE
  JMP gback
 
+.G_MERHOOK              \ (the meridian window's PM_HOOK, gfx-merid.asm: it
+ LDA #MERIDBANK         \ keeps A, X, Y and the flags)
+ STA &F4
+ STA &FE30
+ JSR PM_HOOK
+ JMP gback
+
 .G_PPOINT
  LDA #GFXBANK
  STA &F4

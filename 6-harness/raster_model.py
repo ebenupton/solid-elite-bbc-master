@@ -42,6 +42,7 @@ SRCH = os.path.join(ROOT, 'src', 'raster_hz.asm')
 SRC7 = os.path.join(ROOT, 'src', 'raster7.asm')
 HZ = 0xDC00                        # raster_hz.asm (HAZEL code in the real build)
 ROMSEL, ROMSELCOPY = 0xFE30, 0xF4
+EXTRA = []                         # (name, Tester method, count, (args)): run after the rest
 
 
 def assemble(org):
@@ -742,6 +743,10 @@ class Tester:
         dce, dco = rnd.randrange(256), rnd.randrange(256)
         dbe, dbo = rnd.randrange(256), rnd.randrange(256)
         bands = sc in ('bands', 'bandmix', 'bandjump')
+        beach = sc == 'beachball'       # (the adapter's beach_rows: a rotating meridian planet)
+        if beach:
+            cx, cy, rad = rnd.uniform(20, 236), rnd.uniform(10, 180), rnd.uniform(6, 140)
+            vx, vy, vr = rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-0.6, 0.6)
         if bands:
             cx, cy, rad = rnd.uniform(40, 216), rnd.uniform(30, 160), rnd.uniform(20, 110)
             vx, vy, vr = rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3)
@@ -792,6 +797,10 @@ class Tester:
                 m.wr('R_NDISCR', r, y)
             bnd = {}
             ndf = 0
+            if beach:
+                if rnd.random() < 0.1:
+                    dce, dco, dbe, dbo = (rnd.randrange(256) for _ in range(4))
+                bnd, ndf = self.beach_rows(f, spans, cx, cy, rad)
             if bands:
                 for c in curves:                    # drift, sometimes jump
                     c[0] += rnd.uniform(-2.5, 2.5)
@@ -1180,6 +1189,8 @@ def main():
         run('frames', t.test_frames, int(40 * scale) + 4, sc)
     for k in range(6):          # regression: r_dpe's strips into the gap between
         run('bandjump', t.test_frames, int(40 * scale) + 4, 'bandjump')   # spans apart
+    for name, fn, n, args in EXTRA:     # (tests an adapter adds: name, Tester method,
+        run(name, getattr(t, fn), max(1, int(n * scale)), *args)   # count, more arguments)
     print(summarize(t.stats))
 
 
