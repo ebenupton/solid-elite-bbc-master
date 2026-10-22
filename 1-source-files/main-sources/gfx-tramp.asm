@@ -60,7 +60,9 @@
  LDA #RASTBANK
  STA &F4
  STA &FE30
- JSR tk_y               \ (K mode: row Y's kept state)
+ BIT KMODE              \ (K mode: row Y's kept state)
+ BPL P%+5
+ JSR tk_y
  LDA tA
  JSR R_SPAN
  JMP tback
@@ -80,6 +82,8 @@
  LDA #RASTBANK
  STA &F4
  STA &FE30
+ BIT KMODE
+ BPL P%+5
  JSR tk_y
  LDA tA
  JSR R_MARKDIRTY
@@ -242,6 +246,8 @@ KRMIN = 16              \ kept rows (else K mode sits out KSKIPN frames: the kep
 KSKIPN = 4              \ rows' bookkeeping costs more than they save)
 .T_KFRAME
  STA tA
+ LDA SSPR               \ (not in the station's safe zone: no station close)
+ BEQ tkf3
  LDX F_NSHIP
 .tkf1
  DEX

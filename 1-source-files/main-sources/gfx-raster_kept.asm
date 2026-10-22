@@ -48,13 +48,21 @@
 \ k_commit: after the ships, black every row still pending (KPLO..KPHI)
 .k_commit
 {
-  LDA #&7F
-  STA k_mask
-  LDA KPLO
-  LDX KPHI
-  CPX KPLO
-  BCC none
-  JSR k_rows
+  LDY KPLO
+  CPY KPHI
+  BEQ lp
+  BCS none
+.lp
+  LDA KF,Y
+  BPL nx
+  JSR r_row1              \ (keeps Y)
+  LDA KF,Y
+  AND #&7F
+  STA KF,Y
+.nx
+  CPY KPHI
+  INY
+  BCC lp
 .none
   LDA #&FF
   STA KPLO
