@@ -85,7 +85,9 @@
 
 .HZ_END
 
+ INCLUDE "1-source-files/main-sources/gfx-kept-hz.asm"      \ Port: the kept rows' state (not saved)
  PRINT "HAZEL: game data &C000-", ~HZDATA_END%-1, ", the hangar's tables to ", ~HZ_END-1, ", free ", &DF00-HZ_END, " (+ 256 at &DF00, the MOS's)"
+ ASSERT KF + 192 <= &DF00
  ASSERT HZ_END <= &DF00  \ (&DF00-&DFFF is the MOS's: its FS numbers and
                         \ filing-system names, its lasting state)
  SAVE "3-assembled-output/HZDATA.bin", &C000, HZDATA_END%, &C000

@@ -34,3 +34,16 @@
                         \ H_CIRC clears it for a crater planet)
 .GWARP   EQUB 0         \ bit 7: TT66 is an in-system jump's (WARP sets it,
                         \ F_DIRECT clears it)
+
+\ Kept solid rows (gfx-raster_kept.asm), shared by the frame layer, the
+\ rasteriser's windows and the trampolines
+.KMODE   EQUB 0         \ bit 7: K mode this frame (the station close by)
+.KBIT    EQUB 1         \ this frame's buffer's bit in KF (1 or 2)
+.KBITN   EQUB &FE       \ and its complement
+.KPLO    EQUB &FF       \ the pending rows: KPLO..KPHI
+.KPHI    EQUB 0
+.KREC    EQUB 0         \ kept rows found pending this frame (r7_rowrep)
+.KON     EQUB 0         \ K mode frames in a row (to 3)
+.KSKIP   EQUB 0         \ frames K mode sits out (T_KFRAME)
+                        \ (KF, per row: bit b, kept in buffer b; bit 7,
+                        \ pending: in HAZEL, elite-layout.asm)

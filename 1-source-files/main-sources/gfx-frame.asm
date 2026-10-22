@@ -696,6 +696,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STY f_ysav
  LDA QQ11
  BEQ ff1
+ JSR T_KOFF             \ (no kept rows: docs/renderer.md)
  JMP f_reset            \ not a space view: just forget what was recorded
 
 .ff1
@@ -728,6 +729,8 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA R_CT
  LDA #191
  STA R_CB
+ LDA F_BACK              \ K mode: kept solid rows (gfx-raster_kept.asm)
+ JSR T_KFRAME
  LDA F_BACK
  JSR T_SETBUF
  JSR f_text1            \ text cells to be erased: background them (old dirty)
@@ -749,6 +752,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 .ff_lin                 \ (F_HANGAR points this call at f_hback for its frame)
  JSR f_lines            \ planet meridians, craters, enemy lasers
  JSR f_ships            \ filled ships, far to near
+ JSR T_KCOMMIT          \ (K mode: the kept rows still pending blacked)
  JSR f_dots             \ particles, distant ships
  JSR f_lasers           \ our laser beams and the sights
  JSR f_flt              \ the lens flare (gfx-flare6.asm), then the text on top
@@ -2407,6 +2411,22 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
 \ the glyph's pixels and only inside the clip window
 
 .f_glyph
+ BIT KMODE              \ K mode: the cell's rows are not kept
+ BPL fgk
+ PHA
+ PHY
+ LDA fz_i               \ (rows 8 * row .. + 7)
+ ASL A
+ ASL A
+ ASL A
+ PHA
+ ADC #7                 \ (C = 0)
+ TAX
+ PLA
+ JSR T_KROWS
+ PLY
+ PLA
+.fgk
  SEC
  SBC #32                 \ glyph address = F_FONT + 8 * (char - 32)
  PHA

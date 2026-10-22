@@ -99,6 +99,45 @@ MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
 MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
+# the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
+# bank 7 after the meridian window): their state (KF and the variables, in the
+# low area and HAZEL in the game) and the low area's thunk from the polygon
+# window to bank 7 and k_setbuf7 (gfx-tramp.asm's), here at HZ
+KEPT7 = os.path.join(MS, 'gfx-kept7.asm')
+KEPT = os.path.exists(KEPT7)
+MERIDBANK = 7
+KEPT_HZ = '''SGY = 96
+SGOUT = 20
+.KMODE EQUB 0
+.KBIT EQUB 1
+.KBITN EQUB &FE
+.KPLO EQUB &FF
+.KPHI EQUB 0
+.KREC EQUB 0
+.KF SKIP 192
+.T_KPRE
+ LDX #MERIDBANK
+ STX &F4
+ STX &FE30
+ JSR k_pre
+ LDX #RASTPOLY
+ STX &F4
+ STX &FE30
+ RTS
+.k_setbuf7
+ TAX
+ LDA k_dlh,X
+ STA k_pd1+2
+ STA k_pd3+2
+ STA k_pd5+2
+ LDA k_drh,X
+ STA k_pd2+2
+ STA k_pd4+2
+ STA k_pd6+2
+ RTS
+.k_dlh EQUB HI(R_DIRTYL0), HI(R_DIRTYL1)
+.k_drh EQUB HI(R_DIRTYR0), HI(R_DIRTYR1)
+'''
 DATAM = b''
 WINDOWS = os.path.exists(os.path.join(MS, 'gfx-raster_poly.asm'))
 
@@ -131,19 +170,27 @@ def assemble(org):
         f.write(gfx_constants() + '\n')
         f.write(ws_block() + '\n')
         if WINDOWS:
-            f.write('ORG &%X\n.r_hz_end\n' % tr.HZ)
+            f.write('ORG &%X\n' % tr.HZ)
+            if KEPT:            # the kept rows' state and the low area's thunks
+                f.write(KEPT_HZ)
+            f.write('.r_hz_end\n')
+            if KEPT:
+                f.write('SAVE "h.bin", &%X, r_hz_end\n' % tr.HZ)
             f.write('CLEAR &8000, &C000\nORG &9000\nINCLUDE "%s"\n' % tr.SRC)
             if not LINE7:
                 f.write('INCLUDE "%s"\n' % LINE5)
             f.write('.t_b5end\n')
-            f.write('ORG &8000\nINCLUDE "%s"\nSAVE "r.bin", &8000, t_b5end\n' % os.path.join(MS, 'gfx-raster_disc.asm'))
+            f.write('ORG &8000\nINCLUDE "%s"\n' % os.path.join(MS, 'gfx-raster_disc.asm'))
+            if KEPT:
+                f.write('INCLUDE "%s"\n' % os.path.join(MS, 'gfx-raster_kept.asm'))
+            f.write('SAVE "r.bin", &8000, t_b5end\n')
             f.write('CLEAR &8000, &9000\nORG &8000\nINCLUDE "%s"\n' % os.path.join(MS, 'gfx-raster_poly.asm'))
             if not LINE7:
                 f.write('INCLUDE "%s"\n' % LINEA)
             f.write('SAVE "ra.bin", &8000, P%\n')
             if os.path.exists(MERID):       # the meridian window (bank 7), with the game's
-                f.write(MERID_GAME + 'CLEAR &8000, &C000\nORG &%X\nINCLUDE "%s"\nSAVE "m.bin", &%X, P%%\n'
-                        % (MTEST, MERID, MTEST))
+                f.write(MERID_GAME + 'CLEAR &8000, &C000\nORG &%X\nINCLUDE "%s"\n' % (MTEST, MERID)
+                        + ('INCLUDE "%s"\n' % KEPT7 if KEPT else '') + 'SAVE "m.bin", &%X, P%%\n' % MTEST)
             if LINE7:
                 f.write('CLEAR &8000, &C000\nORG R7START\nINCLUDE "%s"\nSAVE "r7.bin", R7START, P%%\n' % tr.SRC7)
         else:                               # (bank 5 from &8000, the stubs, bank 7 from &8000)
@@ -161,7 +208,7 @@ def assemble(org):
     data = open(os.path.join(d, 'r.bin'), 'rb').read()
     dataa = open(os.path.join(d, 'ra.bin'), 'rb').read() if WINDOWS else b''
     data7 = open(os.path.join(d, 'r7.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'r7.bin')) else b''
-    datah = open(os.path.join(d, 'h.bin'), 'rb').read() if not WINDOWS else b''
+    datah = open(os.path.join(d, 'h.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'h.bin')) else b''
     global DATAM
     DATAM = open(os.path.join(d, 'm.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'm.bin')) else b''
     msg = [l for l in r.stdout.splitlines() if l.startswith('raster')]
@@ -205,6 +252,11 @@ class Machine(tr.Machine):
         self.mpu = MPU(memory=self.mem)
         self.cycles = 0
         self.guard = True
+        if 'KMODE' in self.syms:             # (the game's low area and HAZEL: K mode off)
+            s = self.syms
+            for k, v in (('KMODE', 0), ('KBIT', 1), ('KBITN', 0xFE), ('KPLO', 0xFF), ('KPHI', 0)):
+                self.mem[s[k]] = v
+            self.mem[s['KF']:s['KF'] + 192] = [0] * 192
 
     def check_writes(self, snap, name):
         mem, s = self.mem, self.syms
@@ -273,7 +325,7 @@ class Machine(tr.Machine):
                 self.page(rs)                    # (the runs, which the guard checks, are in
                                                  # bank 5's &9000-&BFFF: paged either way)
             if mpu.processorCycles - c0 > maxcyc:
-                raise RuntimeError('runaway in %s' % name)
+                raise RuntimeError('runaway in %s at &%04X ROMSEL &%02X' % (name, mpu.pc, self.romsel))
         if self.romsel != bank:
             raise AssertionError('%s returned with ROMSEL &%02X' % (name, self.romsel))
         self.cycles = mpu.processorCycles - c0
@@ -561,12 +613,165 @@ def beach_rows(self, f, spans, cx, cy, rad):
     return {y: v for y, v in rows.items()}, 1
 
 
+def test_kept(self, nframes, scenario='station'):
+    """K mode (the kept solid rows: gfx-raster_kept.asm, gfx-kept7.asm) over
+    multi-frame sequences on two buffers, as the frame layer drives it: each
+    frame T_KFRAME's set-up (KMODE, KBIT, KBITN, KPLO/KPHI, k_setbuf7), the
+    disc layer (with its repair), a "station" (two big faces sharing an edge,
+    filling whole rows, and a slot polygon over one, drifting a pixel or two a
+    frame, their colours mostly kept), small ships, lines and dots (each with
+    its trampoline's k_kill first), R_MARKDIRTY (k_kill), then k_commit after
+    the ships; sometimes K mode off (k_clear) or a reset buffer.  After each
+    frame the buffer must equal the reference: [disc over black, polys, lines,
+    dots], exactly as without K mode."""
+    m, rnd = self.m, self.rnd
+    import math
+    Ref, poly_spans, random_poly = tr.Ref, tr.poly_spans, tr.random_poly
+    self.set_clip((2, 253, 1, 191))
+    bufs = [None, None]
+    for b in range(2):
+        m.call('R_SETBUF', a=b)
+        m.clearall()
+        bufs[b] = m.screen()
+    m.call('k_clear')
+    outside = list(bufs)
+    kon = True
+    cx, cy = rnd.uniform(80, 176), rnd.uniform(60, 130)
+    w, h, ang = rnd.uniform(150, 600), rnd.uniform(120, 500), rnd.uniform(-0.3, 0.3)
+    cols = [(rnd.randrange(1, 256), rnd.randrange(1, 256)) for _ in range(3)]
+    disc = scenario == 'sun'
+    kept = 0
+    for f in range(nframes):
+        b = f & 1
+        m.set_screen(bufs[b])
+        m.call('R_SETBUF', a=b)
+        if rnd.random() < 0.05:                       # K mode off for a while (T_KOFF)
+            kon = not kon
+            if not kon:
+                m.wr('KMODE', 0)
+                m.call('k_clear')
+        if kon:                                       # T_KFRAME
+            m.wr('KMODE', 0x80)
+            m.wr('KBIT', 1 << b)
+            m.wr('KBITN', 0xFF ^ (1 << b))
+            m.wr('KPLO', 0xFF)
+            m.wr('KPHI', 0)
+            m.call('k_setbuf7', a=b, bank=7)
+        if rnd.random() < 0.02:                       # a reset buffer (T_RESETBUF)
+            r = Ref(bufs[b], self.clip)
+            r.blackwin()
+            m.set_screen(bytes(r.b))
+            m.call('R_RESETBUF')
+            m.call('k_clear')
+            outside[b] = m.screen()
+        def kill(y0, y1):
+            y0, y1 = max(0, y0), min(191, y1)
+            if kon and y0 <= y1:
+                m.call('k_kill', a=y0, x=y1)
+        if rnd.random() < 0.3:                        # a text cell's mark (f_text1's)
+            y = rnd.randrange(1, 192)
+            kill(y, y)
+            m.wzp('R_XL', rnd.randrange(2, 200))
+            m.wzp('R_XR', min(253, m.mem[tr.ZP['R_XL']] + rnd.randrange(0, 50)))
+            m.call('R_MARKDIRTY', y=y)
+        spans = {}
+        if disc and (f // 6) % 2 == 0:
+            dcx, dcy, rad = 128 + 60 * math.sin(f / 5), 96 + 40 * math.cos(f / 7), 30
+            for y in range(1, 192):
+                dy = y + 0.5 - dcy
+                if abs(dy) < rad:
+                    hh = math.sqrt(rad * rad - dy * dy)
+                    l, r = max(2, int(cx - hh)), min(253, int(cx + hh))
+                    if l <= r:
+                        spans[y] = (l, r)
+        m.wr('R_NDT', min(spans) if spans else 255)
+        m.wr('R_NDB', max(spans) if spans else 0)
+        for y, (l, r) in spans.items():
+            m.wr('R_NDISCL', l, y)
+            m.wr('R_NDISCR', r, y)
+        m.wr('R_NDF', 0)
+        m.wzp('R_DCE', 0x5A)
+        m.wzp('R_DCO', 0xA5)
+        m.call('R_DISCROWS')
+        ref = Ref(outside[b], self.clip)
+        ref.blackwin()
+        for y, (l, r) in spans.items():
+            ref.span(y, l, r, 0x5A, 0xA5)
+        # the station: two faces sharing an edge, a slot over the first
+        cx += rnd.uniform(-2, 2)
+        cy += rnd.uniform(-2, 2)
+        w *= rnd.uniform(0.98, 1.04)
+        h *= rnd.uniform(0.98, 1.04)
+        ang += rnd.uniform(-0.02, 0.02)
+        if rnd.random() < 0.05:
+            cols[rnd.randrange(3)] = (rnd.randrange(0, 256), rnd.randrange(0, 256))
+        ca, sa = math.cos(ang), math.sin(ang)
+        def pt(u, v):
+            return (int(round(cx + u * ca - v * sa)), int(round(cy + u * sa + v * ca)))
+        mid = rnd.uniform(-0.1, 0.1)
+        faces = [[pt(-w, -h), pt(mid * w, -h), pt(mid * w, h), pt(-w, h)],
+                 [pt(mid * w, -h), pt(w, -h), pt(w, h), pt(mid * w, h)]]
+        order = [0, 1] if f % 3 else [1, 0]
+        items = [(faces[i], cols[i]) for i in order]
+        if (f // 10) % 3 != 2:              # (mostly one face filling whole rows)
+            items = [([pt(-w, -h), pt(w, -h), pt(w, h), pt(-w, h)], cols[0])]
+        if rnd.random() < 0.7:
+            sw, sh = rnd.uniform(10, 40), rnd.uniform(5, 30)
+            items.append(([pt(-sw, -sh), pt(sw, -sh), pt(sw, sh), pt(-sw, sh)], cols[2]))
+        for _ in range(rnd.randrange(0, 3)):
+            vs = random_poly(rnd, rnd.choice(['small', 'tiny', 'edge', 'screen']))
+            items.insert(rnd.randrange(len(items) + 1), (vs, (rnd.randrange(256), rnd.randrange(256))))
+        for vs, (ce, co) in items:
+            if rnd.random() < 0.15:                   # a line among the ships (f_item's)
+                pts = [rnd.randrange(-20, 276), rnd.randrange(-20, 212), rnd.randrange(-20, 276), rnd.randrange(-20, 212)]
+                lc = rnd.randrange(256)
+                kill(min(pts[1], pts[3]), max(pts[1], pts[3]))
+                self.draw_line(*pts, lc, lc)
+                for x, y in tr.line_pixels(*pts):
+                    if ref.inwin(x, y):
+                        ref.setpix(x, y, lc, lc)
+            self.draw_poly(vs, ce, co)
+            for y, (l, r) in poly_spans(vs, self.clip).items():
+                ref.span(y, l, r, ce, co)
+        if kon:
+            m.call('k_commit')
+            kept += sum(1 for y in range(192) if m.rd('KF', y) & (1 << b))
+        for _ in range(rnd.randrange(0, 3)):          # dots, after the ships
+            x, y, sz = rnd.randrange(256), rnd.randrange(256), rnd.randrange(1, 4)
+            ce, co = rnd.randrange(256), rnd.randrange(256)
+            if kon and y < 192:
+                kill(y, min(191, y + 1))
+            self.set_col(ce, co)
+            m.call('R_DOT', a=sz, x=x, y=y)
+            for px, py in tr.dot_pixels(x, y, sz):
+                if ref.inwin(px, py):
+                    ref.setpix(px, py, ce, co)
+        got = m.screen()
+        if got != bytes(ref.b):
+            diff = [i for i in range(0x3000) if got[i] != ref.b[i]]
+            a = diff[0]
+            y = (a // 0x200) * 8 + (a & 7)
+            rows = sorted(set((d // 0x200) * 8 + (d & 7) for d in diff))
+            raise AssertionError('kept frame %d (buf %d): %d bytes differ, first row %d col %d; rows %s'
+                                 % (f, b, len(diff), y, (a % 0x200) // 8, rows[:12]))
+        bufs[b] = got
+    m.wr('KMODE', 0)
+    m.call('k_clear')
+    self.set_clip((1, 254, 1, 191))     # (as the other tests expect)
+    return '%.1f rows kept a frame' % (kept / max(1, nframes))
+
+
+tr.Tester.test_kept = test_kept
+
 tr.Tester.merid_rows = merid_rows
 tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
 if os.path.exists(MERID):
     tr.EXTRA += [('merid', 'test_merid', 400, ()), ('beachball', 'test_frames', 44, ('beachball',)),
                  ('beachball', 'test_frames', 44, ('beachball',))]
+
+if KEPT:     # (after the meridian tests, which keep the random numbers they had)
+    tr.EXTRA += [('kept', 'test_kept', 120, ('station',)), ('kept', 'test_kept', 120, ('sun',))] * 3
 
 tr.assemble = assemble
 tr.Tester.test_lines = test_lines

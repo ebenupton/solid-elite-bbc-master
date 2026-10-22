@@ -1764,6 +1764,18 @@ c_BB  = &25
 .none
   RTS
 .band
+  BIT KMODE               \ K mode: the band's rows are not kept (the row
+  BPL k9                  \ loop below repaints them as before)
+  LDX c_BT
+.k1
+  LDA KF,X
+  AND KBITN
+  STA KF,X
+  CPX c_BB
+  INX
+  BCC k1
+  LDY R_PRDYA
+.k9
   CPY c_BT                \ dya .. min(dyz, bt - 1)
   BCS p2
   LDA c_BT
@@ -1841,11 +1853,21 @@ c_BB  = &25
   STA sd1+2
   STA fl1+2
   STA fs1+2
+  STA r_kd1+2
   LDA drh,X
   STA ld2+2
   STA sd2+2
   STA fl2+2
   STA fs2+2
+  STA r_kd3+2
+  LDA #LO(frow-fnb-2)     \ the loop: frow, or in K mode krow (kept rows:
+  BIT KMODE               \ raster_kept.asm), which hands the other rows to
+  BPL k0                  \ frow's body
+  LDA #LO(krow-fnb-2)
+.k0
+  STA fnb+1
+  BIT KMODE
+  BMI krow
 .frow                     \ fast path: extent inside columns 1..62
 .fl2
   LDA R_DIRTYR0,Y
@@ -1887,13 +1909,43 @@ c_BB  = &25
 .fnx
   INY
   CPY c_YE
-  BCC frow
+.fnb
+  BCC frow                \ (patched: frow or krow)
   RTS
 .slow                     \ an end in column 0 or 63: the general row code
   JSR row1
   BRA fnx
+\ K mode (raster_kept.asm): a row kept in this buffer is left as it is,
+\ pending (KF bit 7), its old extent in DIRTY and its WL/WR as if blacked;
+\ the other rows go through frow's body
+.krow
+  LDA KF,Y
+  AND KBIT
+  BEQ frow
+.kp
+  EOR KF,Y                \ (A = KBIT) KBIT off, pending on
+  ORA #&80
+  STA KF,Y
+  INC KREC                \ (counted for T_KFRAME)
+.^r_kd3
+  LDA R_DIRTYR0,Y         \ (patched) WL, WR as row1 would set them
+  ORA #3
+  STA R_WR,Y
+.^r_kd1
+  LDA R_DIRTYL0,Y         \ (patched)
+  AND #&FC
+  STA R_WL,Y
+  CPY KPLO
+  BCS kp1
+  STY KPLO
+.kp1
+  CPY KPHI
+  BCC fnx
+  STY KPHI
+  BRA fnx
 \ row1: row Y, general (the border columns' bytes masked)
 .row1
+.^r_row1                  \ (raster_kept.asm's k_rows: a pending row blacked)
 .ld2
   LDA R_DIRTYR0,Y
   STA c_R
@@ -1927,8 +1979,10 @@ c_BB  = &25
   CMP c_NL
   BEQ nx
   BCC nx
-  TAX                     \ plant the RTS at column NR
-  LDA r7_j3,X
+  ASL A                   \ plant the RTS at column NR (r_jm at 4 NR: 3 (NR - 1))
+  ASL A
+  TAX
+  LDA r_jm,X
   STA RZ_PP
   TYA                     \ the run page of row Y
   LSR A
@@ -1937,8 +1991,11 @@ c_BB  = &25
   ORA #HI(r_run0)         \ (= ADC: Y DIV 8 < 32)
   STA RZ_PP+1
   STA rj+2
-  LDX c_NL
-  LDA r7_j3,X
+  LDA c_NL
+  ASL A
+  ASL A
+  TAX
+  LDA r_jm,X
   STA rj+1
   LDA #&60
   STA (RZ_PP)
@@ -2018,13 +2075,11 @@ c_BB  = &25
 
 
 
-\ the repair's run offset of byte column k (1..63; r7_rowrep's row1)
-.r7_j3                    \ run offset of byte column k (1..63)
-FOR k, 0, 63
-  EQUB LO(3 * (k - 1))
-NEXT
 
 
+\ ============================================================================
+\ R_INIT
+\ ============================================================================
 \ ============================================================================
 \ R_INIT
 \ ============================================================================
@@ -2040,39 +2095,31 @@ NEXT
   LDA #&FF
   STA R_SCOL
   STA R_NDT
+  STA R_PRWT
   STZ R_NDB
   STZ R_NDF
   STZ R_SN
   STZ R_PN
-  LDA #1                  \ R_SETBUF 0 (forcing the patch)
-  STA R_PRBUF
-  LDA #0
+  STZ R_PRWB
+  STZ R_PRBUF             \ buffer 1's state, then buffer 0's (each R_SETBUF
+  LDA #1                  \ patching), ending with buffer 0
+.ib
+  PHA
   JSR R_SETBUF
+  JSR R_RESETBUF
+  PLA
+  DEC A
+  BPL ib
+  JSR k_clear             \ no kept rows
   LDY #191
 .il
   LDA #&FF
-  STA R_DIRTYL0,Y
-  STA R_DISCL0,Y
-  STA R_DIRTYL1,Y
-  STA R_DISCL1,Y
   STA R_WL,Y
   LDA #0
-  STA R_DIRTYR0,Y
-  STA R_DISCR0,Y
-  STA R_DIRTYR1,Y
-  STA R_DISCR1,Y
   STA R_WR,Y
   DEY
   CPY #&FF
   BNE il
-  LDX #1
-.ib
-  JSR r7_reset1
-  DEX
-  BPL ib
-  LDA #&FF
-  STA R_PRWT
-  STZ R_PRWB
   RTS
 }
 

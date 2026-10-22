@@ -104,6 +104,8 @@ INCLUDE "1-source-files/main-sources/gfx-raster_lcold.asm"   \ R_LINE's cold par
 ASSERT B5_END <= &C000
 ORG &8000
 INCLUDE "1-source-files/main-sources/gfx-raster_disc.asm"
+INCLUDE "1-source-files/main-sources/gfx-raster_kept.asm"   \ kept solid rows: bank 5's part
+
 .B5LO_END
 ASSERT B5LO_END <= &9000
 PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", &9000-B5LO_END, "), shared &9000-", ~B5_END-1, " free ", &C000-B5_END, " (+ ", r_tables-r_tfree, " at ", ~r_tfree, ")"
@@ -113,6 +115,7 @@ CLEAR COLD_END%, &C000  \ bank 7 after the cold area (ROMSEL MERIDBANK): the
 ORG COLD_END%           \ meridian window, the beach ball planet's boundaries
 .MERID_START
 INCLUDE "1-source-files/main-sources/gfx-merid.asm"
+INCLUDE "1-source-files/main-sources/gfx-kept7.asm"    \ kept solid rows: the polygons' part (docs/renderer.md)
 .MERID_END
 ASSERT MERID_END <= &C000
 PRINT "Bank 7: meridian window ", ~MERID_START, "-", ~MERID_END-1, ", bank 7 free ", &C000-MERID_END
