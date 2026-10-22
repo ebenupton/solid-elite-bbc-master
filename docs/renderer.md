@@ -114,7 +114,9 @@ back buffer, two frames old:
    front buffer.
 
 Because each buffer repairs only its own dirty rows, a frame costs what
-changed, not the whole screen.
+changed, not the whole screen. Close to the space station, rows that hold
+one solid span are kept from one frame to the next instead (see "Kept solid
+rows").
 
 `TTX66`, which clears the screen for a new view, enters direct mode
 (`G_DIRECT`). The first frame afterwards goes back to double buffering
@@ -134,7 +136,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, `gfx-light.asm`), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | HAZEL, after the game data | the floor's rows and the tans |
-| The meridian window | bank 7 after the cold area, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`) |
+| The meridian window | bank 7 after the cold area, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
@@ -166,6 +168,41 @@ offset of a span's first byte and left after its last, with the row in Y.
 pixel-exact model, with this port's memory layout. It also checks that
 nothing outside the screen, the rasteriser's memory and its zero page is
 written. The gate runs it with `--quick`.
+
+## Kept solid rows
+
+In the last seconds of docking the station fills the screen, and most rows
+are one face from edge to edge. Each frame would erase those rows and fill
+them again with the same byte. Instead, a row is **kept** in a buffer when
+the last thing drawn on it there was one polygon span covering the row's
+whole dirty extent, at least 8 whole bytes, not black. `KF`, one byte a
+row, holds bit 0 or 1 for a row kept in buffer 0
+or 1, and bit 7 for a row pending this frame.
+
+* **K mode.** All of this runs only while the space station is recorded
+  close (z below `&200`) inside the safe zone, and, once K mode has run
+  three frames, only while the repair keeps finding at least 16 kept rows
+  (otherwise it sits out four frames). `T_KFRAME` decides before each
+  frame. Outside K mode `KF` is all zero, and the cost is a few tests of
+  `KMODE`, about 90 cycles a flight iteration.
+* **The repair** (`r7_rowrep`) leaves a kept row as it is and makes it
+  pending, with its old extent still in the dirty extents.
+* **Record and settle.** `R_POLY` calls `k_pre` (bank 7, through `T_KPRE`)
+  between its phases, once per polygon. A span on a pending row settles it
+  (`k_settle`): if the span and colour are unchanged, nothing is written at
+  all; otherwise only the bytes between the old and new ends are written,
+  and if the colour is the same, phase B skips the row. A span that covers
+  a row's dirty extent so far keeps the row.
+* **Everything else** drawn on a pending row (lines, dots, spans, text, the
+  lens flare) first blacks it and forgets it (`k_kill`, from the
+  trampolines). After the ships, `k_commit` blacks the rows still pending.
+
+The pixels are the same as without it: frame hashes of both buffers match
+over replayed elite-agent sessions with three dockings. Dockings run 7.6%
+to 10.6% faster over their last seconds, and up to 27% faster in single
+frames with the station filling the screen. Flight elsewhere is unchanged.
+`test_raster.py`'s `kept` test drives multi-frame sequences through K mode
+against the model.
 
 ## Lighting
 
