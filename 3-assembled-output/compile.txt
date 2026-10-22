@@ -49502,7 +49502,7 @@ Saving file '3-assembled-output/BANK5.bin'
      B0D4   8D 11 29   STA &2911
      B0D7   4C 68 B1   JMP &B168
 .phk8
-     B0DA   A9 03      LDA #&03
+     B0DA   A9 00      LDA #&00
      B0DC   8D 17 B7   STA &B717
      B0DF   EE 18 B7   INC &B718
      B0E2   A5 84      LDA &84

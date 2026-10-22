@@ -430,6 +430,7 @@ def merid_rows(self, vecs, cx, cy, r, spans, held=False, valid=False):
     mem[MG['PS_VALID']] = 0x80 if valid else 0   # (the arrays hold the last rows: T_MERID's)
     if held:                           # the orientation held: the last frame drew it
         mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
+        _hold(m)
     else:                              # a new orientation (PM_SPIN = 0)
         m.page(7); mem[m.syms['PM_SPIN']] = 0; m.page(5)
     zp = mem[0x10:0x29]
@@ -481,6 +482,16 @@ def _game_spans(cx, cy, r, clip=(1, 254, 1, 191)):
     return out
 
 
+def _hold(m):
+    """a frame left to hold the orientation (PM_SPIN), as MERIDHOLD >= 1 leaves
+    it: the held paths are tested whatever MERIDHOLD the build has (with 0 the
+    game never takes them)"""
+    m.page(7)
+    if m.mem[m.syms['PM_SPIN']] == 0:
+        m.mem[m.syms['PM_SPIN']] = 1
+    m.page(5)
+
+
 def test_merid(self, n):
     """the meridian window alone: n random planets (radius 6..250, centre on
     and off the screen, any orientation), PM_HOOK then PM_MERID, bit for bit
@@ -511,6 +522,7 @@ def test_merid(self, n):
             mem[MG[nm] + 1] = (v >> 8) & 255
         mem[MG['PM_R']] = r
         mem[MG['PM_OK']] = 0
+        _hold(m)
         zp = mem[0x10:0x29]
         m.guard = False
         m.call(m.syms['PM_HOOK'], a=1, x=2, y=3, bank=7)
