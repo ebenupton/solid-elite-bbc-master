@@ -79,12 +79,18 @@
  JSR R_MARKDIRTY
  JMP tback
 
-.T_MERID                \ (the meridian window's row loop, gfx-merid.asm: bank 7)
+.T_MERID                \ (the meridian window's row loop, gfx-merid.asm: bank 7;
+ BIT PM_OK              \ not when PM_HOOK has kept the last rows, PM_OK = &C0)
+ BVS tmer9
  LDA #MERIDBANK
  STA &F4
  STA &FE30
  JSR PM_MERID
+ LDA #&80 + MERIDHOLD   \ (the rows are for PM_HOOK's last constants; they
+ STA PS_VALID           \ may be kept MERIDHOLD frames)
  JMP tback
+.tmer9
+ RTS
 
 .T_POLY                 \ (R_POLY is in the rasteriser's polygon window, ANDY)
  STA tA

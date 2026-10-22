@@ -20,7 +20,9 @@
 \
 \   * PM_HOOK, in game context: the per-frame constants of both circles,
 \     from the planet's orientation vectors (INWK), its centre (K3, K4) and
-\     radius (PM_R, which H_CIRC records); PM_OK is set. Called by G_MERHOOK
+\     radius (PM_R, which H_CIRC records); PM_OK is set (&80), or, when the
+\     disc layer's arrays still hold rows that may be kept, PM_OK = &C0 and
+\     nothing is computed (PS_VALID, MERIDHOLD). Called by G_MERHOOK
 \     (gfx-gstubs.asm) from H_MERID, in place of PL9's equator and meridian.
 \     Elite's state is not touched: the workspace is here, Elite's
 \     zero page &10-&28 is saved and restored, and A, X, Y and the flags are
@@ -49,6 +51,32 @@ pmi_s = &27             \ (&27-&28)
  PHA
  PHX
  PHY
+ LDA PS_VALID           \ the disc layer's arrays hold the rows for this
+ BPL phk5               \ centre and radius, and they may be kept another
+ AND #&7F               \ frame (the planet spins by 1/16 radian an
+ BEQ phk5               \ iteration: MERIDHOLD frames in MERIDHOLD + 1 show
+ LDA K3                 \ the last orientation while the planet stays put)?
+ CMP PM_CX
+ BNE phk5
+ LDA K3+1
+ CMP PM_CX+1
+ BNE phk5
+ LDA K4
+ CMP PM_CY
+ BNE phk5
+ LDA K4+1
+ CMP PM_CY+1
+ BNE phk5
+ LDA PM_R
+ CMP pm_rs
+ BNE phk5
+ DEC PS_VALID           \ yes: no constants, and T_MERID skips PM_MERID
+ LDA #&C0
+ STA PM_OK
+ BNE phk7               \ (always)
+.phk5
+ LDA PM_R
+ STA pm_rs
  LDX #24
 .phk0
  LDA &10,X
@@ -89,14 +117,15 @@ pmi_s = &27             \ (&27-&28)
  STA PM_BLK2,X
  DEX
  BPL phk2
- LDA #&FF
- STA PM_OK
+ LDA #&80               \ the constants are ready (bit 6 clear: T_MERID runs
+ STA PM_OK              \ PM_MERID)
  LDX #24
 .phk3
  LDA pm_zsave,X
  STA &10,X
  DEX
  BPL phk3
+.phk7
  PLY
  PLX
  PLA
@@ -789,6 +818,8 @@ pmi_s = &27             \ (&27-&28)
  RTS
 
 .pm_r2  EQUW 0          \ r^2
+.pm_rs  EQUB 0          \ the radius of the last constants (PM_CX, PM_CY: their
+                        \ centre)
 .pm_eu  EQUB 0
 .pm_o   EQUB 0
 .pm_sx  EQUB 0          \ bit 7: mx < 0 (after negating m if mz < 0)

@@ -54,6 +54,10 @@
  BCC P%+3
  RTS
  STZ PM_OK              \ (no meridians yet: PM_HOOK sets it)
+ LDA TYPE               \ (a crater planet's boundaries overwrite the beach
+ CMP #128               \ ball's rows in the disc layer's arrays)
+ BEQ P%+5
+ STZ PS_VALID
  LDA K                  \ the radius, for PM_HOOK (PLS1 overwrites K)
  STA PM_R
  JSR G_PLANET

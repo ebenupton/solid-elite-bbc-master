@@ -96,7 +96,7 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 # quarter squares at &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x40, K3=0x70, K4=0x72, PM_OK=0x0E00, PM_R=0x0E01, QSL=0x7000, QSH=0x7200)
+MG = dict(INWK=0x40, K3=0x70, K4=0x72, PM_OK=0x0E00, PM_R=0x0E01, PS_VALID=0x0E02, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 DATAM = b''
 WINDOWS = os.path.exists(os.path.join(MS, 'gfx-raster_poly.asm'))
@@ -426,6 +426,7 @@ def merid_rows(self, vecs, cx, cy, r, spans):
         mem[MG[nm] + 1] = (v >> 8) & 255
     mem[MG['PM_R']] = r
     mem[MG['PM_OK']] = 0
+    mem[MG['PS_VALID']] = 0            # (nothing kept: the constants are computed)
     zp = mem[0x10:0x29]
     a0, x0, y0 = self.rnd.randrange(256), self.rnd.randrange(256), self.rnd.randrange(256)
     m.guard = False
@@ -436,7 +437,7 @@ def merid_rows(self, vecs, cx, cy, r, spans):
         raise AssertionError('PM_HOOK did not keep A, X, Y and the flags')
     if mem[0x10:0x29] != zp:
         raise AssertionError('PM_HOOK did not restore zero page &10-&28')
-    if mem[MG['PM_OK']] != 0xFF:
+    if mem[MG['PM_OK']] != 0x80:
         raise AssertionError('PM_HOOK did not set PM_OK')
     for a in range(0x10000):           # (bank 7 is paged back out: main RAM only)
         if mem[a] != snap[a] and not (a == MG['PM_OK'] or 0x100 <= a < 0x200 or 0x8000 <= a < 0xC000):
@@ -486,6 +487,23 @@ def test_merid(self, n):
         cy = rnd.randrange(-r // 2, 192 + r // 2)
         rows, c1, c2 = self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r))
         self.stat('merid_hook', c1)
+        m, mem = self.m, self.m.mem          # the kept rows: same centre and radius,
+        keep = rnd.randrange(3)               # PS_VALID = &80 + frames left
+        mem[MG['PS_VALID']] = 0x80 + keep
+        moved = rnd.random() < 0.3
+        if moved:
+            mem[MG[rnd.choice(('K3', 'K4'))] + rnd.randrange(2)] ^= 1 << rnd.randrange(8)
+        mem[MG['PM_OK']] = 0
+        zp = mem[0x10:0x29]
+        m.guard = False
+        m.call(m.syms['PM_HOOK'], a=1, x=2, y=3, bank=7)
+        mpu = m.mpu
+        if (mpu.a, mpu.x, mpu.y) != (1, 2, 3) or mem[0x10:0x29] != zp:
+            raise AssertionError('PM_HOOK (kept rows) did not keep A, X, Y and zero page')
+        want = (0x80, 0x80 + keep) if (moved or keep == 0) else (0xC0, 0x80 + keep - 1)
+        if (mem[MG['PM_OK']], mem[MG['PS_VALID']]) != want:
+            raise AssertionError('PM_HOOK kept rows: PM_OK, PS_VALID = %02X, %02X, not %02X, %02X'
+                                 % (mem[MG['PM_OK']], mem[MG['PS_VALID']], *want))
         self.stat('merid_rows', (len(rows), c2))
     h = self.stats['merid_hook']
     rr = self.stats['merid_rows']

@@ -38,6 +38,10 @@ RASTPOLY = &85          \ the shared region (&9000-&BFFF); ANDY over bank 5, its
 GFXBANK = 6
 MERIDBANK = 7           \ the meridian window (gfx-merid.asm): bank 7, after the
                         \ cold area
+MERIDHOLD = 3           \ while a beach ball stays put (same centre and radius),
+                        \ its rows are recomputed one frame in MERIDHOLD + 1:
+                        \ the spin (1/16 radian an iteration) is shown in steps
+                        \ (0: every frame, as the demo port)
 ELITEBANK = HOMEBANK
 
 NDSTAR = NOST+1         \ stars 1..NOSTM (Master port: NOSTM <= NOST = 20)
