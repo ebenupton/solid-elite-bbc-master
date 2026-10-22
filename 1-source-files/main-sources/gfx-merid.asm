@@ -1035,6 +1035,22 @@ mp_ke = MZ+23           \ the flags hold for k < mp_ke
  STA mz_dl,X
  DEX
  BPL mp0
+ LDA mc_K2              \ K2 and a into the row loop's ADC #s
+ STA mpk0+1
+ LDA mc_K2+1
+ STA mpk1+1
+ LDA mc_K2+2
+ STA mpk2+1
+ LDA mc_K2+3
+ STA mpk3+1
+ LDA mc_a
+ STA mpa0+1
+ LDA mc_a+1
+ STA mpa1+1
+ LDA mc_a+2
+ STA mpa2+1
+ LDA mc_a+3
+ STA mpa3+1
  LSR mz_D+3
  ROR mz_D+2
  ROR mz_D+1
@@ -1158,18 +1174,22 @@ mp_ke = MZ+23           \ the flags hold for k < mp_ke
  STX mp_ke
  BRA mp_a2
 .mp_a1
- CLC
+ CLC                    \ (the ADC #s: K2, patched by mc_pass)
  LDA mz_dl
- ADC mc_K2
+.mpk0
+ ADC #0
  STA mz_dl
  LDA mz_dl+1
- ADC mc_K2+1
+.mpk1
+ ADC #0
  STA mz_dl+1
  LDA mz_dl+2
- ADC mc_K2+2
+.mpk2
+ ADC #0
  STA mz_dl+2
  LDA mz_dl+3
- ADC mc_K2+3
+.mpk3
+ ADC #0
  STA mz_dl+3
  BCC mp_a2
  LDA #&FF
@@ -1178,18 +1198,22 @@ mp_ke = MZ+23           \ the flags hold for k < mp_ke
  STA mz_dl+2
  STA mz_dl+3
 .mp_a2
- CLC                    \ C += a
+ CLC                    \ C += a (the ADC #s: a, patched by mc_pass)
  LDA mz_C
- ADC mc_a
+.mpa0
+ ADC #0
  STA mz_C
  LDA mz_C+1
- ADC mc_a+1
+.mpa1
+ ADC #0
  STA mz_C+1
  LDA mz_C+2
- ADC mc_a+2
+.mpa2
+ ADC #0
  STA mz_C+2
  LDA mz_C+3
- ADC mc_a+3
+.mpa3
+ ADC #0
  STA mz_C+3
  INC mz_yd
  DEC mz_yu
