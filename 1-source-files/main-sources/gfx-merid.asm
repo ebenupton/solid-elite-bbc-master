@@ -95,6 +95,10 @@ pmi_s = &27             \ (&27-&28)
 .phk11
  ROR pm_new             \ (bit 7)
  LDA PM_R
+ EOR pm_rs              \ (C clear if the radius is as it was)
+ CMP #1
+ ROR pm_rch             \ (bit 7: the radius has changed)
+ LDA PM_R
  STA pm_rs
  LDX #24
 .phk0
@@ -157,7 +161,8 @@ pmi_s = &27             \ (&27-&28)
 \ pm_blk. A new orientation: all of them (pm_setup), and its terms t, v and
 \ the signs (pm_tq, pm_v, pm_sx, pm_sy) are kept at pm_oc + Y. A held one:
 \ the circle's last block and terms, then only what depends on the radius
-\ and the centre (pm_radius). X = MCB - 1, Y = the terms' offset.
+\ and the centre (pm_radius), or, with the radius as it was, on the centre
+\ (pm_centre). X = MCB - 1, Y = the terms' offset.
 
 .phk_c2
  BIT pm_new
@@ -184,7 +189,7 @@ pmi_s = &27             \ (&27-&28)
  STA pm_oc,Y
  INY
  INX
- CPX #6
+ CPX #7
  BNE phc6
  RTS
 .phc1
@@ -193,15 +198,24 @@ pmi_s = &27             \ (&27-&28)
  DEX
  BPL phc1
 .phc3
+ STY pm_ocy
  LDX #0
 .phc4
  LDA pm_oc,Y
  STA pm_tq,X
  INY
  INX
- CPX #6
+ CPX #7
  BNE phc4
- JMP pm_radius
+ BIT pm_rch             \ the same radius: only the node rows, which depend
+ BPL phc7               \ on the centre (pm_f kept)
+ JSR pm_radius
+ LDY pm_ocy             \ (and floor(|w|), for next time)
+ LDA pm_f
+ STA pm_oc+6,Y
+ RTS
+.phc7
+ JMP pm_centre
 
 \ pm_setup: the constants of the circle with normal INWK+15+X (roofv 0, sidev 6)
 \ into pm_blk
@@ -463,6 +477,7 @@ pmi_s = &27             \ (&27-&28)
  \ thresholds: P1 = cy - cl + 1, P2 = cy + f + 1, N1 = cy + cl, N2 = cy - f
  \ pos (my' >= 0): (uP, uM) = (P1, P2) if mx >= 0, else (P2, P1)
  \ neg: (uP, uM) = (N1, N2) if mx >= 0, else (N2, N1); each clamped to 0..192
+.pm_centre              \ (phk_c: the constants that depend on the centre)
  LDA pm_sy
  BMI pms20
  LDA #0
@@ -894,17 +909,18 @@ pmi_s = &27             \ (&27-&28)
                         \ centre)
 .pm_eu  EQUB 0
 .pm_o   EQUB 0
-.pm_f   EQUB 0          \ floor(|w|)
 .pm_m   SKIP 6          \ |mx|, |my|, |mz| >> 3
 .pm_sg  SKIP 6          \ their signs (by 2)
 .pm_nz  SKIP 6          \ &80 if non-zero (by 2)
 .pm_tq  EQUW 0          \ mz^2 / rho2, 0.16        } a circle's orientation's
-.pm_v   EQUW 0          \ mx^2 / (mx^2 + my^2), 0.16 } terms (6 bytes, in this
+.pm_v   EQUW 0          \ mx^2 / (mx^2 + my^2), 0.16 } terms, and pm_f (7 bytes, in this
 .pm_sx  EQUB 0          \ bit 7: mx < 0 (after negating m if mz < 0)
 .pm_sy  EQUB 0          \ bit 7: my' < 0           } order: phk_c)
+.pm_f   EQUB 0          \ floor(|w|) (the radius's, kept with them)
 .pm_oc
-.pm_oc1 SKIP 6          \ roofv's, kept while the orientation is held
-.pm_oc2 SKIP 6          \ sidev's
+.pm_oc1 SKIP 7          \ roofv's, kept while the orientation is held
+.pm_oc2 SKIP 7          \ sidev's
+.pm_rch EQUB 0          \ bit 7: the radius has changed since the last constants
 .pm_ocy EQUB 0
 .pm_new EQUB 0          \ bit 7: a new orientation this frame
 .pm_mc  EQUB 0          \ MCNT when the constants were last made or kept
