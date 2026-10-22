@@ -776,7 +776,14 @@ class Tester:
                 cx, cy, rad = rnd.uniform(-50, 300), rnd.uniform(-50, 250), rnd.uniform(0, 120)
             has_disc = sc != 'none' and (sc != 'mixed' or (f // 7) % 2 == 0)
             spans = {}
-            if has_disc:
+            if has_disc and beach:      # the game's disc: the integer circle the
+                ir = max(6, min(250, int(rad)))     # meridian window is given (the
+                for y in range(max(int(cy) - ir, 1), min(int(cy) + ir, 191) + 1):   # frame
+                    h = math.isqrt(ir * ir - (y - int(cy)) ** 2)   # layer's half-widths)
+                    l, r = max(int(cx) - h, 1), min(int(cx) + h, 254)
+                    if l <= r:
+                        spans[y] = (l, r)
+            elif has_disc:
                 for y in range(0, 192):
                     dy = y + 0.5 - cy
                     if abs(dy) < rad:
