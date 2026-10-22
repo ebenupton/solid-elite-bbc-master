@@ -86,6 +86,7 @@ pmi_s = &27             \ (&27-&28)
 .phk8
  LDA #MERIDHOLD         \ a new orientation
  STA PM_SPIN
+ INC pm_og
  LDA MCNT
  STA pm_mc
  SEC                    \ (C: the orientation's constants are computed)
@@ -925,6 +926,13 @@ pmi_s = &27             \ (&27-&28)
 .pm_new EQUB 0          \ bit 7: a new orientation this frame
 .pm_mc  EQUB 0          \ MCNT when the constants were last made or kept
 .PM_SPIN EQUB 0         \ frames the orientation may still be held
+.pm_og  EQUB 0          \ the orientation's generation (one more for each new one)
+.pm_rog EQUB 0          \ the rows in the disc layer's arrays: its generation,
+.pm_rrd EQUB 0          \ radius,
+.pm_rcx EQUW 0          \ centre
+.pm_rcy EQUW 0
+.pm_ndt EQUB 0          \ and rows (pm_save)
+.pm_ndb EQUB 0
 .pm_ulo EQUW 0
 .pm_P                   \ 4-byte operands
 .pm_X2  SKIP 4
@@ -1000,6 +1008,9 @@ mp_G  = MZ+22           \ row cy - k: the same
 mp_ke = MZ+23           \ the flags hold for k < mp_ke
 
 .PM_MERID
+ JSR pm_shift           \ the last rows moved, if they can be (C clear)
+ BCS P%+3
+ RTS
  LDA #1                 \ every row: no crossings yet, and the colour at
  EOR PM_BLK1+mc_inv-mc_blk  \ the left limb, 1 EOR inv1 EOR inv2 EOR neg1
  EOR PM_BLK1+mc_neg-mc_blk  \ EOR neg2 EOR (y < uM1) EOR (y < uM2): constant
@@ -1074,6 +1085,204 @@ mp_ke = MZ+23           \ the flags hold for k < mp_ke
  STA mp_p2
  JSR mc_pass
  STZ mp_p2
+                        \ (falls into pm_save)
+
+\ pm_save: what the rows in the disc layer's arrays are for: the centre,
+\ radius, orientation and rows
+
+.pm_save
+ LDA PM_CX
+ STA pm_rcx
+ LDA PM_CX+1
+ STA pm_rcx+1
+ LDA PM_CY
+ STA pm_rcy
+ LDA PM_CY+1
+ STA pm_rcy+1
+ LDA pm_rs
+ STA pm_rrd
+ LDA pm_og
+ STA pm_rog
+ LDA R_NDT
+ STA pm_ndt
+ LDA R_NDB
+ STA pm_ndb
+ RTS
+
+\ pm_shift: when the planet has only moved since the rows in the disc
+\ layer's arrays were made (the same orientation and radius: PS_VALID,
+\ pm_rog, pm_rrd), by -128..127 pixels each way, with its disc whole between
+\ R_CL and R_CR in both places (no span is clipped, so no crossing is folded
+\ but at the limb, which moves with it) and every new row among the old
+\ ones, the new rows are the old ones moved: row y is row y - dy with dx
+\ added to its boundaries, as PM_MERID would compute them (c - cx and the
+\ node rows' y - cy do not depend on the centre). C clear if so; else C set
+\ and nothing is changed
+
+.pmsh9
+ SEC
+ RTS
+.pm_shift
+ BIT PS_VALID
+ BPL pmsh9
+ LDA pm_og
+ CMP pm_rog
+ BNE pmsh9
+ LDA pm_rs
+ CMP pm_rrd
+ BNE pmsh9
+ SEC                    \ dx = cx - its old value, -128..127 (mt_x: its
+ LDA PM_CX              \ high byte, 0 or &FF)
+ SBC pm_rcx
+ STA pmsh_dx+1
+ LDA PM_CX+1
+ SBC pm_rcx+1
+ JSR pmsh_s8
+ BCS pmsh9
+ SEC                    \ dy likewise (mt_t+1: its high byte)
+ LDA PM_CY
+ SBC pm_rcy
+ STA mt_t
+ LDA PM_CY+1
+ SBC pm_rcy+1
+ STA mt_t+1
+ JSR pmsh_s8b
+ BCS pmsh9
+ LDA PM_CX              \ both discs between R_CL and R_CR
+ LDX PM_CX+1
+ JSR pmsh_in
+ BCS pmsh9
+ LDA pm_rcx
+ LDX pm_rcx+1
+ JSR pmsh_in
+ BCS pmsh9
+ LDA R_NDT              \ NDT - dy >= the old NDT, NDB - dy <= the old NDB
+ SEC
+ SBC mt_t
+ TAY
+ LDA #0
+ SBC mt_t+1
+ BNE pmsh9
+ CPY pm_ndt
+ BCC pmsh9
+ LDA R_NDB
+ SEC
+ SBC mt_t
+ TAY
+ LDA #0
+ SBC mt_t+1
+ BNE pmsh9c
+ CPY pm_ndb
+ BEQ P%+4
+ BCS pmsh9c
+ BIT mt_t+1             \ moved up (dy < 0): rows from the top down
+ BMI pmsh5
+ LDY R_NDB              \ else from the bottom up: row Y from row X = Y - dy
+.pmsh1
+ TYA
+ SEC
+ SBC mt_t
+ TAX
+ JSR pmsh_row
+ CPY R_NDT
+ BEQ pmsh8
+ DEY
+ BRA pmsh1
+.pmsh5
+ LDY R_NDT
+.pmsh6
+ TYA
+ SEC
+ SBC mt_t
+ TAX
+ JSR pmsh_row
+ CPY R_NDB
+ BEQ pmsh8
+ INY
+ BRA pmsh6
+.pmsh8
+ JSR pm_save
+ CLC
+ RTS
+.pmsh9c
+ SEC
+ RTS
+
+.pmsh_row               \ row Y = row X moved by dx
+ LDA R_NDN,X
+ STA R_NDN,Y
+ LDA R_NDP,X
+ STA R_NDP,Y
+ LDA R_NDX0,X
+ CLC
+.pmsh_dx
+ ADC #0                 \ (patched: dx)
+ STA R_NDX0,Y
+ LDA R_NDX1,X
+ CLC
+ ADC pmsh_dx+1
+ STA R_NDX1,Y
+ LDA R_NDX2,X
+ CLC
+ ADC pmsh_dx+1
+ STA R_NDX2,Y
+ LDA R_NDX3,X
+ CLC
+ ADC pmsh_dx+1
+ STA R_NDX3,Y
+ RTS
+
+.pmsh_s8b               \ (A, mt_t) a 16-bit difference: C clear if -128..127
+ TAX
+ LDA mt_t
+ BRA pmsh_s8c
+.pmsh_s8                \ (A, pmsh_dx+1) likewise
+ TAX
+ LDA pmsh_dx+1
+.pmsh_s8c
+ CPX #0
+ BEQ pmss1
+ CPX #&FF
+ BNE pmss9
+ CMP #&80               \ (high byte &FF: C clear if the low byte < &80, no)
+ BCC pmss9
+ CLC
+ RTS
+.pmss1
+ CMP #&80               \ (high byte 0: C clear if the low byte < &80)
+ RTS
+.pmss9
+ SEC
+ RTS
+
+.pmsh_in                \ (X A) = cx: C clear if cx - r >= R_CL and
+ TAY                    \ cx + r <= R_CR (pm_rs = r)
+ SEC
+ SBC pm_rs
+ PHA
+ TXA
+ SBC #0
+ BNE pmsi8
+ PLA
+ CMP R_CL
+ BCC pmsi9
+ TYA
+ CLC
+ ADC pm_rs
+ TAY
+ TXA
+ ADC #0
+ BNE pmsi9
+ CPY R_CR
+ BEQ pmsi7
+ BCS pmsi9
+.pmsi7
+ CLC
+ RTS
+.pmsi8
+ PLA
+.pmsi9
+ SEC
  RTS
 
 .mf_fill                \ rows X .. min(Y, NDB + 1) - 1: NDP = A, NDN = 0

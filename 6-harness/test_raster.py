@@ -408,7 +408,7 @@ def _smag(v):
     return m & 255, (m >> 8) | (0x80 if v < 0 else 0)
 
 
-def merid_rows(self, vecs, cx, cy, r, spans, held=False):
+def merid_rows(self, vecs, cx, cy, r, spans, held=False, valid=False):
     """PM_HOOK (game context) then PM_MERID (frame) on the machine, for the
     planet with orientation vecs (nosev, roofv, sidev), centre (cx, cy) and
     radius r over the disc rows spans {y: (l, r)}; checked against the model
@@ -426,7 +426,7 @@ def merid_rows(self, vecs, cx, cy, r, spans, held=False):
         mem[MG[nm] + 1] = (v >> 8) & 255
     mem[MG['PM_R']] = r
     mem[MG['PM_OK']] = 0
-    mem[MG['PS_VALID']] = 0            # (no rows kept)
+    mem[MG['PS_VALID']] = 0x80 if valid else 0   # (the arrays hold the last rows: T_MERID's)
     if held:                           # the orientation held: the last frame drew it
         mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
     else:                              # a new orientation (PM_SPIN = 0)
@@ -441,7 +441,8 @@ def merid_rows(self, vecs, cx, cy, r, spans, held=False):
         raise AssertionError('PM_HOOK did not keep A, X, Y and the flags')
     if mem[0x10:0x29] != zp:
         raise AssertionError('PM_HOOK did not restore zero page &10-&28')
-    if mem[MG['PM_OK']] != 0x80:
+    kept = mem[MG['PM_OK']] == 0xC0
+    if mem[MG['PM_OK']] != 0x80 and not (valid and kept):
         raise AssertionError('PM_HOOK did not set PM_OK')
     for a in range(0x10000):           # (bank 7 is paged back out: main RAM only)
         if mem[a] != snap[a] and not (a == MG['PM_OK'] or 0x100 <= a < 0x200 or 0x8000 <= a < 0xC000):
@@ -455,7 +456,7 @@ def merid_rows(self, vecs, cx, cy, r, spans, held=False):
         m.wr('R_NDISCL', ndl[y], y)
         m.wr('R_NDISCR', ndr[y], y)
     m.guard = True
-    c2 = m.call(m.syms['PM_MERID'], bank=7) if spans else 0
+    c2 = m.call(m.syms['PM_MERID'], bank=7) if spans and not kept else 0   # (T_MERID)
     want = PA.analytic_rows_fixed(cx, cy, r, PA.frame_normals(inwk), ndt, ndb, ndl, ndr) if spans else {}
     out = {}
     for y in range(ndt, ndb + 1) if spans else []:
@@ -484,6 +485,7 @@ def test_merid(self, n):
     and off the screen, any orientation), PM_HOOK then PM_MERID, bit for bit
     against 6-harness/planet_analytic.py"""
     rnd = self.rnd
+    self.set_clip((1, 254, 1, 191))
     for i in range(n):
         vecs = _rand_frame(rnd)
         r = rnd.choice((rnd.randrange(6, 40), rnd.randrange(6, 251)))
@@ -516,8 +518,12 @@ def test_merid(self, n):
             raise AssertionError('PM_HOOK (held) did not keep A, X, Y and zero page')
         if mem[MG['PM_OK']] != (0xC0 if same else 0x80):
             raise AssertionError('PM_HOOK held: PM_OK = %02X (same %s)' % (mem[MG['PM_OK']], same))
-        if not same:                     # the held orientation's rows, against the model
-            self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True)
+        if not same:                     # the held orientation's rows (moved, if the
+            self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True)   # radius is the same)
+            if rnd.random() < 0.7:           # and once more, moved again: the last rows
+                cx += rnd.randrange(-6, 7)   # moved (pm_shift), or made again
+                cy += rnd.randrange(-6, 7)
+                self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True, valid=True)
     h = self.stats['merid_hook']
     rr = self.stats['merid_rows']
     return 'PM_HOOK %d..%d cycles, PM_MERID %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
@@ -526,14 +532,18 @@ def test_merid(self, n):
 def beach_rows(self, f, spans, cx, cy, rad):
     """test_frames' 'beachball' scenario: this frame's boundaries from the
     meridian window, for a planet spinning about a random axis (its
-    orientation kept between frames), written to the disc layer's arrays"""
+    orientation kept between frames and, as in the game, taken one frame in
+    four: in between the window keeps or moves its last rows, or makes them
+    again for the new centre and radius), written to the disc layer's arrays"""
     st = getattr(self, '_beach', None)
     if st is None or f == 0:
         st = self._beach = dict(vecs=_rand_frame(self.rnd)[:], ax=self.rnd.randrange(3),
                                 w=self.rnd.choice((-1, 1)) * self.rnd.uniform(0.01, 0.12))
-    st['vecs'] = _rotate(st['vecs'], st['ax'], st['w'])
+    held = f % 4 != 0
+    if not held:
+        st['vecs'] = _rotate(st['vecs'], st['ax'], 4 * st['w'])
     r = max(6, min(250, int(rad)))
-    rows, c1, c2 = self.merid_rows(st['vecs'], int(cx), int(cy), r, spans)
+    rows, c1, c2 = self.merid_rows(st['vecs'], int(cx), int(cy), r, spans, held=held, valid=held)
     self.m.wr('R_NDF', 1)
     return {y: v for y, v in rows.items()}, 1
 
