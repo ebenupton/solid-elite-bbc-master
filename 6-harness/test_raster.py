@@ -134,6 +134,7 @@ SGOUT = 20
  STA k_pd2+2
  STA k_pd4+2
  STA k_pd6+2
+ STA k_pd7+2
  RTS
 .k_dlh EQUB HI(R_DIRTYL0), HI(R_DIRTYL1)
 .k_drh EQUB HI(R_DIRTYR0), HI(R_DIRTYR1)
@@ -698,11 +699,12 @@ def test_kept(self, nframes, scenario='station'):
         for y, (l, r) in spans.items():
             ref.span(y, l, r, 0x5A, 0xA5)
         # the station: two faces sharing an edge, a slot over the first
-        cx += rnd.uniform(-2, 2)
-        cy += rnd.uniform(-2, 2)
-        w *= rnd.uniform(0.98, 1.04)
-        h *= rnd.uniform(0.98, 1.04)
-        ang += rnd.uniform(-0.02, 0.02)
+        if (f // 8) % 4 != 1:                         # (and stretches holding still)
+            cx += rnd.uniform(-2, 2)
+            cy += rnd.uniform(-2, 2)
+            w *= rnd.uniform(0.98, 1.04)
+            h *= rnd.uniform(0.98, 1.04)
+            ang += rnd.uniform(-0.02, 0.02)
         if rnd.random() < 0.05:
             cols[rnd.randrange(3)] = (rnd.randrange(0, 256), rnd.randrange(0, 256))
         ca, sa = math.cos(ang), math.sin(ang)

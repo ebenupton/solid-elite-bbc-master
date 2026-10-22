@@ -40,19 +40,23 @@ k_col = &24             \ (4) k_pre: the colour bytes of rows y AND 3 = 0..3
   LDA k_tab,X
   STA kl1+1
   STA kl2+1
+  STA kl3+1
   LDA k_tab+1,X
   STA kl1+2
   STA kl2+2
+  STA kl3+2
   LDA k_tab+2,X
   STA kr1+1
   STA kr2+1
   STA kr2b+1
   STA kr3+1
+  STA kr4+1
   LDA k_tab+3,X
   STA kr1+2
   STA kr2+2
   STA kr2b+2
   STA kr3+2
+  STA kr4+2
   LDA R_COLE              \ the colour bytes of rows y AND 3 = 0..3
   STA k_col
   LDA R_COLO
@@ -174,6 +178,29 @@ k_col = &24             \ (4) k_pre: the colour bytes of rows y AND 3 = 0..3
 .vv
   STA k_v
   LDY k_y
+  \ the same span in the same colour (the station held still): nothing to
+  \ write, phase B has nothing to do, and the row stays kept
+  LDA k_dl
+  CMP k_xl
+  BNE full
+.^k_pd7
+  LDA R_DIRTYR0,Y         \ (patched)
+  CMP k_xr
+  BNE full
+  LDA k_w
+  CMP k_v
+  BNE full
+  LDA #0
+.^kl3
+  STA r_ta,Y              \ (patched with kl1)
+.^kr4
+  STA r_tb,Y              \ (patched with kr1)
+  LDA KF,Y
+  AND #&7F
+  ORA KBIT
+  STA KF,Y
+  RTS
+.full
   \ the new span's end bytes, and their masks
   LDA k_xl
   AND #3

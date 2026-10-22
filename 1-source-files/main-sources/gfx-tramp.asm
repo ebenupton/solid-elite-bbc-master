@@ -356,6 +356,7 @@ KSKIPN = 4              \ rows' bookkeeping costs more than they save)
   STA k_pd2+2
   STA k_pd4+2
   STA k_pd6+2
+  STA k_pd7+2
   RTS
 .k_dlh EQUB HI(R_DIRTYL0), HI(R_DIRTYL1)
 .k_drh EQUB HI(R_DIRTYR0), HI(R_DIRTYR1)
