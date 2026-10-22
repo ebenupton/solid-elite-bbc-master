@@ -1,7 +1,7 @@
 \ ******************************************************************************
 \
-\ elite-hi.asm - the high code: the quarter squares, at the start of the
-\ run's second part, main RAM from &7000 (docs/memory-map.md)
+\ elite-qs.asm - the quarter-square tables, before the run's second part,
+\ main RAM &7000-&73FF (docs/memory-map.md)
 \
 \ Port: no counterpart in the original. Main RAM &7000-&7DFF would be the
 \ dashboard's, but the dashboard is in shadow RAM: the IRQ shows shadow RAM

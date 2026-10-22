@@ -17,8 +17,8 @@
 \
 \   * the run: the configuration and the workspaces, then the main code from
 \     CODE% in main RAM (saved as BCODE) to its split, below screen buffer 0
-\     at &4000, continuing at &7000 after the high code (elite-hi.asm: the
-\     quarter squares) and running on into bank 4 at &8000
+\     at &4000, continuing at &7400 after the quarter-square tables
+\     (elite-qs.asm, &7000-&73FF) and running on into bank 4 at &8000
 \     (main RAM from &7000 saved as HICODE);
 \
 \   * bank 4: the blocks that must be in bank 4, after the run;
@@ -38,7 +38,7 @@
 
  ASSERT P% >= &8000     \ (the run's part from &7000 fills main RAM to &8000)
 
- PRINT "High code: &7000-", ~HI_RUN%-1, ", then the run from ", ~HI_RUN%, " to &7FFF"
+ PRINT "Quarter-square tables: &7000-", ~QS_RUN%-1, ", then the run from ", ~QS_RUN%, " to &7FFF"
  SAVE "3-assembled-output/HICODE.bin", &7000, &8000, &7000
 
 \ ******************************************************************************

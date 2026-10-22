@@ -17736,8 +17736,8 @@ ENDIF
 
 \ ******************************************************************************
 \
-\ Port: the main code continues in main RAM at &7000 from here, after the high
-\ code (elite-hi.asm), and runs on through &8000 into bank 4
+\ Port: the main code continues in main RAM at &7400 from here, after the
+\ quarter-square tables (elite-qs.asm, &7000-&73FF), and runs on through &8000 into bank 4
 \ (docs/memory-map.md), at a routine that nothing falls into. The part from
 \ CODE%, below screen buffer 0 (main RAM &4000-&6FFF), is saved as BCODE; the
 \ part from &7000 as HICODE and the rest, in bank 4, with the blocks tagged
@@ -17753,9 +17753,9 @@ ENDIF
  CLEAR &7000, &C000
  ORG &7000
 
- INCLUDE "1-source-files/main-sources/elite-hi.asm"             \ the quarter squares
+ INCLUDE "1-source-files/main-sources/elite-qs.asm"             \ the quarter-square tables
 
-.HI_RUN%
+.QS_RUN%
 
 \ ******************************************************************************
 \
@@ -20851,7 +20851,7 @@ ENDIF
 
 .MULT3
 
-                        \ Port: by quarter squares (QSL and QSH, elite-hi.asm):
+                        \ Port: by quarter squares (QSL and QSH, elite-qs.asm):
                         \ the three bytes' products by |Q|, added. Exactly the
                         \ original's results: K(3 2 1 0) with the sign of A
                         \ EOR Q, A = K+3, R = the argument A, Y kept, N and Z
@@ -21079,7 +21079,7 @@ ENDIF
 .MULTS
 
                         \ Port: the product by quarter squares (the tables QSL
-                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ and QSH, elite-qs.asm), with exactly the original's
                         \ results: (A P) = |A| * (P AND 31) with A's sign (the
                         \ shift-and-add only used bits 0-4 of P), Y kept (T,
                         \ T1, X, C, N, Z and V are left differently, but every
@@ -21340,7 +21340,7 @@ ENDIF
 .MU11
 
                         \ Port: the product by quarter squares (the tables QSL
-                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ and QSH, elite-qs.asm), with exactly the original's
                         \ results: (A P) = P * X (X = T + 1 = 1..255), T = X - 1,
                         \ X = 0, Y kept, C clear (callers use it)
 
@@ -21595,7 +21595,7 @@ ENDIF
 
 .MLTU2
 
-                        \ Port: by quarter squares (QSL and QSH, elite-hi.asm):
+                        \ Port: by quarter squares (QSL and QSH, elite-qs.asm):
                         \ (A P+1 P) = Q * (A ~P) as the two bytes' products,
                         \ added. Exactly the original's results: Q kept, C
                         \ clear (X, Y, N and Z differ: no caller reads them,
@@ -21764,7 +21764,7 @@ ENDIF
 .MULT1
 
                         \ Port: the product by quarter squares (the tables QSL
-                        \ and QSH, elite-hi.asm), with exactly the original's
+                        \ and QSH, elite-qs.asm), with exactly the original's
                         \ results: (A P) = |A| * |Q| with the sign of A EOR Q,
                         \ T = the sign, Y kept; |Q| = 0: A = P = 0, X = the
                         \ argument A, C = its bit 0, Z set; else X = 0, T1 =

@@ -6059,7 +6059,7 @@ Saving file '3-assembled-output/BCODE.unprot.bin'
      73FD   FD
      73FE   FE
      73FF   FF
-.HI_RUN%
+.QS_RUN%
 .TA352
      7400   A5 9C      LDA &9C
      7402   05 9F      ORA &9F
@@ -12577,7 +12577,7 @@ Code size is &5E7
 Execute at &1E2C 
 Reload at &9AD8 
 S.ELTH &9AD8  &A0BF  &1E2C  &9AD8 
-High code: &7000-&73FF , then the run from &7400  to &7FFF
+Quarter-square tables: &7000-&73FF , then the run from &7400  to &7FFF
 Saving file '3-assembled-output/HICODE.bin'
 .ylookup
      A0BF   40
