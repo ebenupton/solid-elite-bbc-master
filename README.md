@@ -12,7 +12,7 @@ What's new:
 
 * **Solid ships, lit by the sun.** Every ship, the space station and the cargo are drawn with filled, dithered faces, shaded by the direction of the sun.
 * **Planets and suns as discs.** Planets are solid. Meridian planets, Lave's among them, are beach balls (above): two great circles projected exactly onto the disc, splitting it into land and sea, and spinning as the original's planets do. Crater planets have their craters drawn over them. Suns are solid discs with a lens flare when you look towards them.
-* **Flicker-free, double-buffered flight.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades.
+* **Flicker-free, double-buffered flight, at up to 25 frames a second.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades. Every frame is on show for at least two fields, so motion never judders between one field and two; a quicker frame waits at its flip while the game works on the next.
 * **A new dashboard** in the same palette, redrawing only what changes, split cleanly from the space view by a raster-timed interrupt.
 * **Kept solid rows when docking.** Close to the space station, screen rows that one face fills from edge to edge are kept from frame to frame instead of being erased and filled again. The pixels are exactly the same, and the last seconds of docking run 7.6% to 10.6% faster, and up to 27% faster in single frames.
 * **A solid hangar** when you dock, and the Constrictor turning in solid in the mission briefing.
@@ -52,14 +52,14 @@ The port's own code sits below `&3000` too, in a **glue area** before the low pa
 
 ## Speed
 
-In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.99 main-loop iterations per emulated second, against the original's 13.97: 0.858 times its speed, with all the extra drawing. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). The docked screens draw with 4.8% fewer busy cycles than before the three passes.
+In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.73 main-loop iterations per emulated second, against the original's 13.97: 0.840 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): uncapped, the port ran at 11.99 (0.858), but 10.7% of its frames were then shown for a single field. With the cap none are, and frames that took longer than two fields are unaffected. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). The docked screens draw with 4.8% fewer busy cycles than before the three passes.
 
 ## Testing
 
 Every commit was checked against Acornsoft's release (SNG47), running both side by side in an emulated Master on the same inputs and comparing the game state at every main-loop iteration:
 
 * **The gate** ([6-harness](6-harness/README.md), `make verify`) flies both with a deterministic pilot for 10,000 iterations and requires the game state to be the original's at every one, then docks, launches and docks again, saves, loads and catalogues through the game's disc menu, and changes views in flight. The renderer's rasteriser is also tested on its own, primitive by primitive, against a pixel-exact model.
-* **Soak tests** replay long sessions played by Dom Pajak's [elite-agent](https://github.com/8bitkick/elite-agent) on both builds in lockstep. Overnight, 334 sessions (3.97 million iterations and over 80 game hours, with many commanders and play styles, and 3,236 save-file checks) ran with no divergence on the build before the three passes, and a one-hour soak of the final build (29 sessions, 326,642 iterations) found nothing.
+* **Soak tests** replay long sessions played by Dom Pajak's [elite-agent](https://github.com/8bitkick/elite-agent) on both builds in lockstep. Overnight, 334 sessions (3.97 million iterations and over 80 game hours, with many commanders and play styles, and 3,236 save-file checks) ran with no divergence on the build before the three passes, a one-hour soak of the three-pass build (29 sessions, 326,642 iterations) found nothing, and a half-hour campaign with the 25 fps cap (19 sessions, 207,193 iterations, flight, combat, docking and the disc menu, 163 save-file checks) found nothing either.
 
 ## Credits
 
