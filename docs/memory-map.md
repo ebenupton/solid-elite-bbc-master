@@ -278,14 +278,14 @@ line.
 | Region | Addresses | What |
 |---|---|---|
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
-| `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set |
+| `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set, and `VEC` (`&0CCF`), the configuration's last block |
 | The shared workspace | main `&0E00-&1DD4` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
 | The glue area | main from `CODE%` (`&1E24`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
 | The low pass | main `&2869-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
 | The hot pass, in main RAM | main `&2E49-&3F92` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
-| Bank 4 | `&8000-&BCD5` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9074`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B8C6`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then the hot data that HAZEL has no room for: `QQ18`, `SNE`, `ACT` |
+| Bank 4 | `&8000-&BCD5` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9073`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B8C6`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then the hot data that HAZEL has no room for: `QQ18`, `SNE`, `ACT` |
 | Bank 7, the cold pass | `&8000-&A65C` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens |
 | Bank 7, the meridian window | `&A65D-&B573` (its own image, `MERID`) | the beach ball planet's boundaries (`gfx-merid.asm`: `PM_HOOK`, `PM_MERID` and their workspace), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FE4` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
@@ -303,18 +303,24 @@ parts branch into one another and so move as a whole, leads the second.
 Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 810 at the end of bank 4,
 2,700 at the end of bank 7, 363 in HAZEL, 16 and 107 (and 252 in the row
-runs' tails) in bank 5, 27 in ANDY, 12 in bank 6, and 50 and 105 in `WP`'s
+runs' tails) in bank 5, 27 in ANDY, 12 in bank 6, and 48 and 105 in `WP`'s
 pages and the shared workspace, with 79 more between it and the main code.
 
 The three passes cost 373 free bytes outside shadow RAM. The stubs between
 the passes are 884 bytes, against the far calls' 184, all in the glue area
-below `&3000`. The low pass gave the room: the head's 2,413 bytes, with
-`stackpt` and `NEWBRK`, became the low pass's 1,504, and the hot pass
-starts after it. Aligning the log tables in bank 4 costs 140 bytes. The
+below `&3000`. The low pass gave the room: the original's code that the
+earlier layout kept below `&3000` (`VEC` to `UP`, with `stackpt` and
+`NEWBRK`: 2,413 bytes) became the low pass's 1,504, and the hot pass starts
+after it. Aligning the log tables in bank 4 costs 140 bytes. The
 text printers and the routines that crossed most moved from bank 7 into the
 hot pass (bank 7's free space grew from 89 bytes to 2,700, and bank 4's
 fell from 3,853 to 810), and `SNE` and `ACT` followed `QQ18` into bank 4
 (HAZEL's free space grew from 283 to 363).
+
+The code moved, so the page crossings moved too. `6-harness/profile.mjs
+--pagex` counts 1,108 cycles a flight iteration in page crossings, against
+1,140 before the three passes, and 1,421 off flight, against 1,697. No
+alignment pass has been made: nothing is padded to save a crossing.
 
 ## The loader
 
@@ -346,10 +352,12 @@ takes its address and bank from the game's symbols
 * **The passes.** Memory follows the source's order within each pass and
   container, not across them. The low pass comes first. The hot pass's
   ACCCON X blocks lead bank 4, as they come early in the source but cannot
-  be in main RAM. The cold pass is apart. The low pass holds what the
-  original's head held, less `VEC`, `T1SYNC`, `pxpatd`, `pxpat` and
+  be in main RAM. The cold pass is apart. The low pass holds the original's
+  code from `WSCAN` to `UP`, less `T1SYNC`, `pxpatd`, `pxpat` and
   `HANGFLAG` (now hot) and `ADDK` and the log tables (hot, ACCCON X), with
-  `stackpt` and `NEWBRK` at its end.
+  `stackpt` and `NEWBRK` at its end. `VEC`, the one variable before
+  `WSCAN`, goes with the configuration, after `DASHV` in `WP`'s page
+  (`&0CCF`).
 * **Stubs and seams.** The stubs between the passes are in the glue area.
   `streams.py` generates them; they are not in the source. The original's
   fall-throughs that cross the hot/cold line fall into a JMP to the stub at

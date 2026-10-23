@@ -129,7 +129,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E00-&1E2B`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| The shared workspace | main `&0E00-&1DD4`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the lens flare, and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
@@ -270,8 +270,9 @@ window keeps what it can:
 `MERIDHOLD` in `elite-gfx.asm` is 0. A larger value holds the orientation
 for that many frames, so the spin shows in steps, and the rows are kept
 outright while the planet stays put: 3 gives 13.56 flight iterations per
-second in the gate's run, 7 about 14, against 11.98 with 0. The held
-paths stay in the code, and `test_raster.py` tests them.
+second in the gate's run, 7 about 14, against 11.98 with 0 (measured
+before the three passes, which made 0 give 11.99). The held paths stay in
+the code, and `test_raster.py` tests them.
 
 The 6502 code matches a reference model, `6-harness/planet_analytic.py`,
 row for row: `test_raster.py`'s `merid` test runs the window alone on random

@@ -17,6 +17,6 @@ Right on, Commanders!
 _Mark Moxon_
 ## Added for Solid Elite
 
-* [faces.py](faces.py), [lightramps.py](lightramps.py), [lightcheck.py](lightcheck.py), [hangarcols.py](hangarcols.py), [hangarinks.py](hangarinks.py) and [flare.py](flare.py) generate and check the renderer's tables (see [docs/renderer.md](../docs/renderer.md)); [dashboard.py](dashboard.py), [streams.py](streams.py), [layout-info.py](layout-info.py) and [bankcheck.py](bankcheck.py) run in the build.
+* [faces.py](faces.py), [lightramps.py](lightramps.py), [lightcheck.py](lightcheck.py), [hangarcols.py](hangarcols.py), [hangarinks.py](hangarinks.py) and [flare.py](flare.py) generate and check the renderer's tables (see [docs/renderer.md](../docs/renderer.md)); [dashboard.py](dashboard.py) (with [swatch35.py](swatch35.py), the dither cells), [streams.py](streams.py) (the three passes, the flow and the stubs), [layout-info.py](layout-info.py) and [bankcheck.py](bankcheck.py) (the banking rules) run in the build (see [docs/memory-map.md](../docs/memory-map.md)).
 
 * [hooks/pre-commit](hooks/pre-commit) refuses a commit whose `solid-elite-bbc-master.ssd` (the disc in the repository's root, which `make` copies from `5-compiled-game-discs`) is not the build's disc. Install it with `git config core.hooksPath 2-build-files/hooks`.

@@ -75,8 +75,8 @@ pixel. Each commit's message explains its idea, and the source carries
 
 ## Where the cycles went
 
-The biggest wins are the multiplications. A quarter-square table (2K, at
-main `&7000`) replaces the shift-and-add loops of MU11, MULT1, MULTS,
+The biggest wins are the multiplications. Quarter-square tables (1K, `QSL` and
+`QSH` at main `&7000`, `elite-qs.asm`) replaces the shift-and-add loops of MU11, MULT1, MULTS,
 MLTU2 and MULT3, which every rotation, projection and stardust step uses.
 After them come the stardust loop (STL1), where the multipliers are fixed
 for a whole pass or particle and are patched into the code, and LL51's dot

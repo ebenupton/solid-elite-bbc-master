@@ -21,8 +21,9 @@ Master Elite (the Acornsoft SNG47 release), in five parts:
    ([renderer.md](renderer.md), [memory-map.md](memory-map.md)). Meridian
    planets are beach balls again, drawn by a meridian window in bank 7, and
    close-up docking keeps the rows that the station fills. The shared
-   workspace shrinks by two pages, the low area comes before the head, and
-   HAZEL holds only the game's data. This runs at 11.98 flight iterations
+   workspace shrinks by two pages and takes the kept rows' `KF`, the port's
+   own code below `&3000` becomes one area, the hangar's tables move to
+   bank 6, and HAZEL holds only the game's data. This runs at 11.98 flight iterations
    per emulated second (0.857 times SNG47): a big spinning beach ball costs
    more than the original's half ellipses, and the gate's pilot starts at
    Lave, whose planet is one.
@@ -50,8 +51,12 @@ every iteration. The memory map's hardware findings are in
     make                        (BeebAsm 1.11 and Python 3, as upstream)
     make verify                 (the gate: Node.js, jsbeeb and py65, see 6-harness)
 
-`make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd`
-and the binaries to `3-assembled-output`. It also reports whether each game
+`make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd`,
+copies it to `solid-elite-bbc-master.ssd` in the repository's root (the
+disc to download), and writes the binaries to `3-assembled-output`. If
+`python` or `beebasm` is not on the path, pass `PYTHON=` and `BEEBASM=`.
+The pre-commit hook in `2-build-files/hooks` (`git config core.hooksPath
+2-build-files/hooks`) refuses a commit whose root disc is not the build's. It also reports whether each game
 binary still matches the original's. The disc needs a BBC Master 128 with
 sideways RAM in banks 4 to 7 (links LK18 and LK19 set to RAM), and boots
 with SHIFT-BREAK. The tracked outputs in `3-assembled-output` and

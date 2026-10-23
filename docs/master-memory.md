@@ -112,12 +112,12 @@ ADFS's (`&D9`).
 | `&0B00-&0CFF` | unused on the Master | yes |
 | `&0D00-&0DFF` | DFS's NMI routine, extended vectors, ROM workspace table | **never** |
 
-The port puts Elite's workspace `WP` at `&0841-&0CA9`, followed by the CMYK
-dashboard's variables to `&0CCE`. From `&0E00` (OSHWM) up to the main code
-is the renderer's shared workspace; the loader runs there first, and its
-last part from `&0400`. This is the original's
-`&0E41-&12A9`, moved down by `&600` so that each byte keeps its place in its
-page. The commander file buffer (`commbuf`, which shares its place with
+The port puts Elite's workspace `WP` at `&0841-&0CA9`, the original's
+`&0E41-&12A9` moved down by `&600` so that each byte keeps its place in its
+page. The CMYK dashboard's variables follow it to `&0CCE`, then `VEC`, the
+original IRQ1 vector, at `&0CCF`. From `&0E00` (OSHWM) up to the main code
+(`&1E24`) is the renderer's shared workspace; the loader runs there first,
+and its last part from `&0400`. The commander file buffer (`commbuf`, which shares its place with
 `LSX2`) is at `&087E`. `*SAVE` gives commander files load and execution
 addresses of 0, so their catalogue entries do not depend on the buffer. A
 commander saved by the original and one saved by the port at the same state
