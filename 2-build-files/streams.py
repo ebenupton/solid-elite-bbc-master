@@ -494,17 +494,29 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
                 own.update(IDENT.findall(m.group(2).split(",")[0] if m.group(1).upper() == "FOR"
                                          else m.group(2)))
         for i, l in enumerate(ls):
-            for a, b, name in tokens(split_code(l)[0]):
-                if name not in cold or name in own:
-                    continue
-                if name in elsewhere:      # (another file's label of the same name)
-                    if f in hotcopies:
-                        errors.append("%s:%d: %s is a cold label and a label of another file"
-                                      % (SRC, i + 1, name))
-                    continue
-                if name not in seen7:
-                    seen7.add(name)
-                    out7.append(name)
+            for off, st in statements(split_code(l)[0]):
+                for a, b, name in tokens(st):
+                    if name not in cold or name in own:
+                        continue
+                    if name in elsewhere:  # (another file's label of the same name)
+                        if f in hotcopies:
+                            errors.append("%s:%d: %s is a cold label and a label of another file"
+                                          % (SRC, i + 1, name))
+                        continue
+                    # a stub reaches the routine: a call or a jump to it, or its
+                    # address (#LO/#HI, EQUW, a constant); anything else would
+                    # read or write the stub's bytes, not the cold pass's
+                    t = re.sub(r"^\s*(\.[A-Za-z_]\w*\s*)+", "", st).strip()
+                    if not (re.match(r"^(JSR|JMP)\s+%s$" % re.escape(name), t, re.I)
+                            or re.match(r"^[A-Z]{3}\s+#", t, re.I)
+                            or re.match(r"^(EQU[BWD]|[A-Za-z_][\w%]*\s*=)", t, re.I)):
+                        errors.append("%s:%d: %s refers to the cold label %s other than by a call, a "
+                                      "jump or its address (%s): a stub has no data"
+                                      % (f if not f in hotcopies + ["config"] else SRC, i + 1, f, name, t))
+                        continue
+                    if name not in seen7:
+                        seen7.add(name)
+                        out7.append(name)
     # the stubs that the fall-through seams land on: a block that falls
     # through its end into a block of the other side falls into the stub at
     # that block's entry label
