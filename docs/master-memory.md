@@ -74,7 +74,7 @@ command (`DOSCLI`):
 * Put DFS's and the MOS's 128 lasting bytes back from `DFSST`. The loader
   takes them after its last disc access.
 * Write `&FF` to the six drive-state bytes.
-* Copy the command to `&6000`. The command strings are in the cold area,
+* Copy the command to `&6000`. The command strings are in the cold pass,
   which is not paged in while the MOS and DFS run the command.
 * Run the command.
 * Stash the lasting bytes again, as `*DIR` and `*DRIVE` change them.

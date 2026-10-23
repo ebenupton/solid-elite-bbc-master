@@ -136,7 +136,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, `gfx-light.asm`), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold area, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
@@ -243,7 +243,7 @@ tears.
 
 The disc layer already draws up to four boundaries a row. What the beach
 ball needs is the geometry, which is about 3K and has its own window: the
-meridian window, `gfx-merid.asm`, in bank 7 after the cold area. It has two
+meridian window, `gfx-merid.asm`, in bank 7 after the cold pass. It has two
 entry points, each behind one stub in the glue area:
 
 * `PM_HOOK` runs in game context. `H_MERID` calls it through `G_MERHOOK`
