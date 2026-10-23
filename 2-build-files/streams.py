@@ -68,27 +68,29 @@
 # it goes (no block aligns itself; a stub at its place is the same size in
 # every container). 3-assembled-output/flow.txt lists the containers and their units.
 #
-# Each pass is the original in its order, with a stub wherever a routine
-# lives on the other side. The hot side is the low and hot passes, the cold
-# side the cold pass. In a hot copy, the line that defines a cold label X
-# that the hot side refers to holds X's stub, under X's own name:
+# Each pass is the original in its order, and every call from one side to
+# the other goes through a stub of its own, in the glue area (main RAM below
+# &3000), which this script writes (3-assembled-output/elite-stubs.asm, INCLUDEd by
+# elite-stubs.asm). The hot side is the low and hot passes, the cold side
+# the cold pass. The hot side calls a cold label X by its own name, which is
+# X's stub; its body is X_C in the cold pass:
 #
-#   .TT22 JSR far7 : EQUW TT22_C        (TT22_C: the body, in the cold copy)
+#   .TT22 JSR to7 : JSR TT22_C : JMP to4
 #
-# and in the cold copy, the line that defines a hot label H that cold code
-# calls or jumps to holds H's stub, under the name the cold copy's calls are
-# renamed to:
+# and the cold pass's calls and jumps to a hot label H are renamed to H's
+# stub, x4_H (j4_H for a jump):
 #
-#   .x4_TT26 JSR far4 : EQUW TT26
+#   .x4_LL5 JSR to4 : JSR LL5 : JMP to7
 #
-# (far7j and j4_ / far4j for the targets that never return, NORETURN below).
-# A cold block's stubs go in the copy of the nearest block before it that is
-# not cold (the low copy, or the container of a hot block), so the stubs sit
-# where the routine was carved out of that pass, and a block that falls
-# through into a routine of the other side falls into its stub: the stub
-# calls the body and returns to the falling routine's caller with the
-# caller's bank back, which is what the fall-through did in the original (a
-# jump stub, for a target that never returns, just jumps).
+# (for the targets that never return, NORETURN below, the stub jumps:
+# .TT170 JSR to7 : JMP TT170_C). The cold pass calls the low pass's routines
+# that need nothing of the hot side directly (direct_calls). A block that
+# falls through into a routine of the other side falls into a JMP to that
+# routine's stub, written at the routine's place in the falling block's pass
+# (the copy of the nearest block before it that is not of the other side):
+# the stub calls the routine, which returns to the falling routine's caller
+# with the caller's bank back, which is what the fall-through did in the
+# original.
 #
 # The data source, elite-data.asm, is the original's too, and is emitted
 # the same way (3-assembled-output/elite-data-<copy>.asm): its blocks are hot data (no
@@ -119,6 +121,8 @@ OUT = "3-assembled-output/elite-source-%s.asm"
 DATA = "1-source-files/main-sources/elite-data.asm"
 DOUT = "3-assembled-output/elite-data-%s.asm"
 MEASURE = "3-assembled-output/measure-symbols.txt"
+STUBS = "3-assembled-output/elite-stubs.asm"
+DIRECT = "3-assembled-output/direct.txt"
 FLOWTXT = "3-assembled-output/flow.txt"
 DTAGS = {"cold": "cold", "BDATA": "bdata"}
 STAR = re.compile(r"^\\ \*{70,}\s*$")
@@ -284,23 +288,20 @@ def falls_through(stmt, macros):
 # The source uses the original's names throughout. The cold copy is assembled
 # with each cold label X renamed X_C (its definition and every reference in the
 # cold copy), and with each JSR or JMP from cold code to a label of the low
-# or hot pass (H) going through a stub, x4_H (JSR far4: call H with
-# bank 4 paged in, then page the cold area back) or, for the targets in
-# NORETURN, j4_H (JSR far4j: jump to H). Every other file keeps the names as
-# they are, so a reference from outside the cold area to a cold label X
-# reaches its stub, .X (JSR far7 : EQUW X_C, or far7j for the targets in
-# NORETURN). Each stub is at its target's place in the other side's pass
-# (above); there is one for each cold label that a file outside the cold area
-# refers to and for each hot label that cold code calls or jumps to, and one
-# for each routine that a block of the other side falls into. Labels that are
-# one place (defined one after another, with nothing assembled between them)
-# share a stub: the earlier ones are bare labels at their lines. Labels ending
-# in % keep their names (the cold area's S% is the loader's entry point, by
-# address). Cold code that needs a stub's address (a jump table: JMTB) names
-# the stub itself, x4_H.
+# or hot pass (H) going through a stub, x4_H (call H with bank 4 paged in, then
+# page the cold pass back) or, for the targets in NORETURN, j4_H (jump to H),
+# but for the low routines it calls directly. Every other file keeps the names
+# as they are, so a reference from outside the cold pass to a cold label X
+# reaches its stub, .X. There is one stub for each cold label that a file
+# outside the cold pass refers to, for each hot label that cold code calls or
+# jumps to, and for each routine that a block of the other side falls into.
+# Labels that are one place (defined one after another, with nothing
+# assembled between them) share a stub. Labels ending in % keep their names
+# (the cold pass's S% is the loader's entry point, by address). Cold code that
+# needs a stub's address (a jump table: JMTB) names the stub itself, x4_H.
 #
 # NORETURN: the targets that never return to their caller, so that their
-# stubs jump (far7j, far4j) and leave no far-call frame on the stack.
+# stubs jump and leave no return into the stub on the stack.
 
 NORETURN = {"BAY", "DEATH2", "TT170", "FRCE", "GOIN", "BEGIN"}
 # the files outside elite-source.asm whose references to cold labels need
@@ -431,6 +432,7 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
     alias = {}
     for f, ls in hotfiles + [("cold", copies["cold"])]:
         alias.update(aliases(ls, macros))
+    direct = direct_calls(lines, bl, eff, cold, hot)
     # the cold copy: X -> X_C, JSR/JMP H -> x4_H / j4_H
     out4 = []                               # (stub name, target) in order
     seen4 = {}
@@ -445,7 +447,7 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
                 if name in cold:
                     code = code[:a] + name + "_C" + code[b:]
             m = re.match(r"^(\s*(?:JSR|JMP)\s+)([A-Za-z_]\w*)(.*)$", code, re.I)
-            if m and m.group(2) in hot and m.group(2) not in cold:
+            if m and m.group(2) in hot and m.group(2) not in cold and m.group(2) not in direct:
                 code = m.group(1) + ("j4_" if m.group(2) in NORETURN else "x4_") + m.group(2) + m.group(3)
             cc[i] = code + comment
             continue
@@ -453,7 +455,7 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
         pos = 0
         for off, st in statements(code):
             m = re.match(r"^(\s*)(JSR|JMP)(\s+)([A-Za-z_][A-Za-z0-9_]*%?)(.*)$", st, re.I)
-            if m and m.group(4) in hot and m.group(4) not in cold:
+            if m and m.group(4) in hot and m.group(4) not in cold and m.group(4) not in direct:
                 h = m.group(4)
                 if m.group(5).strip():
                     errors.append("%s:%d: %s %s%s from the cold pass: a stub can only call a label"
@@ -539,66 +541,154 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
             return copy_of[k]
         return "low"
 
-    def place_stubs(groups, ok_area, side):
-        """groups: [(far helper, [(stub label, target label)])], each group one
-        place; each stub goes at the line of its target's definition, in the
-        copy that hosts it, and the labels of a place share the stub at the
-        last of them"""
-        n = 0
-        for far, members in groups:
-            at = []
-            for stub, target in members:
-                i = where.get(target)
-                if i is None or eff[barea[i]] not in ok_area:
-                    errors.append("%s: no place in the source for the stub %s (%s is not defined "
-                                  "in elite-source.asm's %s blocks)" % (SRC, stub, target, side))
-                    continue
-                at.append((i, stub, target))
-            at.sort()
-            for k, (i, stub, target) in enumerate(at):
-                a = host(i) if side == "cold" else "cold"
-                text = ".%s" % stub
-                # (a label shares the next one's stub only if nothing is
-                # assembled between them in this copy)
-                if k == len(at) - 1 or any(assembles(code_part(copies[a][j]), macros)
-                                           for j in range(i + 1, at[k + 1][0])):
-                    text += " JSR %s : EQUW %s" % (far, target + "_C" if side == "cold" else target)
-                    n += 1
-                cur = copies[a][i]
-                if (a, i) in placed:
-                    copies[a][i] = cur + " : " + text      # (two stubs at one line)
-                elif code_part(cur):
-                    errors.append("%s:%d: the stub %s's line is not blank in the %s copy"
-                                  % (SRC, i + 1, stub, a))
-                else:
-                    copies[a][i] = text
-                    placed.add((a, i))
-        return n
+    # the stubs (3-assembled-output/elite-stubs.asm, INCLUDEd in the glue area by
+    # elite-stubs.asm): one per target, the labels of one place sharing it
+    def grouped(items, side):
+        """items: [(stub label, target label, jumps)] -> [(jumps, [stub
+        labels], target)], one per place"""
+        out, done = [], {}
+        for stub, target, jumps in items:
+            i = where.get(target)
+            ok = ("cold",) if side == "cold" else ("low", "hot", "hotx")
+            if i is None or eff[barea[i]] not in ok:
+                errors.append("%s: no place in the source for the stub %s (%s is not defined "
+                              "in elite-source.asm's %s blocks)" % (SRC, stub, target, side))
+                continue
+            key = (alias.get(target, target), jumps)
+            if key not in done:
+                done[key] = len(out)
+                out.append((jumps, [], target))
+            if stub not in out[done[key]][1]:
+                out[done[key]][1].append(stub)
+        return out
 
-    placed = set()
+    s7 = grouped([(n, n, alias.get(n, n) in NORETURN or n in NORETURN) for n in out7], "cold")
+    s4 = grouped([(stub, h, kind == "j4_") for stub, h, place, kind in out4], "hot")
+    for kind in (s7, s4):
+        seen = {}
+        for jumps, labels, target in kind:
+            for l in labels:
+                if l in seen and seen[l] != jumps:
+                    errors.append("%s: %s is called and jumped to through one stub" % (SRC, l))
+                seen[l] = jumps
+    text = ["\\ 3-assembled-output/elite-stubs.asm: the stubs between the passes, written by",
+            "\\ 2-build-files/streams.py (elite-stubs.asm INCLUDEs it in the glue area)", "",
+            "\\ into the cold pass (the hot side's calls of cold routines)", "", ".STUBS7"]
+    for jumps, labels, target in s7:
+        text += [".%s" % l for l in labels[:-1]]
+        text.append(stub_text(labels[-1], target + "_C", "to7", "to4", jumps))
+    text += [".STUBS7_END", "", "\\ out of the cold pass (the cold pass's calls of hot routines)", "", ".STUBS4"]
+    for jumps, labels, target in s4:
+        text += [".%s" % l for l in labels[:-1]]
+        text.append(stub_text(labels[-1], target, "to4", "to7", jumps))
+    text += [".STUBS4_END", ""]
+    with open(STUBS, "w") as f:
+        f.write("\n".join(text))
+    # the fall-through seams: a block that falls through its end into a
+    # routine of the other side falls into a jump to that routine's stub (or,
+    # for a low routine the cold pass calls directly, to the routine)
+    for side_, entry in falls:
+        i = where.get(entry)
+        if side_ == "hot":
+            a, to = host(i), entry
+        else:
+            a, to = "cold", entry if entry in direct else \
+                ("j4_" if alias.get(entry, entry) in NORETURN or entry in NORETURN else "x4_") + entry
+        if code_part(copies[a][i]):
+            errors.append("%s:%d: the seam into %s: its line is not blank in the %s copy" % (SRC, i + 1, entry, a))
+        else:
+            copies[a][i] = " JMP %s                \\ (the fall-through into %s, on the other side)" % (to, entry)
+    return len(s7), len(s4), direct
 
-    # the stubs into the cold pass, in the hot copies at the cold labels' places
-    groups, done = [], {}
-    for name in out7:
-        place = alias.get(name, name)
-        far = "far7j" if place in NORETURN or name in NORETURN else "far7"
-        if place not in done:
-            done[place] = len(groups)
-            groups.append((far, []))
-        elif groups[done[place]][0] != far:
-            errors.append("%s: %s and %s are one place but not both NORETURN" % (SRC, name, place))
-        groups[done[place]][1].append((name, name))
-    n7 = place_stubs(groups, ("cold",), "cold")
-    # the stubs out of the cold pass, in the cold copy at the hot labels' places
-    groups, done = [], {}
-    for stub, h, place, kind in out4:
-        key = (kind, place)
-        if key not in done:
-            done[key] = len(groups)
-            groups.append(("far4j" if kind == "j4_" else "far4", []))
-        groups[done[key]][1].append((stub, h))
-    n4 = place_stubs(groups, ("low", "hot", "hotx"), "hot")
-    return n7, n4
+
+# INLINE: the stubs that are written out in full rather than through the
+# shared to7 and to4 (the busiest; each costs 17 bytes more and saves 15
+# cycles a call)
+INLINE = set()
+
+
+def stub_text(label, target, enter, leave, jumps):
+    """a stub, one statement a line (so that the tools that read the source
+    a line at a time see each instruction's own operand): page the target's
+    bank in (A and the flags kept), call the target, page the caller's bank
+    back (A and the flags kept), return; or, for a target that never
+    returns, page its bank in and jump"""
+    bank = {"to7": "COLDBANK", "to4": "HOMEBANK"}
+    page = lambda b: [" PHP", " PHA", " LDA #%s" % b, " STA &F4", " STA VIA+&30", " PLA", " PLP"]
+    if jumps:
+        body = page(bank[enter]) if label in INLINE else [" JSR %s" % enter]
+        return "\n".join([".%s" % label] + body + [" JMP %s" % target])
+    if label in INLINE:
+        body = page(bank[enter]) + [" JSR %s" % target] + page(bank[leave]) + [" RTS"]
+    else:
+        body = [" JSR %s" % enter, " JSR %s" % target, " JMP %s" % leave]
+    return "\n".join([".%s" % label] + body)
+
+
+GLUEOK = ("1-source-files/main-sources/gfx-gluehooks.asm", "1-source-files/main-sources/gfx-gvars.asm")
+KEEPBANK = {"TTX66M"}                      # (elite-stubs.asm's stub that keeps
+                                           # the caller's bank, for CHPR)
+
+
+def direct_calls(lines, bl, eff, cold, hot):
+    """the low pass's labels that the cold pass may call or jump to directly,
+    with no stub: those of the low blocks that, with every low block they
+    call, jump or branch to or fall into, refer to nothing of the hot or cold
+    pass and to no glue code but the text hooks and the shared variables
+    (GLUEOK, which keep whatever bank is paged), so that they run the same
+    with the cold pass paged in"""
+    lab = {}
+    for k, (s, e, name, area) in enumerate(bl):
+        for n, i in defined(lines[s:e]):
+            if ACTIVE[s + i]:
+                lab.setdefault(n, k)
+    glue = {}
+    for f, ls in read_file("1-source-files/main-sources/elite-glue.asm"):
+        for n, i in defined(ls):
+            glue.setdefault(n, f)
+    low = [k for k in range(len(bl)) if eff[k] == "low" and ASM[k]]
+    bad, edges = set(), {k: set() for k in low}
+    for k in low:
+        s, e, name, area = bl[k]
+        own = {n for n, i in defined(lines[s:e])}
+        for i in range(s, e):
+            if not ACTIVE[i]:
+                continue
+            for off, st in statements(split_code(lines[i])[0]):
+                st = re.sub(r"^\s*(\.[A-Za-z_]\w*\s*)+", "", st)
+                m = re.match(r"^([A-Za-z]{3})\b", st.strip())
+                op = m.group(1).upper() if m else ""
+                for a, b, t in tokens(st):
+                    if t in own or (m and t.upper() == op):
+                        continue
+                    k2 = lab.get(t)
+                    if k2 is not None and eff[k2] == "low":
+                        if op in ("JSR", "JMP") or op in BRANCH:
+                            edges[k].add(k2)
+                    elif k2 is not None and eff[k2] in ("hot", "hotx", "cold"):
+                        bad.add(k)
+                    elif t in cold:
+                        bad.add(k)
+                    elif t in glue and glue[t] not in GLUEOK and t not in KEEPBANK:
+                        bad.add(k)
+        st = last_statement(lines, s, e)
+        if falls_through(st, set()):
+            nxt = [k2 for k2 in range(k + 1, len(bl)) if ASM[k2]]
+            if nxt and eff[nxt[0]] == "low":
+                edges[k].add(nxt[0])
+    changed = True
+    while changed:
+        changed = False
+        for k in low:
+            if k not in bad and edges[k] & bad:
+                bad.add(k)
+                changed = True
+    out = set()
+    for k in low:
+        if k not in bad:
+            s, e, name, area = bl[k]
+            out.update(n for n, i in defined(lines[s:e]) if ACTIVE[s + i])
+    return out
 
 
 def measured():
@@ -876,6 +966,8 @@ def main():
             copies["measure"][bl[k][0]] = ".FLOW_%d" % k
     nstubs = glue(copies, errors, lines, bl, eff, copy_of, falls,
                   ["low"] + (["measure"] if phase == "measure" else ["hot1", "hot2", "hot3"]))
+    with open(DIRECT, "w") as f:           # (for bankcheck.py: what the cold pass calls directly)
+        f.write("".join("%s\n" % n for n in sorted(nstubs[2])))
     for a in allc:
         with open(OUT % a, "w", encoding="latin-1") as f:
             f.write("\n".join(copies[a]))

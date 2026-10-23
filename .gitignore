@@ -37,3 +37,5 @@ run.bat
 3-assembled-output/flare/
 3-assembled-output/measure-symbols.txt
 3-assembled-output/flow.txt
+3-assembled-output/direct.txt
+3-assembled-output/elite-stubs.asm

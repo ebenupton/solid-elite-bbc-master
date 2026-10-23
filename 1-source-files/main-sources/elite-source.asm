@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1DDB          \ The address where the code will be run (Port: the
+ CODE% = &1E6F          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low
@@ -273,6 +273,10 @@
 
  HOMEBANK = 4           \ Port: Elite's home bank, the sideways RAM bank that is
                         \ paged in while the game runs (bank 6 in the original)
+
+ COLDBANK = 7           \ Port: the cold pass's bank, sideways RAM bank 7, paged
+                        \ in by the stubs (3-assembled-output/elite-stubs.asm) while cold code
+                        \ runs (ANDY is the rasteriser's)
 
  VIA = &FE00            \ Memory-mapped space for accessing internal hardware,
                         \ such as the video ULA, 6845 CRTC and 6522 VIAs (also
@@ -3210,7 +3214,7 @@ ENDIF
                         \ Port: the original set the ROM Select latch to bank 6
                         \ here, to page the game's data back in after disc
                         \ access. getzp now runs in the cold area, so it leaves
-                        \ ROMSEL alone: the far call that reaches it pages the
+                        \ ROMSEL alone: the stub that reaches it pages the
                         \ caller's bank back in, and NEWBRK pages Elite's home
                         \ bank in itself before calling it
 

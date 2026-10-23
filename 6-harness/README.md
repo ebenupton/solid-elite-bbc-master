@@ -79,7 +79,7 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 
 | File | What it does |
 |---|---|
-| `mlib.mjs` | Boots a disc on the emulated Master and runs the game under the pilot. Handles input injection, state snapshots and the screen hash, and walks far-call frames. |
+| `mlib.mjs` | Boots a disc on the emulated Master and runs the game under the pilot. Handles input injection, state snapshots and the screen hash, and sees through the stubs between the passes to the code that called them. |
 | `mpilot.mjs` | The deterministic pilot and its commander patch. |
 | `mcompare.mjs` | Compares the reference against a candidate and reports the first divergence, the speed per window and by pilot phase, and the cycles per flight iteration. |
 | `mredock.mjs` | The regression check for docking, launching and docking again, with real key presses. |

@@ -94,6 +94,14 @@ export function mapOfLabel(sy, name) {
     const a = sy[name], b = sy.__bank[name];
     return b === undefined ? "m" : mapAt(b, a);
 }
+// The bank of the caller of a stub between the passes (elite-stubs.asm)
+// whose code holds address a, or null if a is in no stub: bank 4 for the stubs
+// into the cold pass, bank 7 for those out of it
+export function stubBank(sy, a) {
+    if (sy.STUBS7 !== undefined && a >= sy.STUBS7 && a < sy.STUBS7_END) return 4;
+    if (sy.STUBS4 !== undefined && a >= sy.STUBS4 && a < sy.STUBS4_END) return 7;
+    return null;
+}
 // Read a byte of a given mapping regardless of what is paged
 export function physRead(cpu, map, addr) {
     if (map === "m") return cpu.ramRomOs[addr & 0xffff];
@@ -268,16 +276,20 @@ export async function runElite(opts) {
     };
     const stackWord = k => rb(0x100 + ((cpu.s + k) & 0xff)) | (rb(0x100 + ((cpu.s + k + 1) & 0xff)) << 8);
     // The JSR whose return address is at S+k: its address and the ROMSEL it ran
-    // with, seeing through far-call frames. A far call (master/src/elite-far.asm)
-    // runs its target with the stack holding the return into the far-call code
-    // (farret), then the caller's ROMSEL, then the caller's own return address.
+    // with, seeing through the stubs between the passes. A stub
+    // (elite-stubs.asm) runs its target with the stack holding the
+    // return into the stub, then the caller's own return address; the caller's
+    // bank is the stub's: bank 4 for the stubs into the cold pass (STUBS7 to
+    // STUBS7_END), bank 7 for those out of it (STUBS4 to STUBS4_END).
     // (romsel: what the code that owns S+k ran with, if not the current ROMSEL:
     // the ROMSEL of the frame below, when walking further up a chain)
     const callerAt = (k, romsel = cpu.romsel) => {
         let w = stackWord(k);
-        while (sy.farret !== undefined && w + 1 === sy.farret) {
-            romsel = rb(0x100 + ((cpu.s + k + 2) & 0xff));
-            k += 3;
+        for (;;) {
+            const b = stubBank(sy, w + 1);
+            if (b === null) break;
+            romsel = b;
+            k += 2;
             w = stackWord(k);
         }
         return { site: w + 1 - 3, romsel, k };

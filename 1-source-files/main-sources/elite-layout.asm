@@ -46,7 +46,7 @@
 
  ORG CODE%
 
- INCLUDE "1-source-files/main-sources/elite-glue.asm"           \ the port's own code: far calls, the
+ INCLUDE "1-source-files/main-sources/elite-glue.asm"           \ the port's own code: the stubs, the
                                         \ renderer's glue, the G_ stubs, the hooks
 .GLUE_END%
 
@@ -58,7 +58,7 @@
  ASSERT LOW_END% <= &3000   \ the glue area and the low pass must be below
                         \ &3000: they are used while ACCCON X = 1 (shadow RAM at
                         \ &3000-&7FFF), from interrupts or from MOS vectors with
-                        \ any ROM paged: the far calls, the renderer's glue and
+                        \ any ROM paged: the stubs, the renderer's glue and
                         \ hooks, NEWBRK, the IRQ and sound code, CHPR and its
                         \ font and UP (CATF, FLH, COMC)
 
