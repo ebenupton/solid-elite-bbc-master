@@ -55,10 +55,17 @@ PYTHON?=python
 #     which elite-data.asm includes as BDATA) and writes the tables that the
 #     dashboard's routines include (dashtab-*.asm), into 3-assembled-output
 #
-#   * 2-build-files/streams.py writes a copy of elite-source.asm for each of
-#     the port's areas (the run, the glue area, bank 4, the cold area) and of
-#     elite-data.asm (the hot data, the cold data, the dashboard image), each
-#     with the other areas' lines blanked, into 3-assembled-output
+#   * 2-build-files/streams.py emits elite-source.asm in three passes, low,
+#     hot and cold (docs/memory-map.md, "The source and its passes"). First
+#     ("measure") it writes the hot pass in one copy, and the hot data in
+#     one, which elite-measure.asm assembles for the size of each block
+#     (measure-symbols.txt). Then ("place") it flows the hot pass and the
+#     hot data through their containers by those sizes (flow.txt), and
+#     writes a copy of elite-source.asm for each place a pass goes (the
+#     configuration, the low pass, the hot pass's three containers, the cold
+#     pass) and of elite-data.asm (the hot data in HAZEL and in bank 4, the
+#     cold data, the dashboard image), each with the other lines blanked,
+#     into 3-assembled-output
 #
 #   * BeebAsm assembles the dashboard image (BDATA), then elite-layout.asm,
 #     which assembles the copies in turn, each at its own address, and saves
@@ -89,7 +96,9 @@ all:
 	echo _MATCH_ORIGINAL_BINARIES=$(match-original-binaries) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
 	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
-	$(PYTHON) 2-build-files/streams.py > 3-assembled-output/compile.txt
+	$(PYTHON) 2-build-files/streams.py measure > 3-assembled-output/compile.txt
+	$(BEEBASM) -i 1-source-files/main-sources/elite-measure.asm -d > 3-assembled-output/measure-symbols.txt
+	$(PYTHON) 2-build-files/streams.py place >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 3-assembled-output/elite-data-bdata.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -d > 3-assembled-output/symbols.txt

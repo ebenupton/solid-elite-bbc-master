@@ -6,8 +6,8 @@
 #
 # Run by the Makefile from the repository's root, after the game has been
 # assembled. From the game's symbols (3-assembled-output/symbols.txt, which
-# "beebasm -d" writes) and the per-area copies of the source that
-# 2-build-files/streams.py writes, it produces:
+# "beebasm -d" writes) and the copies of the source that
+# 2-build-files/streams.py writes for each pass, it produces:
 #
 #   * 3-assembled-output/banks.txt: each label of code in sideways RAM, with
 #     the ROMSEL value of its bank in hex (4: Elite's home bank, 7: the cold
@@ -44,13 +44,13 @@ def labels(path):
     return re.findall(r"^\.([A-Za-z_][\w%]*)", open(path, encoding="latin-1").read(), re.M)
 
 
-# The banks of the labels in sideways RAM: the blocks tagged bank 4 and cold,
-# and the main code's run where it continues into bank 4 (its labels at
-# &8000-&BFFF)
+# The banks of the labels in sideways RAM: the hot pass's container in bank 4
+# and the hot data after it, and the cold pass
 
-BANKED = [(OUT + "elite-source-bank4.asm", "4"), (OUT + "elite-source-cold.asm", "7"),
+BANKED = [(OUT + "elite-source-hot3.asm", "4"), (OUT + "elite-data-hot4.asm", "4"),
           (OUT + "dashtab-scan.asm", "4"), (OUT + "dashtab-dot.asm", "4"), (OUT + "dashtab-spbt.asm", "4"),
           (OUT + "dashtab-ecbt.asm", "4"), (OUT + "dashtab-msbar.asm", "4"),
+          (OUT + "elite-source-cold.asm", "7"),
           (SRC + "gfx-raster.asm", "5"), (SRC + "gfx-raster_disc.asm", "5"), (SRC + "gfx-raster_poly.asm", "85"),
           (SRC + "gfx-raster_line.asm", "85"), (SRC + "gfx-raster_lcold.asm", "5"),
           (SRC + "gfx-flare.asm", "5"), (SRC + "gfx-frame.asm", "6"), (SRC + "gfx-flare6.asm", "6"),
@@ -62,9 +62,6 @@ with open(OUT + "banks.txt", "w") as f:
         if os.path.exists(path):
             for name in labels(path):
                 f.write("%s %s\n" % (name, bank))
-    for name in labels(OUT + "elite-source-run.asm"):
-        if 0x8000 <= sy.get(name, 0) < 0xC000:
-            f.write("%s 4\n" % name)
 
 banks = {}
 for line in open(OUT + "banks.txt"):

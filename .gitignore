@@ -35,3 +35,5 @@ run.bat
 3-assembled-output/*.png
 3-assembled-output/lighting/
 3-assembled-output/flare/
+3-assembled-output/measure-symbols.txt
+3-assembled-output/flow.txt

@@ -3,30 +3,38 @@
 \ elite-layout.asm - the port's memory layout (docs/memory-map.md)
 \
 \ Port: the file that the Makefile assembles. elite-source.asm is the original's
-\ main source in the original's order, and the header of each routine or
-\ table names the area it lives in (no Area field: the main code's run;
-\ "Area: bank 4"; "Area: cold"). Banks 4 and 7 share the addresses
-\ &8000-&BFFF and BeebAsm assembles a file with one location counter, so
-\ 2-build-files/streams.py writes a copy of elite-source.asm for each area, with the
-\ other areas' lines blanked (build/elite-source-run.asm, -bank4.asm,
-\ -cold.asm; the line numbers are the source's), and this file assembles
-\ them one after the other, each at its own address. Every label is defined
-\ once, in its own area's copy, and every block is assembled once; where a
-\ routine lives on the other side (hot or cold), each copy holds the far-call
-\ stub that reaches it, at the routine's place:
+\ main source in the original's order, emitted in three passes, each in the
+\ source's order: the low pass (blocks tagged "Area: low": Elite's code that
+\ must be below &3000), the hot pass (no Area field, or "Area: hot, ACCCON X")
+\ and the cold pass ("Area: cold"). 2-build-files/streams.py writes a copy of
+\ elite-source.asm for each place a pass goes, with the other lines blanked
+\ (3-assembled-output/elite-source-<copy>.asm; the line numbers are the source's), and
+\ flows the hot pass through its containers by the sizes that
+\ elite-measure.asm measured (3-assembled-output/flow.txt). This file assembles the copies
+\ one after the other, each at its own address. Every label is defined once,
+\ in its own copy, and every block is assembled once; where a routine lives
+\ on the other side (hot or cold), each pass holds the far-call stub that
+\ reaches it, at the routine's place:
 \
-\   * the run: the configuration and the workspaces, then the main code from
-\     CODE% in main RAM (saved as BCODE) to its split, below screen buffer 0
-\     at &4000, continuing at &7400 after the quarter-square tables
-\     (elite-qs.asm, &7000-&73FF) and running on into bank 4 at &8000
-\     (main RAM from &7000 saved as HICODE);
+\   * the configuration and the workspaces (3-assembled-output/elite-source-config.asm);
 \
-\   * bank 4: the blocks that must be in bank 4, after the run;
+\   * main RAM from CODE%: the glue area (elite-glue.asm, the port's own
+\     code), then the low pass, both below &3000, then the hot pass's first
+\     container, to &4000 (screen buffer 0 is above; all of this is saved as
+\     BCODE);
+\
+\   * main RAM from &7000: the quarter-square tables (elite-qs.asm,
+\     &7000-&73FF), then the hot pass's second container, to &8000 (saved as
+\     HICODE);
+\
+\   * bank 4 from &8000: the hot pass's third container (the code that runs
+\     with ACCCON X set first, as it comes first in the source), then the hot
+\     data that HAZEL has no room for (saved as BANK4);
 \
 \   * HAZEL: elite-data.asm's hot data (build/elite-data-hot.asm);
 \
-\   * the cold area, sideways RAM bank 7: elite-source.asm's cold blocks,
-\     then elite-data.asm's (build/elite-data-cold.asm);
+\   * the cold pass, sideways RAM bank 7: elite-source.asm's cold blocks,
+\     then elite-data.asm's (3-assembled-output/elite-data-cold.asm);
 \
 \ then the renderer (elite-gfx.asm).
 \ elite-data.asm's blocks tagged BDATA, the dashboard image, are assembled on
@@ -34,25 +42,63 @@
 \
 \ ******************************************************************************
 
- INCLUDE "3-assembled-output/elite-source-run.asm"
+ INCLUDE "3-assembled-output/elite-source-config.asm"
 
- ASSERT P% >= &8000     \ (the run's part from &7000 fills main RAM to &8000)
+ ORG CODE%
 
- PRINT "Quarter-square tables: &7000-", ~QS_RUN%-1, ", then the run from ", ~QS_RUN%, " to &7FFF"
+ INCLUDE "1-source-files/main-sources/elite-glue.asm"           \ the port's own code: far calls, the
+                                        \ renderer's glue, the G_ stubs, the hooks
+.GLUE_END%
+
+ INCLUDE "3-assembled-output/elite-source-low.asm"   \ the low pass
+
+.LOW_END%
+
+ PRINT "Glue area: ", ~CODE%, "-", ~GLUE_END%-1, "; low pass: ", ~GLUE_END%, "-", ~LOW_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-LOW_END%
+ ASSERT LOW_END% <= &3000   \ the glue area and the low pass must be below
+                        \ &3000: they are used while ACCCON X = 1 (shadow RAM at
+                        \ &3000-&7FFF), from interrupts or from MOS vectors with
+                        \ any ROM paged: the far calls, the renderer's glue and
+                        \ hooks, NEWBRK, the IRQ and sound code, CHPR and its
+                        \ font, the log tables (LOINQ), HANGFLAG, ADDK (DIALS,
+                        \ PIX1) and UP (CATF, FLH, COMC)
+
+ INCLUDE "3-assembled-output/elite-source-hot1.asm"  \ the hot pass: main RAM, to &4000
+
+.HOT1_END%
+
+ PRINT "Hot pass: main RAM ", ~LOW_END%, "-", ~HOT1_END%-1, " free ", &4000 - HOT1_END%
+ ASSERT HOT1_END% <= &4000  \ (main RAM &4000-&6FFF is screen buffer 0)
+ ASSERT NA2% < HOT1_END%    \ (elite-checksum.py sets the commander's checksum in BCODE)
+ PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
+ SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
+
+ CLEAR &7000, &C000
+ ORG &7000
+
+ INCLUDE "1-source-files/main-sources/elite-qs.asm"             \ the quarter-square tables
+
+.QS_RUN%
+
+ INCLUDE "3-assembled-output/elite-source-hot2.asm"  \ the hot pass: main RAM from &7400
+
+.HOT2_END%
+
+ PRINT "Quarter-square tables: &7000-", ~QS_RUN%-1, ", then the hot pass ", ~QS_RUN%, "-", ~HOT2_END%-1, " free ", &8000 - HOT2_END%
+ ASSERT HOT2_END% <= &8000
  SAVE "3-assembled-output/HICODE.bin", &7000, &8000, &7000
 
-\ ******************************************************************************
-\
-\ Port: the main code's part in bank 4 ends here; the rest of bank 4 is the
-\ blocks of elite-source.asm tagged bank 4 (docs/memory-map.md)
-\
-\ ******************************************************************************
+ ORG &8000
 
- INCLUDE "3-assembled-output/elite-source-bank4.asm"
+ INCLUDE "3-assembled-output/elite-source-hot3.asm"  \ the hot pass: bank 4
+
+.HOT3_END%
+
+ INCLUDE "3-assembled-output/elite-data-hot4.asm"    \ the hot data that HAZEL has no room for
 
 .BANK4_END%
 
- PRINT "Bank 4: &8000-", ~BANK4_END%-1, " free ", &C000-BANK4_END%
+ PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~BANK4_END%-1, " free ", &C000-BANK4_END%
  ASSERT BANK4_END% <= &C000
  SAVE "3-assembled-output/BANK4.bin", &8000, &C000, &8000
 

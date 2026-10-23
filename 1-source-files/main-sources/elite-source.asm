@@ -45,13 +45,13 @@
 \
 \ ******************************************************************************
 
- CODE% = &1E2C          \ The address where the code will be run (Port: the
+ CODE% = &1E53          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
-                        \ docs/memory-map.md; the glue area, elite-glue.asm, starts
-                        \ here and the head follows it, and the low byte is
-                        \ chosen so that the font, at its place after ADDK,
-                        \ starts a page with no padding: the build prints the
-                        \ padding, FONTPAD%)
+                        \ docs/memory-map.md; the glue area, elite-glue.asm,
+                        \ starts here and the low pass follows it, and the low
+                        \ byte is chosen so that the font, at its place after
+                        \ ADDK, starts a page with no padding: the build prints
+                        \ the padding, FONTPAD%)
 
  LOAD% = CODE%          \ The address where the code will be loaded
 
@@ -2083,23 +2083,11 @@ ENDIF
 \
 \ ******************************************************************************
 
- ORG CODE%              \ Set the assembly address to CODE%
+ \ORG CODE%             \ Set the assembly address to CODE% (Port: the passes
+                        \ are placed by elite-layout.asm, docs/memory-map.md:
+                        \ the glue area from CODE%, then the low pass)
 
  LOAD_A% = LOAD%
-
-\ ******************************************************************************
-\
-\ Port: the glue area (elite-glue.asm, docs/memory-map.md), first in the main
-\ code: the blocks of this source tagged low and the port's own code and
-\ variables that must be in main RAM outside the banks; then the head, the
-\ original's VEC to UP; then the run, from M%, straight after UP. All of the
-\ glue area and the head are below &3000 (asserted after UP)
-\
-\ ******************************************************************************
-
- INCLUDE "1-source-files/main-sources/elite-glue.asm"
-
-.HEAD_START%            \ Port: the head, the original's VEC to UP
 
 \ ******************************************************************************
 \
@@ -2107,6 +2095,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing the screen
 \    Summary: The original value of the IRQ1 vector
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2121,6 +2110,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Implement the #wscn command (wait for the vertical sync)
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -2155,6 +2145,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Wait for a specified time, in 1/50s of a second
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -2187,6 +2178,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Make a long, low beep
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2201,6 +2193,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Make a short, high beep
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2216,6 +2209,7 @@ ENDIF
 \       Type: Variable
 \   Category: Sound
 \    Summary: Sound chip data mask for choosing a tone channel in the range 0-2
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2232,6 +2226,7 @@ ENDIF
 \   Category: Sound
 \    Summary: Sound chip data to turn the volume down on all channels and to act
 \             as a mask for choosing a tone channel in the range 0-2
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2258,6 +2253,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Write sound data directly to the 76489 sound chip
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -2304,6 +2300,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Reset the sound buffers and turn off all sound channels
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2358,6 +2355,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Make the sound of us being hit
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2376,6 +2374,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Make the sound of our laser firing
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2393,6 +2392,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Sound
 \    Summary: Make the sound whose number is in Y by populating the sound buffer
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -2535,6 +2535,7 @@ ENDIF
 \   Category: Sound
 \    Summary: Process the contents of the sound buffer and send it to the sound
 \             chip
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2656,6 +2657,7 @@ ENDIF
 \   Category: Sound
 \    Summary: The sound buffer where the data to be sent to the sound chip is
 \             processed
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2740,6 +2742,7 @@ ENDIF
 \       Type: Variable
 \   Category: Sound
 \    Summary: Sound data block 1
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2756,6 +2759,7 @@ ENDIF
 \       Type: Variable
 \   Category: Sound
 \    Summary: Sound data block 2
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2772,6 +2776,7 @@ ENDIF
 \       Type: Variable
 \   Category: Sound
 \    Summary: Sound data block 3
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2788,6 +2793,7 @@ ENDIF
 \       Type: Variable
 \   Category: Sound
 \    Summary: Sound data block 4
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2846,6 +2852,7 @@ ENDIF
 \   Category: Drawing the screen
 \    Summary: The main screen-mode interrupt handler (IRQ1V points here)
 \  Deep dive: The split-screen mode in BBC Micro Elite
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -2968,6 +2975,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing the screen
 \    Summary: Defines the split position in the split-screen mode
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -2999,6 +3007,7 @@ ENDIF
 \   Category: Drawing the screen
 \    Summary: Port: start timer 1 running freely, once a frame, in step with
 \             vsync, for the split
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3044,6 +3053,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Change the mode 1 palette
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3244,7 +3254,7 @@ ENDIF
 \   Category: Drawing pixels
 \    Summary: Lookup table for converting pixel y-coordinate to page number of
 \             screen address
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3285,6 +3295,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Scan the keyboard to see if SHIFT is currently pressed
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3317,6 +3328,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Keyboard
 \    Summary: Scan the keyboard to see if RETURN is currently pressed
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3350,6 +3362,7 @@ ENDIF
 \   Category: Keyboard
 \    Summary: Scan the Master Compact keyboard to see if CTRL is currently
 \             pressed
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3381,6 +3394,7 @@ ENDIF
 \    Summary: Scan the Master Compact keyboard to see if a specific key is being
 \             pressed
 \  Deep dive: The key logger
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3450,7 +3464,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Display the current ship on the scanner
 \  Deep dive: The 3D scanner
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3646,7 +3660,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a one-segment line
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3684,7 +3698,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made single-pixel character row bytes for mode 1
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3706,7 +3720,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made double-pixel character row bytes for mode 1
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3729,7 +3743,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Calculate the line gradient in the form of deltas
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3833,7 +3847,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Line has a shallow gradient, step right along x-axis
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -3989,7 +4003,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a shallow line going right and up or left and down
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4273,7 +4287,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a shallow line going right and down or left and up
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4588,7 +4602,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a line: Line has a steep gradient, step up along y-axis
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -4748,7 +4762,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a steep line going up and left or down and right
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -5325,7 +5339,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a steep line going up and right or down and left
 \  Deep dive: Elite's line-drawing algorithm
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -5899,7 +5913,7 @@ ENDIF
 \   Category: Drawing lines
 \    Summary: Draw a horizontal line from (X1, Y1) to (X2, Y1)
 \  Deep dive: Drawing colour pixels on the BBC Micro
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6196,7 +6210,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made character rows for the left end of a horizontal line
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6221,7 +6235,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Ready-made character rows for the right end of a horizontal line
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6246,7 +6260,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Lookup table for two-pixel mode 1 orange pixels for the sun
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6286,6 +6300,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Stardust
 \    Summary: Set COL for the stardust, then pxpat
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -6302,6 +6317,7 @@ ENDIF
 \    Summary: Patch PIX1's, H_STAR's and H_STAROFF's record-mode tests for a
 \             pass over the stardust (Port: the demo port's per-frame patching
 \             of the QQ11 OR GFORCE test, transfer item B12)
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6340,7 +6356,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (YY+1 SYL+Y) = (A P) + (S R) and draw stardust particle
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6432,7 +6448,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing pixels
 \    Summary: Draw a stardust particle relative to the screen centre
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6527,7 +6543,7 @@ ENDIF
 \   Category: Drawing pixels
 \    Summary: Draw a one-pixel dot, two-pixel dash or four-pixel square
 \  Deep dive: Drawing colour pixels on the BBC Micro
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6688,7 +6704,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: A four-colour mode 1 pixel byte that represents a dot's distance
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6720,7 +6736,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Draw a dash on the compass
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6789,7 +6805,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing pixels
 \    Summary: Port: draw a dot on the dashboard, in place of CPIXK
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6877,7 +6893,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Start up the E.C.M. (light up the indicator, start the countdown
 \             and make the E.C.M. sound)
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6899,7 +6915,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Light up the E.C.M. indicator bulb ("E") on the dashboard
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6929,7 +6945,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Light up the space station indicator ("S") on the dashboard
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6963,7 +6979,7 @@ ENDIF
 \       Type: Variable
 \   Category: Dashboard
 \    Summary: The bitmap definition for the space station indicator bulb
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6979,7 +6995,7 @@ ENDIF
 \       Type: Variable
 \   Category: Dashboard
 \    Summary: The character bitmap for the E.C.M. indicator bulb
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -6995,7 +7011,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Draw a specific indicator in the dashboard's missile bar
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7090,6 +7106,7 @@ ENDIF
 \    Summary: The number of ships being displayed in the ship hangar
 \             (Port: HALL still sets it, but nothing reads it: HANGER, which
 \             did, is removed, as the renderer draws the hangar)
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -7239,6 +7256,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the top part of the screen and draw a border box
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -7257,6 +7275,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Text
 \    Summary: Print a newline
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -7281,6 +7300,7 @@ ENDIF
 \   Category: Text
 \    Summary: Print a character at the text cursor by poking into screen memory
 \  Deep dive: Drawing text
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7836,7 +7856,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the top part of the screen and draw a border box
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -7985,6 +8005,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Zero-fill the page whose number is in X
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8007,6 +8028,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Utility routines
 \    Summary: Zero-fill a specific page
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8059,7 +8081,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing the screen
 \    Summary: Clear the bottom three text rows of the space view
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ******************************************************************************
 
@@ -8172,7 +8194,7 @@ ENDIF
 \   Category: Dashboard
 \    Summary: Update the dashboard
 \  Deep dive: The dashboard indicators
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8451,7 +8473,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \   Category: Dashboard
 \    Summary: Fetch the current dashboard colours for non-striped indicators, to
 \             support flashing
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8473,7 +8495,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Fetch the current dashboard colours, to support flashing
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8502,7 +8524,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \   Category: Dashboard
 \    Summary: Update a bar-based indicator on the dashboard
 \  Deep dive: The dashboard indicators
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8584,7 +8606,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \   Category: Dashboard
 \    Summary: Update the roll or pitch indicator on the dashboard
 \  Deep dive: The dashboard indicators
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8652,7 +8674,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Port: the cache index of a dashboard indicator, and the caches
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8689,7 +8711,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \       Type: Subroutine
 \   Category: Dashboard
 \    Summary: Port: draw a segment of a dashboard indicator
-\       Area: bank 4
+\       Area: hot, ACCCON X
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8784,6 +8806,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \   Category: Maths (Arithmetic)
 \    Summary: Calculate (A X) = (A P) + (S R)
 \  Deep dive: Adding sign-magnitude numbers
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8877,6 +8900,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \       Type: Variable
 \   Category: Text
 \    Summary: A copy of the character definition bitmap table from the MOS ROM
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8915,6 +8939,7 @@ DCN_MARK = 6            \ roll / pitch marker
 \       Type: Variable
 \   Category: Maths (Arithmetic)
 \    Summary: Binary logarithm table (high byte)
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8991,6 +9016,7 @@ ENDIF
 \       Type: Variable
 \   Category: Maths (Arithmetic)
 \    Summary: Binary logarithm table (low byte)
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -9069,6 +9095,7 @@ ENDIF
 \       Type: Variable
 \   Category: Maths (Arithmetic)
 \    Summary: Binary antilogarithm table
+\       Area: low
 \
 \ ------------------------------------------------------------------------------
 \
@@ -9097,6 +9124,7 @@ ENDIF
 \    Address: &2C40 to &2C61
 \   Category: Workspaces
 \    Summary: Configuration variables
+\       Area: low
 \
 \ ******************************************************************************
 
@@ -9277,18 +9305,6 @@ ENDIF
                         \ game is paused, and the default level is 7
 
  PRINT "UP workspace from ", ~UP, "to ", ~P%-1, "inclusive"
-
-.HEAD_END%              \ Port: the end of the head, where the run starts (M%)
-
- PRINT "Glue area: ", ~CODE%, "-", ~HEAD_START%-1, "; head: ", ~HEAD_START%, "-", ~HEAD_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-HEAD_END%
- ASSERT HEAD_END% <= &3000  \ Port: the glue area and the head must be below
-                        \ &3000: they are used while ACCCON X = 1 (shadow RAM at
-                        \ &3000-&7FFF), from interrupts or from MOS vectors with
-                        \ any ROM paged: the glue area (NEWBRK, the far calls,
-                        \ the renderer's glue and hooks), the IRQ and sound
-                        \ code, CHPR and its font, the log tables (LOINQ),
-                        \ HANGFLAG (HANGER), ADDK (DIALS, PIX1) and UP (CATF,
-                        \ FLH, COMC)
 
 \ ******************************************************************************
 \
@@ -17733,29 +17749,6 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
-
-\ ******************************************************************************
-\
-\ Port: the main code continues in main RAM at &7400 from here, after the
-\ quarter-square tables (elite-qs.asm, &7000-&73FF), and runs on through &8000 into bank 4
-\ (docs/memory-map.md), at a routine that nothing falls into. The part from
-\ CODE%, below screen buffer 0 (main RAM &4000-&6FFF), is saved as BCODE; the
-\ part from &7000 as HICODE and the rest, in bank 4, with the blocks tagged
-\ bank 4 after it, as BANK4 (elite-layout.asm)
-\
-\ ******************************************************************************
-
- PRINT "Main code: ", ~CODE%, "-", ~P%-1, " free ", &4000 - P%
- ASSERT P% <= &4000     \ (main RAM &4000-&6FFF is screen buffer 0)
- PRINT "S.BCODE ", ~CODE%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD%
- SAVE "3-assembled-output/BCODE.unprot.bin", CODE%, P%, LOAD%
-
- CLEAR &7000, &C000
- ORG &7000
-
- INCLUDE "1-source-files/main-sources/elite-qs.asm"             \ the quarter-square tables
-
-.QS_RUN%
 
 \ ******************************************************************************
 \
