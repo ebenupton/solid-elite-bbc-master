@@ -57,11 +57,18 @@ BANKED = [(OUT + "elite-source-hot3.asm", "4"), (OUT + "elite-data-hot4.asm", "4
           (SRC + "gfx-hangar.asm", "6"), (SRC + "gfx-faces.asm", "6"), (SRC + "gfx-frame_cold.asm", "6"),
           (SRC + "gfx-merid.asm", "7")]
 
+# Each name is written once, from the first file that defines it: the game's
+# copies come first, and a name they share with a scoped local label of the
+# renderer's (.t2, .out ...) is the game's
+
+seen = set()
 with open(OUT + "banks.txt", "w") as f:
     for path, bank in BANKED:
         if os.path.exists(path):
             for name in labels(path):
-                f.write("%s %s\n" % (name, bank))
+                if name not in seen:
+                    seen.add(name)
+                    f.write("%s %s\n" % (name, bank))
 
 banks = {}
 for line in open(OUT + "banks.txt"):
