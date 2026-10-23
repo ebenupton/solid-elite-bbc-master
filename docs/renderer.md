@@ -347,8 +347,8 @@ tables.
 
 ## Speed
 
-The gate's run gives 11.98 flight iterations per emulated second, against
-SNG47's 13.97 (0.857 times), at 166,950 cycles a flight iteration. With the
+The gate's run gives 11.99 flight iterations per emulated second, against
+SNG47's 13.97 (0.858 times), at 166,791 cycles a flight iteration. With the
 speed-ups of the port's second part and the original's wireframe drawing it
 is 17.86, and with plain disc planets in place of the beach ball the
 renderer ran at 17.24 (115,992 cycles). So most of the cost is the beach
