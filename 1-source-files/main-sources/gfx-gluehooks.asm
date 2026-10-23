@@ -110,13 +110,28 @@
 \ (buffer 1); ACCCON D shows it (the timer 1 interrupt at the dashboard sets
 \ D = 1 again, as the dashboard is in shadow RAM). Only D is touched, so the
 \ main code's ACCCON X is kept
+\
+\ The frame rate is capped at 25 frames a second: a frame stays on show for at
+\ least two fields. A flip pending at the vsync straight after the last flip
+\ (GVLAST non-zero) is held to the next one; F_FRAME, which waits for GFLIP
+\ before it draws into the back buffer, has meanwhile run the next iteration's
+\ game code and its frame's set-up, so only the drawing waits. A frame slower
+\ than two fields flips as before, at the first vsync after F_FRAME queues it.
+\ Cost: 4 cycles more at a vsync with no flip pending, 15 more at a flip, 1
+\ fewer at a held flip than at the flip it was; 13 bytes and GVLAST
 
 .H_VSYNC
  LDA GFLIP
- BEQ hv0
+ BEQ hv3
+ LDA GVLAST             \ the last vsync flipped: hold this flip one field
+ BNE hv3
  LDA GPEND
  STA GFRONT
  STZ GFLIP
+ DEC GVLAST             \ (0 to &FF: this vsync flipped)
+ BRA hv0
+.hv3
+ STZ GVLAST             \ no flip at this vsync
 .hv0
  BIT GMODE
  BMI hv1

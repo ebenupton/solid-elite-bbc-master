@@ -113,6 +113,18 @@ back buffer, two frames old:
 8. Request a flip at the next vsync. `H_VSYNC`, from `IRQ1`, shows the
    front buffer.
 
+The frame rate is capped at 25 frames a second: each frame is on show for at
+least two fields. `H_VSYNC` holds a pending flip for one field when the vsync
+before it flipped (`GVLAST`), so a frame quicker than two fields waits at its
+flip, while the next iteration's game code runs. A slower frame flips at the
+first vsync after it is queued, as before. Every flip goes this way: flight,
+the escape pod's drift, the title screens and the briefing's Constrictor.
+The docked screens never flip. Before the cap, 10.7% of the gate's frames
+were shown for a single field, so motion juddered between one field and two;
+with it, none are. The cost is 4 cycles a vsync, 15 at a flip, and 13 bytes.
+On the title screen the ship's approach, quicker than 25 frames a second
+while the ship is small, now takes about 3.5 seconds rather than 2.3.
+
 Because each buffer repairs only its own dirty rows, a frame costs what
 changed, not the whole screen. Close to the space station, rows that hold
 one solid span are kept from one frame to the next instead (see "Kept solid
@@ -348,14 +360,16 @@ tables.
 
 ## Speed
 
-The gate's run gives 11.99 flight iterations per emulated second, against
-SNG47's 13.97 (0.858 times), at 166,791 cycles a flight iteration. With the
-speed-ups of the port's second part and the original's wireframe drawing it
-is 17.86, and with plain disc planets in place of the beach ball the
-renderer ran at 17.24 (115,992 cycles). So most of the cost is the beach
-ball: its geometry and its two-colour disc rows, every frame that a
-meridian planet is on screen, which is about half the gate's run, as the
-pilot starts at Lave. Flight with no beach ball on screen runs as fast as
-before. The big planet and the space station close up are the slowest
+The gate's run gives 11.73 flight iterations per emulated second, against
+SNG47's 13.97 (0.840 times), at 170,501 cycles a flight iteration, with the
+frame rate capped at 25 frames a second; without the cap it gave 11.99
+(0.858 times, 166,791 cycles), with a tenth of its frames shown for a single
+field. With the speed-ups of the port's second part and the original's
+wireframe drawing it is 17.86, and with plain disc planets in place of the
+beach ball the renderer ran at 17.24 (115,992 cycles). So most of the cost
+is the beach ball: its geometry and its two-colour disc rows, every frame
+that a meridian planet is on screen, which is about half the gate's run, as
+the pilot starts at Lave. Flight with no beach ball on screen runs as fast
+as before. The big planet and the space station close up are the slowest
 views, as their discs and faces cover most of the screen; the kept solid
 rows speed up the station's last seconds.

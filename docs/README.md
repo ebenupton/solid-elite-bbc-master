@@ -37,6 +37,10 @@ Master Elite (the Acornsoft SNG47 release), in five parts:
    crossed most are hot. The docked screens take 4.8% fewer busy cycles
    (5,152,363 against 5,411,007, `6-harness/mdocktime.mjs`), and flight
    runs at 11.99 iterations per emulated second (0.858 times SNG47).
+   Since then the frame rate is capped at 25 frames a second
+   ([renderer.md](renderer.md)): no frame is on show for a single field, and
+   flight runs at 11.73 (0.840 times SNG47), as the frames that were quicker
+   than two fields now wait at their flip.
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -87,6 +91,7 @@ encrypt=no`.
 | End of part 3: the filled renderer | 17.24 | 1.234 | 115,992 |
 | End of part 4: beach balls and kept rows | 11.98 | 0.857 | 166,950 |
 | End of part 5: three passes | 11.99 | 0.858 | 166,791 |
+| The 25 fps cap | 11.73 | 0.840 | 170,501 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never

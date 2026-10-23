@@ -280,7 +280,7 @@ line.
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
 | `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set, and `VEC` (`&0CCF`), the configuration's last block |
 | The shared workspace | main `&0E00-&1DD4` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
-| The glue area | main from `CODE%` (`&1E24`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
+| The glue area | main from `CODE%` (`&1E16`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
 | The low pass | main `&2869-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
 | The hot pass, in main RAM | main `&2E49-&3F92` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
@@ -304,7 +304,10 @@ Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 810 at the end of bank 4,
 2,700 at the end of bank 7, 363 in HAZEL, 16 and 107 (and 252 in the row
 runs' tails) in bank 5, 27 in ANDY, 12 in bank 6, and 48 and 105 in `WP`'s
-pages and the shared workspace, with 79 more between it and the main code.
+pages and the shared workspace, with 65 more between it and the main code
+(79 before the 25 fps cap's 14 bytes in the glue area: `CODE%` moved down
+from `&1E24` to `&1E16` to keep the font page aligned, so nothing after the
+glue area moved).
 
 The three passes cost 373 free bytes outside shadow RAM. The stubs between
 the passes are 884 bytes, against the far calls' 184, all in the glue area
@@ -337,7 +340,7 @@ place, using its table `FTAB`:
 * HICODE goes to main `&7000-&7FFF`.
 
 Then it loads BCODE (the glue area, the low pass and the hot pass's first
-container) to its address (`&1E24`) and changes directory to E. The
+container) to its address (`&1E16`) and changes directory to E. The
 loader is in the shared workspace's place, so its last part runs from `K%`
 (`&0400`), where it is copied first. That part takes DFS's and the MOS's
 lasting bytes into `DFSST` and `DFSST2`, copies HAZEL into place, quietens the 1770 and

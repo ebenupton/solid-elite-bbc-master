@@ -13,6 +13,7 @@
                         \ Master's direct-mode screen)
 .GFLIP   EQUB 0         \ non-zero: show buffer GPEND at the next vsync
 .GPEND   EQUB 0
+.GVLAST  EQUB 0         \ non-zero: the last vsync flipped (H_VSYNC: 25 fps cap)
 .GDRAWON EQUB &FF       \ 0: drawing primitives are erasing, ignore them
 .GFORCE  EQUB 0         \ non-zero: draw directly even though QQ11 = 0
 .GSIGHT  EQUB 0         \ non-zero: draw the laser sights
