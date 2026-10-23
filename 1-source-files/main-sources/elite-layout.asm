@@ -12,9 +12,10 @@
 \ flows the hot pass through its containers by the sizes that
 \ elite-measure.asm measured (3-assembled-output/flow.txt). This file assembles the copies
 \ one after the other, each at its own address. Every label is defined once,
-\ in its own copy, and every block is assembled once; where a routine lives
-\ on the other side (hot or cold), each pass holds the far-call stub that
-\ reaches it, at the routine's place:
+\ in its own copy, and every block is assembled once. A call from one side
+\ (the low and hot passes) to the other (the cold pass) goes through a stub
+\ of its own in the glue area (elite-stubs.asm); a fall-through across the
+\ line falls into a seam, a JMP to the stub at the next routine's place:
 \
 \   * the configuration and the workspaces (3-assembled-output/elite-source-config.asm);
 \
@@ -31,14 +32,14 @@
 \     with ACCCON X set first, as it comes first in the source), then the hot
 \     data that HAZEL has no room for (saved as BANK4);
 \
-\   * HAZEL: elite-data.asm's hot data (build/elite-data-hot.asm);
+\   * HAZEL: elite-data.asm's hot data (3-assembled-output/elite-data-hot.asm);
 \
 \   * the cold pass, sideways RAM bank 7: elite-source.asm's cold blocks,
 \     then elite-data.asm's (3-assembled-output/elite-data-cold.asm);
 \
 \ then the renderer (elite-gfx.asm).
 \ elite-data.asm's blocks tagged BDATA, the dashboard image, are assembled on
-\ their own (build/elite-data-bdata.asm, by the Makefile).
+\ their own (3-assembled-output/elite-data-bdata.asm, by the Makefile).
 \
 \ ******************************************************************************
 
@@ -104,10 +105,10 @@
 \ ******************************************************************************
 \
 \ Port: HAZEL (&C000-&DFFF), visible whatever bank is paged: the hot data,
-\ elite-data.asm's blocks that are not tagged (build/elite-data-hot.asm,
+\ elite-data.asm's blocks that are not tagged (3-assembled-output/elite-data-hot.asm,
 \ which 2-build-files/streams.py writes) in the original's order from &C000: XX21,
-\ E%, KWL%, KWH%, the blueprints from the missile's to the Dodo's, SNE and
-\ ACT. DOSCLI stashes all of HAZEL in screen buffer 0 around each disc
+\ E%, KWL%, KWH% and the blueprints from the missile's to the Dodo's (the
+\ hot data that follows, QQ18, SNE and ACT, flows on into bank 4). DOSCLI stashes all of HAZEL in screen buffer 0 around each disc
 \ command, so the data may sit anywhere in it; nothing the IRQ handler or
 \ CHPR uses during a command is here. Saved as HAZEL (it ends below &DF00: the MOS's own
 \ bytes from &DF00 on are left as the loader's disc accesses left them, and
@@ -135,12 +136,12 @@
 
 \ ******************************************************************************
 \
-\ Port: the cold area (docs/memory-map.md), paged in as ROMSEL = COLDBANK
+\ Port: the cold pass (docs/memory-map.md), paged in as ROMSEL = COLDBANK
 \ (7): sideways RAM bank 7 from &8000, the original's cold code and data in
-\ the original's order: the blocks of elite-source.asm tagged cold, with the
-\ stubs that lead out of the cold area at their targets' places, then those
-\ of elite-data.asm (QQ18 and the extended tokens TKN1, RUPLA, RUGAL and
-\ RUTOK). Saved as COLD7.
+\ the original's order: the blocks of elite-source.asm tagged cold (with a
+\ seam, a JMP to a hot routine's stub, where a cold routine falls into a hot
+\ one), then those of elite-data.asm (the extended tokens TKN1, RUPLA, RUGAL
+\ and RUTOK). Saved as COLD7.
 \
 \ ******************************************************************************
 
@@ -151,7 +152,7 @@
 
  INCLUDE "3-assembled-output/elite-source-cold.asm"
 
- INCLUDE "3-assembled-output/elite-data-cold.asm"    \ QQ18 and the extended tokens
+ INCLUDE "3-assembled-output/elite-data-cold.asm"    \ the extended tokens
 
 .COLD_END%
 

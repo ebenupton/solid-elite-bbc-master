@@ -10,9 +10,10 @@
 \ the start of each block, FLOW_END after the last) from the low pass's end
 \ onwards, past the containers' limits, and the whole hot data in one copy
 \ (3-assembled-output/elite-data-measure.asm, DFLOW_<n> and DFLOW_END) at &C000. A
-\ block's size is the same wherever it goes (no block of either aligns
-\ itself, and a stub at a routine's place is the same size in every
-\ container), so the sizes measured here are the sizes in the layout. It
+\ block's size is the same wherever it goes (a seam at a routine's place is
+\ the same size in every container, and streams.py takes the measure's
+\ padding off the one block that aligns itself, the log tables' ALIGN
+\ &100), so the sizes measured here are the sizes in the layout. It
 \ also gives the containers' starts: LOW_END% (the glue area and the low
 \ pass are assembled as in the layout) and QS_RUN% (after the quarter-square
 \ tables). Nothing it saves is used: elite-layout.asm saves every image

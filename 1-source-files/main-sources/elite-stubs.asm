@@ -38,7 +38,7 @@
 \ runs with bank 7 paged. So a stub pages the target's bank in, calls it and
 \ pages the caller's bank back, with no frame of its own: the target sees
 \ only the stub's return address above its caller's (two bytes more than a
-\ direct call; harness/mlib.mjs sees through it by the stubs' ranges,
+\ direct call; 6-harness/mlib.mjs sees through it by the stubs' ranges,
 \ STUBS7 to STUBS7_END and STUBS4 to STUBS4_END). A, X, Y and every flag
 \ reach the target as they were at the stub, and come back unchanged.
 \
@@ -52,8 +52,10 @@
 \ JSR to the stub, 35 for to7's JSR and body, 6 and 6 for the JSR to the
 \ target and its RTS, 3 for the JMP, 29 for to4's body and RTS); the far
 \ calls this replaces (far7 and far4: the stub's address of the target read
-\ through the stack and a self-modified operand) cost about 171. The
-\ busiest stubs (streams.py's INLINE) are written out in full, 70 cycles.
+\ through the stack and a self-modified operand) cost about 171.
+\ streams.py's INLINE can write a stub out in full (70 cycles, 17 bytes
+\ more), but none is: the gate's run makes 0.015 crossings a flight
+\ iteration.
 \
 \ ******************************************************************************
 

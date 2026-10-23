@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// fbhash.mjs: the pixel oracle (as the Tube branch's fbreplay.mjs): replay a run on a
+// fbhash.mjs: the pixel oracle: replay a run on a
 // Master build and hash both screen buffers (main RAM's &4000-&6FFF, then shadow
 // RAM's) at each frame's end (hframe's return from G_FRAME), keyed "iteration.n" (n a
 // running frame count); compare two builds' files with fbcmp.mjs.

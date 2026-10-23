@@ -1,13 +1,13 @@
-// Boot BBC Master Elite (master/build.sh's disc) on the emulated BBC Master and
+// Boot BBC Master Elite (the build's disc) on the emulated BBC Master and
 // check that it reaches the title screen with its code and data in place.
 //
-// node harness/mboot.mjs [--disc master/build/elite-master-sng47.ssd]
-//                        [--syms master/build/symbols.txt] [--out dir] [--polls N]
+// node 6-harness/mboot.mjs [--disc 5-compiled-game-discs/elite-master-sng47.ssd]
+//                        [--syms 3-assembled-output/symbols.txt] [--out dir] [--polls N]
 //
 // Boots with SHIFT+BREAK, runs until the first title screen ("Load New
 // Commander (Y/N)?") has drawn its rotating ship a few times (the 8th call of
 // RDKEY after TITLE starts), then reports ROMSEL / ACCCON, compares the
-// sideways, shadow and main RAM images the loader installs (build/images.txt)
+// sideways, shadow and main RAM images the loader installs (3-assembled-output/images.txt)
 // with what memory holds,
 // and
 // writes title.png.
@@ -57,12 +57,12 @@ console.log(`sideways RAM banks in this model: ${cpu.model.swram.map((v, i) => v
 // The banked images against the build: [file, ROMSEL or "shadow", start]
 // (ROMSEL bit 7: ANDY at &8000-&8FFF). The game writes XX21+2/3 (the station's
 // blueprint, in HAZEL) and patches DETOK's JSR at DTM (DTM_C in the cold area).
-// (build/images.txt, from build.sh: file, ROMSEL or main/shadow/hazel, start,
+// (3-assembled-output/images.txt, from layout-info.py: file, ROMSEL or main/shadow/hazel, start,
 // "v" if it holds variables or self-modified code)
 const images = readFileSync(SYMS.replace(/symbols\.txt$/, "images.txt"), "utf8").trim().split("\n").map(l => l.trim().split(/\s+/))
     .map(([f, rs, at, v]) => [f, /^[0-9a-f]+$/i.test(rs) ? parseInt(rs, 16) : rs, parseInt(at, 16), v === "v"]);
 // (XX21: in the symbols since the data is assembled with the code; before
-// that, in build/data-addresses.asm)
+// that, in data-addresses.asm beside them)
 const xx21 = syms.XX21 ?? parseInt(readFileSync(SYMS.replace(/symbols\.txt$/, "data-addresses.asm"), "utf8").match(/XX21 = &([0-9A-F]+)/)[1], 16);
 let diffs = [];
 for (const [f, rs, start, vol] of images) {

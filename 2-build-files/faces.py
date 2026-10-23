@@ -32,7 +32,7 @@ PATCH = {}
 
 
 def _mem():
-    """The game data in HAZEL (build/HZDATA.bin, from XX21 at &C000) and XX21's
+    """The game data in HAZEL (3-assembled-output/HZDATA.bin, from XX21 at &C000) and XX21's
     address."""
     mem = bytearray(0x10000)
     sy = {}

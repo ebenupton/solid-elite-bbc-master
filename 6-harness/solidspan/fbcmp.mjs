@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// fbcmp.mjs: compare two frame-hash files (fbreplay.mjs's, tfbreplay.mjs's: keys
+// fbcmp.mjs: compare two frame-hash files (fbhash.mjs's: keys
 // "iteration.n", values the hash of both screen buffers) as ordered sequences of
 // distinct frames per iteration. jsbeeb skips its instruction hook on the first
 // instruction of an execute slice, so either side can miss a frame: a lone frame
 // inserted or deleted (its neighbours matching) is a sampling gap; a frame whose
 // hash differs from the other side's at the same place is a mismatch.
-// node tube/tools/fbcmp.mjs ref.json cand.json [--from I] [--to J]
+// node 6-harness/solidspan/fbcmp.mjs ref.json cand.json [--from I] [--to J]
 import { readFileSync } from "fs";
 const [fa, fb] = process.argv.slice(2).filter(x => !x.startsWith("--"));
 const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? +process.argv[i + 1] : undefined; };

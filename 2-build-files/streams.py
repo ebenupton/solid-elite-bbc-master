@@ -17,9 +17,8 @@
 #
 #   * "Area: low": the low pass, Elite's code that must be in main RAM below
 #     &3000, where it is seen whatever bank is paged and whatever ACCCON X is
-#     (the head, VEC to UP: the IRQ and the sound, CHPR and its font, the
-#     log tables, UP ...; stackpt and NEWBRK, which the MOS enters through
-#     BRKV with any ROM paged). elite-layout.asm puts it after the glue area,
+#     (WSCAN, DELAY, the IRQ and the sound, CHPR and its font, UP; stackpt
+#     and NEWBRK, which the MOS enters through BRKV with any ROM paged). elite-layout.asm puts it after the glue area,
 #     all of it below &3000.
 #   * no Area field: the hot pass, the rest of the game code, which runs with
 #     Elite's home bank (bank 4) paged. It flows through its containers in
@@ -40,8 +39,9 @@
 #
 # A block runs from its header to the next header (or to a separator line of
 # stars, which starts an untagged block: the original's PRINT and SAVE
-# sections). The blocks before the head (the configuration and the
-# workspaces: ZP, XX3, K%, WP) are the configuration, assembled first. A
+# sections). The blocks before the low pass's first block (the
+# configuration and the workspaces: ZP, XX3, K%, WP, then VEC) are the
+# configuration, assembled first. A
 # block that assembles nothing (a banner, constants, PRINTs) goes with the
 # block before it.
 #
@@ -69,8 +69,10 @@
 # bank 4, after the hot code. The sizes are measured, not estimated: the
 # measure copies are assembled once (elite-measure.asm, whose symbols give
 # each FLOW_<n> and DFLOW_<n>), and a block's size does not depend on where
-# it goes (no block aligns itself; a stub at its place is the same size in
-# every container). 3-assembled-output/flow.txt lists the containers and their units.
+# it goes (a seam at its place is the same size in every container; a block
+# that aligns itself, the log tables, is placed at its boundary with the
+# padding counted). 3-assembled-output/flow.txt lists the containers and
+# their units.
 #
 # Each pass is the original in its order, and every call from one side to
 # the other goes through a stub of its own, in the glue area (main RAM below
@@ -627,8 +629,8 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
 
 
 # INLINE: the stubs that are written out in full rather than through the
-# shared to7 and to4 (the busiest; each costs 17 bytes more and saves 15
-# cycles a call)
+# shared to7 and to4 (each costs 17 bytes more and saves 15 cycles a call;
+# none is, as the gate's run makes 0.015 crossings a flight iteration)
 INLINE = set()
 
 
@@ -820,7 +822,7 @@ def main():
                 depth -= 1
         if depth:
             errors.append("%s:%d: %s: IF ... ENDIF not balanced in a block" % (SRC, s + 1, name))
-    # each block's pass: the configuration before the head, then its tag; a
+    # each block's pass: the configuration before the low pass, then its tag; a
     # block that assembles nothing goes with the block before it
     ASM[:] = [any(ACTIVE[i] and assembles(code_part(lines[i]), macros) for i in range(s, e))
               for s, e, name, area in bl]

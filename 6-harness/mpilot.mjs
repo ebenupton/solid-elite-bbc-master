@@ -1,5 +1,5 @@
-// A deterministic pilot for BBC Master Elite (used by harness/mcompare.mjs via
-// harness/mlib.mjs).
+// A deterministic pilot for BBC Master Elite (used by mcompare.mjs via
+// mlib.mjs).
 //
 // The pilot decides which keys are down at each keyboard read from the game
 // state at that moment, plus its own memory (phase, step counters), which is

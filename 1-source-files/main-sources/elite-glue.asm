@@ -4,8 +4,8 @@
 \ the low pass (docs/memory-map.md)
 \
 \ Port: INCLUDEd by elite-layout.asm at CODE%, before the low pass (Elite's
-\ code that must be below &3000: the head, VEC to UP, then stackpt and
-\ NEWBRK). All of it is below &3000 (asserted after the low pass), so it is
+\ code that must be below &3000: WSCAN, the sound, IRQ1, CHPR and its font,
+\ UP, stackpt and NEWBRK). All of it is below &3000 (asserted after the low pass), so it is
 \ visible whatever is paged at &8000-&BFFF and whatever ACCCON X is (the IRQ
 \ handler, the MOS vectors, entered with any ROM paged, and code that runs
 \ with ACCCON X set use much of it). It holds the port's own code only:

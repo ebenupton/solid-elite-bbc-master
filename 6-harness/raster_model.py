@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Soak test for src/raster.asm against a pixel-exact Python reference.
+"""Soak test for the demo port's raster.asm against a pixel-exact Python reference.
 
 (The Demonstration Disc port's test of its rasteriser, which this port's
 rasteriser descends from: its pixel-exact model, machine and tests.
@@ -12,7 +12,7 @@ below.  Also checks that nothing outside the screen window, the module, the
 renderer's zero page (&06-&27) and the stack page is ever written, and reports
 cycle counts.
 
-    python3 tools/test_raster.py [--seed N] [--quick] [--org HEX] [--cycles]
+    (run here through 6-harness/test_raster.py [--quick])
 """
 import argparse
 import math

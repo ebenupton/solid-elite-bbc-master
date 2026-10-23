@@ -1,6 +1,6 @@
 // Deterministic driver for BBC Master Elite on the emulated BBC Master (jsbeeb).
 //
-// Shared by harness/mcompare.mjs and the pilot (harness/mpilot.mjs).
+// Shared by mcompare.mjs and the pilot (mpilot.mjs).
 //
 // Input injection
 // ---------------
@@ -67,7 +67,7 @@ export const WORK = `${ROOT}6-harness/work/`;
 export function loadSyms(path) {
     const syms = {};
     for (const m of readFileSync(path, "utf8").matchAll(/'([^']+)':(\d+)L?/g)) if (!(m[1] in syms)) syms[m[1]] = +m[2];
-    // Labels in sideways RAM: build/banks.txt next to the symbols, "label bank" per
+    // Labels in sideways RAM: 3-assembled-output/banks.txt next to the symbols, "label bank" per
     // line with the ROMSEL value of the code's bank in hex (4: Elite's home bank,
     // 7: the cold area, 85: the rasteriser's polygon window, ANDY over bank 5).
     // Kept non-enumerable so
@@ -258,7 +258,7 @@ export async function runElite(opts) {
     const rb = a => cpu.ramRomOs[a & 0xffff];
     const wr = (a, bytes) => { for (let i = 0; i < bytes.length; i++) cpu.ramRomOs[a + i] = bytes[i] & 255; };
     // label lookup for call sites, per mapping ("m" for main RAM, then ANDY and
-    // the sideways banks, from build/banks.txt). A cold copy's label (name_C) is
+    // the sideways banks, from banks.txt). A cold copy's label (name_C) is
 // reported as name.
     const labs = {};
     for (const [k, v] of Object.entries(sy)) {

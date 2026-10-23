@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // mspeed.mjs: iterations per emulated second over windows of a replayed run on a
-// Master build (tube/tools/tspeed.mjs's --kind m, on its own).
+// Master build.
 //   node 6-harness/solidspan/mspeed.mjs --log run1.jsonl --cand DISC --csyms SYMS [--windows 1000-1400,3420-3550,0-3550]
 import { replayMachine, CYCLES_PER_FRAME } from "./common.mjs";
 import { parseArgs } from "../args.mjs";

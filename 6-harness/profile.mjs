@@ -1,18 +1,18 @@
 // Cycle profile of full Master Elite per (mapping, PC), for weighting the grind's
-// windows, over exactly the run the gate (master/verify.sh) times.
+// windows, over exactly the run the gate (6-harness/verify.sh) times.
 //
-// node master/tools/grind/profile.mjs [--root <tree>] [--disc d] [--syms s]
+// node 6-harness/profile.mjs [--disc d] [--syms s]
 //                                     [--iters 10000] [--seed boot|none]
-//                                     [--out <tree>/scratch/grind/profile.json] [--pagex]
+//                            [--out 6-harness/work/profile.json] [--pagex]
 //
-// The run: harness/mlib.mjs runElite with harness/mpilot.mjs's pilot and its commander
+// The run: mlib.mjs runElite with mpilot.mjs's pilot and its commander
 // patch, the candidate's boot leftovers seeded from the reference disc at TT170 exactly
-// as harness/mcompare.mjs --seed boot does (the reference is booted to its first MLOOP
+// as mcompare.mjs --seed boot does (the reference is booted to its first MLOOP
 // for that), --iters MLOOP iterations (the gate's 10000) -- so the same pilot, seeds and
-// trajectory as master/verify.sh 10000.  (Defaults: <tree>'s master/build disc and
-// symbols, <tree> = the tree this script is in; the harness is <tree>'s.)
+// trajectory as 6-harness/verify.sh 10000.  (Defaults: the build's disc and
+// symbols, 5-compiled-game-discs and 3-assembled-output.)
 //
-// Attribution (as tools/grind/profile.mjs, from harness/prof.mjs): the cycles between
+// Attribution: the cycles between
 // two consecutive instruction hooks go to the earlier PC (its own cycles, plus an
 // interrupt entry that followed it), keyed by what was mapped there:
 //   M:<pc>  main RAM (&0000-&7FFF)       A:<pc>   ANDY (&8000-&8FFF, ROMSEL bit 7)

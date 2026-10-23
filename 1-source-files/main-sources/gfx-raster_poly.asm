@@ -752,7 +752,7 @@
 
 \ ============================================================================
 \ R_POLY's phase A for polygons with some coordinate outside 0..255: chain A
-\ into r_ta, chain B into r_tb, rows r_ystart..r_ylast (HAZEL scratch); bank
+\ into r_ta, chain B into r_tb, rows r_ystart..r_ylast (the shared workspace); bank
 \ R_POLY calls r7_pf16 and does phase B (r_pcbd)
 \ ============================================================================
 \ phase A's edge set-up (rp_ov)

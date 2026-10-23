@@ -24,9 +24,6 @@
 #    3-assembled-output/elite-stubs.asm, whose body is name_C), and never read cold data;
 #  * the stubs (elite-stubs.asm and 3-assembled-output/elite-stubs.asm) may refer to
 #    anything, and every area may call them;
-#  * data in shadow RAM ("shadow": the extended tokens) is only read with
-#    ACCCON X set, by readers marked "bankcheck: ok"; other references to it
-#    must be immediate (#LO/#HI: its address);
 #  * a line with the comment "bankcheck: ok" is exempt (reviewed by hand).
 #  * the renderer's banks (bank5: gfx-raster.asm, the rasteriser's shared region,
 #    with its disc window bank5d, gfx-raster_disc.asm, and its polygon window
@@ -58,8 +55,8 @@ FILES = {"../../3-assembled-output/elite-source-config.asm": "main", "../../3-as
          # elite-data.asm's hot data (in HAZEL, and in bank 4 what HAZEL has no
          # room for) and cold data (in the cold pass)
          "../../3-assembled-output/elite-data-hot.asm": "hazel", "../../3-assembled-output/elite-data-hot4.asm": "bank4", "../../3-assembled-output/elite-data-cold.asm": "cold",
-         # the renderer: its HAZEL glue (stubs, trampolines, hooks, shared state)
-         # and its banks
+         # the renderer: its glue in the glue area (stubs, trampolines, hooks,
+         # shared variables), its shared workspace and its banks
          "elite-glue.asm": "main",
          "gfx-gvars.asm": "main", "gfx-tramp.asm": "main", "gfx-gluehooks.asm": "main",
          "gfx-raster_scr.asm": "hazel",
@@ -69,7 +66,7 @@ FILES = {"../../3-assembled-output/elite-source-config.asm": "main", "../../3-as
          "gfx-frame.asm": "bank6", "gfx-faces.asm": "bank6", "gfx-light6.asm": "bank6", "gfx-light.asm": "bank6", "gfx-finit.asm": "bank6",
          "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar6.asm": "bank6", "gfx-flare.asm": "bank5",
          "gfx-merid.asm": "bank7m",
-         "gfx-raster_kept.asm": "bank5d", "gfx-kept7.asm": "bank7m", "gfx-kept-hz.asm": "hazel"}
+         "gfx-raster_kept.asm": "bank5d", "gfx-kept7.asm": "bank7m"}
 # the copies of elite-source.asm that 2-build-files/streams.py writes, one per area
 # (their line numbers are elite-source.asm's)
 SHOW = {"../../3-assembled-output/elite-source-%s.asm" % a: "elite-source.asm" for a in ("config", "low", "hot1", "hot2", "hot3", "cold")}
@@ -167,18 +164,14 @@ for f, a in FILES.items():
             continue
         if mn is None and re.match(r"^[A-Za-z_][\w%]*\s*=", op.strip()):
             continue                       # (an assignment defines a constant)
-        if mn is None and re.match(r"^(PRINT|SAVE|ASSERT|IF|ELIF|SKIP|ORG|CLEAR|ALIGN|GUARD|INCLUDE|INCBIN|R_TO7)\b", op.strip(), re.I):
-            continue                       # (assembler directives; R_TO7: the call to bank 7)
+        if mn is None and re.match(r"^(PRINT|SAVE|ASSERT|IF|ELIF|SKIP|ORG|CLEAR|ALIGN|GUARD|INCLUDE|INCBIN)\b", op.strip(), re.I):
+            continue                       # (assembler directives)
         for x in idents(op):
             b = "self" if x in own[f] else area.get(x)
             if b is None or b == a or b == "self" or a == "stubs" or b == "stubs":
                 continue                   # (the stubs are callable from anywhere, and
                                            # reach both sides)
             where = "%s:%d" % (SHOW.get(f, f), n)
-            if b == "shadow":
-                if not op.strip().startswith("#"):
-                    errors.append("%s: %s reads shadow RAM data %s outside a reader marked bankcheck: ok" % (where, a, x))
-                continue
             if a in RAST5 and b in RAST5:
                 if {a, b} == {"bank5d", "bank5a"} and not op.strip().startswith("#"):
                     errors.append("%s: %s refers to %s label %s (the disc and polygon windows are never paged in together)" % (where, a, b, x))

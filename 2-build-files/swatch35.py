@@ -5,9 +5,8 @@ cyan, yellow and magenta counts falling), and each one's cell, the ink at each o
 the four positions (cell).
 
 A tile is filled with its entry's cell repeated: pixel (x, y) of the screen takes
-the ink at (x & 1, y & 1), so tools/landgen.py turns an entry into two bytes, one
-for even lines and one for odd (dither_bytes), and land.s fills whole bytes with
-them.  Pixels from different cells therefore meet without a seam only if the inks
+the ink at (x & 1, y & 1), so an entry becomes two bytes, one for even lines and
+one for odd (dashboard.py's pair), and the fills write whole bytes of them.  Pixels from different cells therefore meet without a seam only if the inks
 they share are in phase, which cell arranges: black at the same positions in
 every colour that has it (one in four at (0, 0); two the checkerboard (0, 0) and
 (1, 1); three those and (1, 0)), and magenta likewise where the black leaves room.
@@ -16,7 +15,7 @@ PHYS is each ink's RGB.
 The landscape uses entries land.LAND, land.SEAC, land.PADC (19, K1C1M1Y1) and
 frame.BLACK (34, K4); shipgen picks the ship's shades from the same list.
 
-    python3 proto/swatch35.py   writes proto/swatch35.png: every entry's cell tiled
+    python3 2-build-files/swatch35.py   writes 2-build-files/swatch35.png: every entry's cell tiled
                                 12 x 8 pixels beside its average colour and number
 """
 import os

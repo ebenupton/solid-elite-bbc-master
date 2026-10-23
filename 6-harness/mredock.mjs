@@ -1,5 +1,5 @@
 // Regression test: dock, launch, dock again (the docking computer), from a
-// fresh boot, with real key presses. node harness/mredock.mjs [--disc d]
+// fresh boot, with real key presses. node 6-harness/mredock.mjs [--disc d]
 // [--syms s] [--out dir]. Exit status 0 if both dockings happen (DOENTRY
 // reached twice) within 90 emulated seconds each; screenshots of each stage.
 import { MachineSession } from "./jsbeeb.mjs";

@@ -1,18 +1,19 @@
 // Determinism and speed comparison for BBC Master Elite: a reference build
 // against a candidate build, both on the emulated BBC Master, both driven by the
-// same deterministic pilot (harness/mpilot.mjs) through harness/mlib.mjs's input
+// same deterministic pilot (mpilot.mjs) through mlib.mjs's input
 // injection.
 //
-// node harness/mcompare.mjs [--iters 5000] [--ref disc] [--rsyms file]
+// node 6-harness/mcompare.mjs [--iters 5000] [--ref disc] [--rsyms file]
 //                           [--cand disc] [--csyms file] [--seed boot|rand|none]
 //                           [--loose] [--window 200] [--out dir] [--shots N]
 //                           [--maxsecs S] [--nopatch] [--norefcache] [--views]
 //                           [--trace FROM,TO,LABEL+LABEL,VAR+VAR~OFFSET]
 //
-// Defaults: reference = master/reference/elite-master-sng47.ssd (the released
-// SNG47 disc) with master/reference/symbols.txt (the symbols of the pristine
-// in-tree build, which is bit-identical to it: see master/build.sh); candidate =
-// master/build/elite-master-sng47.ssd with master/build/symbols.txt.
+// Defaults: reference = 4-reference-binaries/sng47/elite-master-sng47.ssd (the
+// released SNG47 disc) with 4-reference-binaries/sng47/symbols.txt (the symbols
+// of the original source's build, which is bit-identical to it); candidate =
+// 5-compiled-game-discs/elite-master-sng47.ssd with
+// 3-assembled-output/symbols.txt.
 //
 // An iteration is one pass of the main loop, counted at MLOOP (so docked
 // iterations count too; the flight loop proper, TT100 to MLOOP, runs only in
@@ -87,7 +88,7 @@ async function run(label, disc, sy, seed, seedBoot) {
 
 // The reference run depends only on the reference disc and symbols, the
 // harness (mlib, mpilot) and the options that shape the run, so it is cached
-// (scratch/master/refcache, keyed by a hash of all of those; --norefcache to
+// (6-harness/work/refcache, keyed by a hash of all of those; --norefcache to
 // rerun it).
 async function cachedRef() {
     const { createHash } = await import("crypto");

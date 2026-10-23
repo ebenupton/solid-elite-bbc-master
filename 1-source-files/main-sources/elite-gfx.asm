@@ -5,7 +5,7 @@
 \ and ANDY, and the meridian window in bank 7
 \ (docs/memory-map.md)
 \
-\ INCLUDEd at the end of elite-source.asm (after the game's code, so that the
+\ INCLUDEd at the end of elite-layout.asm (after the game's code, so that the
 \ layer can use Elite's symbols). From the Demonstration Disc port (tag
 \ demo-final, src/gfx-build.asm), with the memory laid out for the full
 \ game. The state that more than one bank, the IRQ handler or code running
@@ -16,15 +16,20 @@
 \ and text hooks run during disc commands too. HAZEL holds the game data
 \ (the ship blueprints, elite-data.asm: elite-layout.asm). Produces:
 \
-\   build/BANK5.bin  sideways RAM bank 5: the rasteriser's shared region and
-\                    disc window (gfx-raster.asm, gfx-flare.asm,
-\                    gfx-raster_lcold.asm; gfx-raster_disc.asm)
-\   build/RASTA.bin  ANDY: the rasteriser's polygon window (gfx-raster_poly.asm,
-\                    gfx-raster_line.asm)
-\   build/BANK6.bin  sideways RAM bank 6: the frame layer (gfx-frame.asm),
-\                    the ship faces and colours (gfx-faces.asm) and its state
-\   build/MERID.bin  sideways RAM bank 7 after the cold area: the meridian
-\                    window, the beach ball planet's boundaries (gfx-merid.asm)
+\   BANK5.bin  sideways RAM bank 5: the rasteriser's shared region and
+\              disc window (gfx-raster.asm, gfx-flare.asm,
+\              gfx-raster_lcold.asm; gfx-raster_disc.asm, gfx-raster_kept.asm)
+\   RASTA.bin  ANDY: the rasteriser's polygon window (gfx-raster_poly.asm,
+\              gfx-raster_line.asm)
+\   BANK6.bin  sideways RAM bank 6: the frame layer (gfx-frame.asm),
+\              the ship faces and colours (gfx-faces.asm), the lighting,
+\              the flare's step and the hangar, its state, then the
+\              hangar's tables (gfx-hangar6.asm)
+\   MERID.bin  sideways RAM bank 7 after the cold pass: the meridian
+\              window, the beach ball planet's boundaries (gfx-merid.asm)
+\              and the kept solid rows' polygon part (gfx-kept7.asm)
+\
+\ (all in 3-assembled-output)
 \
 \ ******************************************************************************
 

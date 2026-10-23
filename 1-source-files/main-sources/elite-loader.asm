@@ -536,8 +536,8 @@ ENDIF
                         \ as the game uses their places (DOSCLI puts them back
                         \ for each disc command): &C2C0-&C2FF and &DFC0-&DFFF
                         \ (ACCCON Y = 1 maps HAZEL at &C000-&DFFF), then copy
-                        \ HAZEL's contents (the game data and the renderer's
-                        \ glue) from their staging copy at &4000 into place
+                        \ HAZEL's contents (the game data) from their staging
+                        \ copy at &4000 into place
 
  SEI
  LDA #%00001001
@@ -666,11 +666,12 @@ ENDIF
 
  LDA #SBANK             \ Set the RAM copy of the currently selected paged ROM
  STA LATCH              \ to SBANK, the bank of the game's entry point S% (the
-                        \ cold area, ROMSEL &87, from build/game-addresses.asm),
- STA VIA+&30            \ and page it in
+ STA VIA+&30            \ cold pass, bank 7, from 3-assembled-output/game-
+                        \ addresses.asm), and page it in
 
- JMP S%                 \ Jump to the start of the main game code at S%, which
-                        \ we just loaded in the BCODE/ELITE file
+ JMP S%                 \ Jump to the start of the main game code at S% (Port:
+                        \ in the cold pass, which we copied into bank 7 from
+                        \ the COLD7 file)
 
 .NMIH                   \ Port: the minimal NMI handler's body at &0D01, after
 
@@ -797,12 +798,12 @@ ENDIF
  EQUB HOMEBANK, %00001001
  EQUW &8000, &4000
 
- EQUW MESS6             \ COLD7: the cold area, bank 7 from &8000 (the cold data,
- EQUB 7, %00001001      \ QQ18 and the extended tokens, then the cold code)
+ EQUW MESS6             \ COLD7: the cold pass, bank 7 from &8000 (the cold
+ EQUB 7, %00001001      \ code, then the extended tokens)
  EQUW &8000, C7LEN
 
  EQUW MESS7             \ MERID: the renderer's meridian window, bank 7 after
- EQUB 7, %00001001      \ the cold area
+ EQUB 7, %00001001      \ the cold pass
  EQUW M7AT, M7LEN
 
  EQUW MESS8             \ RASTA: the rasteriser's polygon window, ANDY
@@ -817,13 +818,13 @@ ENDIF
  EQUB 6, %00001001
  EQUW &8000, B6LEN
 
- EQUW MESS12            \ HAZEL: the game data and the hangar's tables, staged
+ EQUW MESS12            \ HAZEL: the game data, staged
  EQUB HOMEBANK, %00001001 \ in main RAM at &4000 (screen buffer 0) and copied to
  EQUW &4000, HZLEN      \ HAZEL after the last disc access (see LDEND), as DFS
                         \ uses HAZEL
 
- EQUW MESS14            \ HICODE: the quarter-square tables, then the
- EQUB HOMEBANK, %00001001 \ run's second part, main RAM &7000-&7FFF
+ EQUW MESS14            \ HICODE: the quarter-square tables, then the hot
+ EQUB HOMEBANK, %00001001 \ pass's second container, main RAM &7000-&7FFF
  EQUW &7000, HILEN
 
  EQUW 0

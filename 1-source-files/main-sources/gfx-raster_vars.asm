@@ -1,7 +1,8 @@
 \ ============================================================================
 \ raster_vars.asm -- the variables and arrays of raster.asm that its caller
 \ reads or writes.  Assemble it (before INCLUDEing raster.asm) anywhere in
-\ memory both the caller and the rasteriser can see (e.g. HAZEL, &C000-&DFFF).
+\ memory both the caller and the rasteriser can see (here the shared
+\ workspace in main RAM below &3000, elite-gfx.asm).
 \ No ORG and no alignment: it is placed at P%.
 \ See raster.asm for what each one means.
 \ ============================================================================
