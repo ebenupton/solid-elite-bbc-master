@@ -35,7 +35,7 @@ fz_u    = FZ+15
 \ State
 \ ------------------------------------------------------------------------------
 
-\ Shared with the IRQ handler and Elite (in the low area, gfx-gvars.asm):
+\ Shared with the IRQ handler and Elite (in the glue area, gfx-gvars.asm):
 \ GMODE (bit 7 set = space mode, double buffered), GFRONT (0/1 buffer
 \ displayed), GFLIP (non-zero = flip pending to GPEND), GPEND, GDRAWON
 \ (0 = primitives are erasing, so ignore them), GFORCE (non-zero = draw

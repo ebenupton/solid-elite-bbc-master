@@ -12,7 +12,7 @@
 #
 # No Area field: the main code's run (main RAM from the head, after the low
 # area at CODE%, then bank 4 where main RAM ends). "Area: low": main RAM below
-# &3000, first in the low area, before the head (what the MOS enters with any
+# &3000, first in the glue area, before the head (what the MOS enters with any
 # ROM paged, but whose original place is later in the run). "Area: bank 4": bank 4, after the run (code that runs
 # with ACCCON X set, which hides main RAM at &3000-&7FFF, and the tables it
 # reads). "Area: cold": the cold area, sideways RAM bank 7. A block runs from its
@@ -29,7 +29,7 @@
 # defined exactly once and every block is assembled once.
 #
 # Each emission is the original in its order, with a stub wherever a routine
-# lives on the other side. The hot side is the run, the low area and bank 4;
+# lives on the other side. The hot side is the run, the glue area and bank 4;
 # the cold side the cold area. In a hot copy, the line that defines a cold
 # label X that the hot side refers to holds X's stub, under X's own name:
 #
@@ -43,7 +43,7 @@
 #
 # (far7j and j4_ / far4j for the targets that never return, NORETURN below).
 # A cold block's stubs go in the copy of the hot area of the nearest block
-# before it that is not cold (the run's for the low area), so the stubs sit
+# before it that is not cold (the run's for the glue area), so the stubs sit
 # where the routine was carved out of that emission, and a block that falls
 # through into a routine of the other side falls into its stub: the stub
 # calls the body and returns to the falling routine's caller with the
@@ -69,7 +69,7 @@
 #     block of the other side whose first statement is its entry label, so
 #     that the falling block falls into that label's stub (run or bank 4 into
 #     cold, cold into run, low or bank 4); any other fall-through across areas
-#     (between the run, the low area and bank 4, or from the low area into
+#     (between the run, the glue area and bank 4, or from the glue area into
 #     the cold area) is an error;
 #   * every stub's line is blank in its copy, and every target is defined in
 #     elite-source.asm (a stub has a place only there).
@@ -235,7 +235,7 @@ def falls_through(stmt, macros):
 # The source uses the original's names throughout. The cold copy is assembled
 # with each cold label X renamed X_C (its definition and every reference in the
 # cold copy), and with each JSR or JMP from cold code to a label of the run,
-# the low area or bank 4 (H) going through a stub, x4_H (JSR far4: call H with
+# the glue area or bank 4 (H) going through a stub, x4_H (JSR far4: call H with
 # bank 4 paged in, then page the cold area back) or, for the targets in
 # NORETURN, j4_H (JSR far4j: jump to H). Every other file keeps the names as
 # they are, so a reference from outside the cold area to a cold label X
@@ -256,7 +256,7 @@ def falls_through(stmt, macros):
 NORETURN = {"BAY", "DEATH2", "TT170", "FRCE", "GOIN", "BEGIN"}
 # the files outside elite-source.asm whose references to cold labels need
 # stubs (everything else that elite-layout.asm assembles)
-OTHERS = ("1-source-files/main-sources/elite-layout.asm", "1-source-files/main-sources/elite-low.asm",
+OTHERS = ("1-source-files/main-sources/elite-layout.asm", "1-source-files/main-sources/elite-glue.asm",
           "1-source-files/main-sources/elite-qs.asm", "1-source-files/main-sources/elite-gfx.asm")
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*%?")
 
@@ -363,7 +363,7 @@ def glue(copies, errors, lines, bl, falls):
         if m:
             macros.add(m.group(1))
     cold = {n for n, i in defined(copies["cold"]) if not n.endswith("%")}
-    # the labels of the run, the low area and bank 4, with the files the hot
+    # the labels of the run, the glue area and bank 4, with the files the hot
     # blocks INCLUDE
     hotfiles = [("run", copies["run"]), ("low", copies["low"]), ("bank4", copies["bank4"])]
     for a in ("run", "low", "bank4"):
@@ -482,7 +482,7 @@ def glue(copies, errors, lines, bl, falls):
     def host(i):
         """the hot area whose emission holds the stubs at line i of a cold
         block: that of the nearest block before it, in the source, that is not
-        cold and holds code (the low area's blocks: the run's), so that a block
+        cold and holds code (the glue area's blocks: the run's), so that a block
         that falls through into the cold block falls into its stubs"""
         for k in range(barea[i] - 1, -1, -1):
             s0, e0, name, area = bl[k]

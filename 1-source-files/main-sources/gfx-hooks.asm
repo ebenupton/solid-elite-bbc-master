@@ -4,8 +4,8 @@
 \ layer (after the Demonstration Disc port's src/hooks.asm)
 \
 \ Master port: these run in game context only, with ACCCON X clear; they are
-\ in the low area (elite-low.asm), with the renderer's other glue (below
-\ &3000, as the hooks that run with X set or from the IRQ, gfx-lowhooks.asm,
+\ in the glue area (elite-glue.asm), with the renderer's other glue (below
+\ &3000, as the hooks that run with X set or from the IRQ, gfx-gluehooks.asm,
 \ must be). Elite's drawing routines call
 \ these with a single JSR at their start. "Record mode" is QQ11 = 0 (a view that draws ships) and GFORCE = 0:
 \ drawing is then recorded for FRAME instead of being done. A hook that takes

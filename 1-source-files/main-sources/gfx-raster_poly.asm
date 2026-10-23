@@ -273,7 +273,7 @@
   BIT KMODE               \ K mode: the kept rows' pass (gfx-raster_kept.asm)
   BPL d3
   LDA r_pbl1_e+1
-  JSR T_KPRE              \ (the low area: k_pre in bank 7)
+  JSR T_KPRE              \ (the glue area: k_pre in bank 7)
 .d3
   \ phase B set-up
   LDY r_ystart

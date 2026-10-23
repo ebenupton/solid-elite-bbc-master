@@ -2871,7 +2871,7 @@ WP workspace from &841 to &CCE inclusive
      2F21   07
 UP workspace from &2F00 to &2F21 inclusive
 .HEAD_END%
-Low area: &1E2C -&25DB ; head: &25DC -&2F21  (the font's alignment: 0  bytes of padding); free below &3000: 222 
+Glue area: &1E2C -&25DB ; head: &25DC -&2F21  (the font's alignment: 0  bytes of padding); free below &3000: 222 
 .G%
      2F22
 .DOENTRY

@@ -103,8 +103,8 @@ MTEST = 0xA000
 MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0C00, PM_R=0x0C01, PS_VALID=0x0C02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
-# bank 7 after the meridian window): their variables (in the low area in the
-# game; KF is in the shared workspace, as in the game) and the low area's
+# bank 7 after the meridian window): their variables (in the glue area in the
+# game; KF is in the shared workspace, as in the game) and the glue area's
 # thunk from the polygon window to bank 7 and k_setbuf7 (gfx-tramp.asm's),
 # here at HZ
 KEPT7 = os.path.join(MS, 'gfx-kept7.asm')
@@ -175,7 +175,7 @@ def assemble(org):
         f.write(ws_block() + '\n')
         if WINDOWS:
             f.write('ORG &%X\n' % tr.HZ)
-            if KEPT:            # the kept rows' state and the low area's thunks
+            if KEPT:            # the kept rows' state and the glue area's thunks
                 f.write(KEPT_HZ)
             f.write('.r_hz_end\n')
             if KEPT:
@@ -256,7 +256,7 @@ class Machine(tr.Machine):
         self.mpu = MPU(memory=self.mem)
         self.cycles = 0
         self.guard = True
-        if 'KMODE' in self.syms:             # (the game's low area and HAZEL: K mode off)
+        if 'KMODE' in self.syms:             # (the game's glue area and HAZEL: K mode off)
             s = self.syms
             for k, v in (('KMODE', 0), ('KBIT', 1), ('KBITN', 0xFE), ('KPLO', 0xFF), ('KPHI', 0)):
                 self.mem[s[k]] = v

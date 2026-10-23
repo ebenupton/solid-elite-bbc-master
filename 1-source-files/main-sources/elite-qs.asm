@@ -12,7 +12,7 @@
 \ which the port's multiplications (MU11, MULT1, MULTS, MLTU2, MULT3, the
 \ stardust's) and the lighting (gfx-light.asm, in bank 6) use with bank 4,
 \ 6 or 7 paged, so they must be outside the banks, and are too big for the
-\ low area below &3000. Page aligned, as their users patch the operands' low
+\ glue area below &3000. Page aligned, as their users patch the operands' low
 \ bytes. Like the run there, they are never used with ACCCON X set (which
 \ hides main RAM at &3000-&7FFF).
 \

@@ -47,7 +47,7 @@
 
  CODE% = &1E2C          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
-                        \ docs/memory-map.md; the low area, elite-low.asm, starts
+                        \ docs/memory-map.md; the glue area, elite-glue.asm, starts
                         \ here and the head follows it, and the low byte is
                         \ chosen so that the font, at its place after ADDK,
                         \ starts a page with no padding: the build prints the
@@ -2089,15 +2089,15 @@ ENDIF
 
 \ ******************************************************************************
 \
-\ Port: the low area (elite-low.asm, docs/memory-map.md), first in the main
+\ Port: the glue area (elite-glue.asm, docs/memory-map.md), first in the main
 \ code: the blocks of this source tagged low and the port's own code and
 \ variables that must be in main RAM outside the banks; then the head, the
 \ original's VEC to UP; then the run, from M%, straight after UP. All of the
-\ low area and the head are below &3000 (asserted after UP)
+\ glue area and the head are below &3000 (asserted after UP)
 \
 \ ******************************************************************************
 
- INCLUDE "1-source-files/main-sources/elite-low.asm"
+ INCLUDE "1-source-files/main-sources/elite-glue.asm"
 
 .HEAD_START%            \ Port: the head, the original's VEC to UP
 
@@ -9280,11 +9280,11 @@ ENDIF
 
 .HEAD_END%              \ Port: the end of the head, where the run starts (M%)
 
- PRINT "Low area: ", ~CODE%, "-", ~HEAD_START%-1, "; head: ", ~HEAD_START%, "-", ~HEAD_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-HEAD_END%
- ASSERT HEAD_END% <= &3000  \ Port: the low area and the head must be below
+ PRINT "Glue area: ", ~CODE%, "-", ~HEAD_START%-1, "; head: ", ~HEAD_START%, "-", ~HEAD_END%-1, " (the font's alignment: ", FONTPAD%, " bytes of padding); free below &3000: ", &3000-HEAD_END%
+ ASSERT HEAD_END% <= &3000  \ Port: the glue area and the head must be below
                         \ &3000: they are used while ACCCON X = 1 (shadow RAM at
                         \ &3000-&7FFF), from interrupts or from MOS vectors with
-                        \ any ROM paged: the low area (NEWBRK, the far calls,
+                        \ any ROM paged: the glue area (NEWBRK, the far calls,
                         \ the renderer's glue and hooks), the IRQ and sound
                         \ code, CHPR and its font, the log tables (LOINQ),
                         \ HANGFLAG (HANGER), ADDK (DIALS, PIX1) and UP (CATF,

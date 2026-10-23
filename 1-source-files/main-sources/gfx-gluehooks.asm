@@ -1,7 +1,7 @@
 \ ******************************************************************************
 \
-\ gfx-lowhooks.asm - the hooks that must live in main RAM below &3000 (the
-\ low area, elite-low.asm): the text map's (CHPR runs as WRCHV with any ROM
+\ gfx-gluehooks.asm - the hooks that must live in main RAM below &3000 (the
+\ glue area, elite-glue.asm): the text map's (CHPR runs as WRCHV with any ROM
 \ paged and with ACCCON X set, which hides main RAM above &3000) and the
 \ IRQ's (H_VSYNC); split from gfx-hooks.asm
 \

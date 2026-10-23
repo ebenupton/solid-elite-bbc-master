@@ -1,7 +1,7 @@
 \ ============================================================================
 \ gfx-kept7.asm -- kept solid rows (docs/renderer.md), the polygons' part:
 \ bank 7 (ROMSEL 7), after the meridian window.  R_POLY calls k_pre in K
-\ mode, between its phases, through T_KPRE (the low area); k_settle writes
+\ mode, between its phases, through T_KPRE (the glue area); k_settle writes
 \ the screen itself (piece).  Everything it reads
 \ is in main RAM (the edge tables, DIRTY, KF) or the screen (ACCCON X as
 \ the frame has it).  See gfx-raster_kept.asm for the scheme.

@@ -1,6 +1,6 @@
 \ ******************************************************************************
 \
-\ elite-low.asm - the low area, first in the main code, in main RAM below
+\ elite-glue.asm - the glue area, first in the main code, in main RAM below
 \ the head (docs/memory-map.md)
 \
 \ Port: INCLUDEd by elite-source.asm at CODE%, before the head (VEC to UP),
@@ -21,7 +21,7 @@
 \     the renderer's banks share, with their initial values (gfx-gvars.asm),
 \     the trampolines from the frame layer into the rasteriser
 \     (gfx-tramp.asm), the hooks that CHPR (WRCHV: any ROM paged, ACCCON X
-\     set) and IRQ1 call (gfx-lowhooks.asm), the G_ stubs that page the
+\     set) and IRQ1 call (gfx-gluehooks.asm), the G_ stubs that page the
 \     frame layer in (gfx-gstubs.asm) and the hooks in Elite's drawing code
 \     (gfx-hooks.asm).
 \
@@ -33,7 +33,7 @@
 
  INCLUDE "1-source-files/main-sources/gfx-gvars.asm"            \ the renderer's glue: shared variables,
  INCLUDE "1-source-files/main-sources/gfx-tramp.asm"            \ the trampolines into the rasteriser,
- INCLUDE "1-source-files/main-sources/gfx-lowhooks.asm"         \ the text map's and the IRQ's hooks
+ INCLUDE "1-source-files/main-sources/gfx-gluehooks.asm"         \ the text map's and the IRQ's hooks
 
 
  INCLUDE "1-source-files/main-sources/gfx-gstubs.asm"           \ the stubs that page the frame layer in

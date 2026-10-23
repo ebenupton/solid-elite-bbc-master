@@ -26,7 +26,7 @@ the original's source.
    layer. The original's order puts what this code reaches in main RAM
    (`ADDK`, the font, the log tables, `UP`) in the main code's head, below
    `&3000`. The renderer's shared workspace and its glue are below `&3000`
-   too. The main code starts with the low area, then the head, and the
+   too. The main code starts with the glue area, then the head, and the
    build asserts that the head ends below `&3000`, so both do.
 2. **Interrupts and MOS vectors.** The IRQ arrives with any bank paged and
    with X either way. WRCHV (`CHPR`) and BRKV (`NEWBRK`) are entered with
@@ -119,7 +119,7 @@ own address. Each label is defined once and each block is assembled once.
 
 **Stubs at their routines' places.** Each emission is the original in its
 order, with a far-call stub wherever a routine lives on the other side. The
-hot side is the run, the low area and bank 4. The cold side is the cold
+hot side is the run, the glue area and bank 4. The cold side is the cold
 area. The source calls everything by the original's names. In the cold copy
 `streams.py` renames each cold label `X` to `X_C`, and turns each call from
 cold code to hot code `H` into a call of `x4_H`. It then writes the stubs
@@ -136,7 +136,7 @@ the stub at the next routine's place. The stub calls the routine, which
 returns to the falling routine's caller with the caller's bank back, just
 as the fall-through did.
 
-`elite-far.asm` holds the far-call helpers, in the low area. A far call
+`elite-far.asm` holds the far-call helpers, in the glue area. A far call
 reads the stub's address while the caller's bank is still paged, keeps the
 caller's ROMSEL on the stack, pages the target in, calls it and pages the
 caller's bank back. A, X, Y and the flags pass both ways. A far call costs
@@ -162,8 +162,8 @@ through a stub:
 |---|---|---|
 | far7 and far7j stubs (`.TT22 JSR far7 : EQUW TT22_C`), generated into the hot copies | the run, each at its cold routine's place | the cold area in, then the caller's bank back |
 | far4 and far4j stubs (`.x4_TT26 JSR far4 : EQUW TT26`), generated into the cold copy | the cold area, each at its hot routine's place | bank 4 in, then the cold area back |
-| `G_` stubs | the low area (`gfx-gstubs.asm`; `G_CHAR`, `G_DELCHAR` and `G_CLRTEXT` in `gfx-lowhooks.asm`) | bank 6 in (bank 7 for `G_MERHOOK`, the meridian window), then bank 4 back (or the caller's bank, for the text stubs) |
-| `T_` trampolines | the low area (`gfx-tramp.asm`) | the rasteriser in (ROMSEL `&85` for `T_POLY` and `T_LINE`, bank 5 for most of the rest) or the meridian window (bank 7, for `T_MERID` and `T_KPRE`), then bank 6 back |
+| `G_` stubs | the glue area (`gfx-gstubs.asm`; `G_CHAR`, `G_DELCHAR` and `G_CLRTEXT` in `gfx-gluehooks.asm`) | bank 6 in (bank 7 for `G_MERHOOK`, the meridian window), then bank 4 back (or the caller's bank, for the text stubs) |
+| `T_` trampolines | the glue area (`gfx-tramp.asm`) | the rasteriser in (ROMSEL `&85` for `T_POLY` and `T_LINE`, bank 5 for most of the rest) or the meridian window (bank 7, for `T_MERID` and `T_KPRE`), then bank 6 back |
 
 In the gate's run the flight iterations make about 0.5 far calls each,
 nearly all of them `x4_TT26` from the cold area's token printing. The `G_`
@@ -181,7 +181,7 @@ ok` on its line.
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
 | `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set |
 | The shared workspace | main `&0E00-&1E2B` | the renderer's shared state, one block that ends where the main code starts: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
-| The low area | main from `CODE%` (`&1E2C`) to `&25DB` | `elite-low.asm`: the blocks tagged low (`stackpt`, `NEWBRK`), the far calls (`elite-far.asm`) and the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-lowhooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
+| The glue area | main from `CODE%` (`&1E2C`) to `&25DB` | `elite-glue.asm`: the blocks tagged low (`stackpt`, `NEWBRK`), the far calls (`elite-far.asm`) and the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
 | The main code's head | main `&25DC` to `HEAD_END%` (`&2F21`), below `&3000` | the original's head, `VEC` to `UP`, in its order: the IRQ handler and the sound, `CHPR`, `ADDK`, the font and the log tables (page aligned at `&2900`: `CODE%` is chosen so that this pads nothing), `UP` |
 | The run, in main RAM | from `HEAD_END%` to below `&4000` (`&3EC3`) | the rest of the main code in its order, with the stubs of the cold routines whose places are in it, to a marker before `TACTICS` |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
@@ -236,8 +236,8 @@ takes its address and bank from the game's symbols
 * **Stubs.** Each emission holds a far-call stub at the place of each
   routine that lives on the other side. `streams.py` generates them; they
   are not in the source.
-* **The low area.** `stackpt` and `NEWBRK` are at their original place in
-  the source but are emitted first in the low area, before the head. `NEWBRK` is the
+* **The glue area.** `stackpt` and `NEWBRK` are at their original place in
+  the source but are emitted first in the glue area, before the head. `NEWBRK` is the
   original with three lines that page bank 4 in, and a call of `DOSNMI`.
 * **Port routines next to the routine they serve.** These are `ddot` (at
   `CPIXK`'s place), `DILI` and `DSEG` (after `DIL2`), `pxpatd` and `pxpat`
@@ -254,7 +254,7 @@ takes its address and bank from the game's symbols
   Master's direct drawing of ships, which nothing uses any more. Each
   original routine keeps its header with a "Port: removed" note.
 * **Port additions outside the source**, each in its own file with a header
-  saying why: the low area (`elite-low.asm`), the far calls
+  saying why: the glue area (`elite-glue.asm`), the far calls
   (`elite-far.asm`), the quarter-square tables (`elite-qs.asm`), the layout
   (`elite-layout.asm`) and the renderer (`elite-gfx.asm` and the `gfx-*.asm`
   files).

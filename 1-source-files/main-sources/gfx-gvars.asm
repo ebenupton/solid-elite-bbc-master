@@ -1,8 +1,8 @@
 \ ******************************************************************************
 \
 \ gfx-gvars.asm - the variables shared between Elite, the IRQ handler and the
-\ graphics bank, with their initial values (in the low area, main RAM below
-\ &3000: elite-low.asm)
+\ graphics bank, with their initial values (in the glue area, main RAM below
+\ &3000: elite-glue.asm)
 \
 \ ******************************************************************************
 

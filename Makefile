@@ -56,7 +56,7 @@ PYTHON?=python
 #     dashboard's routines include (dashtab-*.asm), into 3-assembled-output
 #
 #   * 2-build-files/streams.py writes a copy of elite-source.asm for each of
-#     the port's areas (the run, the low area, bank 4, the cold area) and of
+#     the port's areas (the run, the glue area, bank 4, the cold area) and of
 #     elite-data.asm (the hot data, the cold data, the dashboard image), each
 #     with the other areas' lines blanked, into 3-assembled-output
 #

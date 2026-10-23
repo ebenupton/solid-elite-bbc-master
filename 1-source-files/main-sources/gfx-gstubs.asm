@@ -4,10 +4,10 @@
 \
 \ Each G_xxx preserves A, X, Y and C into F_xxx, which lives in sideways RAM bank
 \ GFXBANK; Elite's own bank (ELITEBANK) is paged back in afterwards. Master
-\ port: in the low area (elite-low.asm), with the renderer's other glue, as
+\ port: in the glue area (elite-glue.asm), with the renderer's other glue, as
 \ code that pages a bank in must be outside the banks; they are only ever
 \ called from game code, with ACCCON X clear (the frame sets X itself, inside
-\ F_FRAME), but sit in the one low area with the rest (below &3000).
+\ F_FRAME), but sit in the one glue area with the rest (below &3000).
 \
 \ ******************************************************************************
 
