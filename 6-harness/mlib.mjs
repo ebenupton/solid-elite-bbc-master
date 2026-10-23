@@ -280,12 +280,21 @@ export async function runElite(opts) {
     // (elite-stubs.asm) runs its target with the stack holding the
     // return into the stub, then the caller's own return address; the caller's
     // bank is the stub's: bank 4 for the stubs into the cold pass (STUBS7 to
-    // STUBS7_END), bank 7 for those out of it (STUBS4 to STUBS4_END).
+    // STUBS7_END), bank 7 for those out of it (STUBS4 to STUBS4_END). An older
+    // build's far calls (elite-far.asm, before the stubs, in this branch's
+    // history) are seen through too: the return into farret, then the
+    // caller's ROMSEL, then its return.
     // (romsel: what the code that owns S+k ran with, if not the current ROMSEL:
     // the ROMSEL of the frame below, when walking further up a chain)
     const callerAt = (k, romsel = cpu.romsel) => {
         let w = stackWord(k);
         for (;;) {
+            if (sy.farret !== undefined && w + 1 === sy.farret) {     // (an older build's far
+                romsel = rb(0x100 + ((cpu.s + k + 2) & 0xff));          // call: the return into
+                k += 3;                                                 // farret, the caller's
+                w = stackWord(k);                                       // ROMSEL, its return)
+                continue;
+            }
             const b = stubBank(sy, w + 1);
             if (b === null) break;
             romsel = b;
