@@ -91,6 +91,7 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `planet_analytic.py` | The reference model of the beach ball's boundaries, from the Demonstration Disc port: per row, where each great circle's projected ellipse crosses it, in floating point or exactly as the 6502 code's integer arithmetic. `test_raster.py` checks the meridian window against it. |
 | `mlight.mjs` | Records what the lighting (`L_REC`) was given and wrote for every ship drawn, for `2-build-files/lightcheck.py` to check against the model. |
 | `mhangar.mjs` | Screenshots of the hangar in chosen configurations, for `2-build-files/hangarinks.py`. |
+| `mdocktime.mjs` | The docked screens' drawing times: boots the build as the gate does and, from the Status screen, presses each docked-screen key in turn (f8, f1 ... f7, f9), giving each screen's cycles from the key's scan to the next, and its busy cycles (less the wait for the vertical sync). The emulation is deterministic, so a build gives the same figures every run. |
 | `verify.sh` | The gate. |
 
 ### Replay tools
