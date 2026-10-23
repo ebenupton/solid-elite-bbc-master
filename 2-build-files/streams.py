@@ -33,6 +33,10 @@
 #     &3000-&7FFF: the flow puts it in bank 4 (in the source's order, before
 #     the hot code that follows it in the source).
 #   * "Area: cold": the cold pass, sideways RAM bank 7 from &8000.
+#   * ", runs on" after any of these ("Area: hot, runs on"): a table that code
+#     reads past its end into the next block (DETOK2 reads TKN2 on into QQ16),
+#     so the next block must follow it, in the same pass and unit, as if it
+#     fell through. ("Area: hot" is the hot pass written out.)
 #
 # A block runs from its header to the next header (or to a separator line of
 # stars, which starts an untagged block: the original's PRINT and SAVE
@@ -127,7 +131,11 @@ FLOWTXT = "3-assembled-output/flow.txt"
 DTAGS = {"cold": "cold", "BDATA": "bdata"}
 STAR = re.compile(r"^\\ \*{70,}\s*$")
 AREA = re.compile(r"^\\       Area: (.*)$")
-TAGS = {"cold": "cold", "low": "low", "hot, ACCCON X": "hotx"}
+TAGS = {"cold": "cold", "low": "low", "hot": "run", "hot, ACCCON X": "hotx"}
+# the blocks (by their first line) whose header says ", runs on": a table that
+# code reads past its end into the next block (TKN2 into QQ16), which must
+# therefore follow it as a fall-through does
+RUNSON = set()
 NOFALL = set("RTS RTI JMP BRA BRK".split())
 BRANCH = set("BCC BCS BEQ BMI BNE BPL BRA BVC BVS".split())
 
@@ -176,6 +184,9 @@ def blocks(lines, tags=TAGS):
             m = AREA.match(l)
             if m:
                 t = m.group(1).strip()
+                if t.endswith(", runs on"):    # (read past its end into the next block)
+                    t = t[:-len(", runs on")]
+                    RUNSON.add(out[-1][0])
                 if t not in tags:
                     sys.exit("%d: unknown area %r" % (i + 1, t))
                 out[-1][3] = tags[t]
@@ -457,16 +468,18 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
             m = re.match(r"^(\s*)(JSR|JMP)(\s+)([A-Za-z_][A-Za-z0-9_]*%?)(.*)$", st, re.I)
             if m and m.group(4) in hot and m.group(4) not in cold and m.group(4) not in direct:
                 h = m.group(4)
-                if m.group(5).strip():
-                    errors.append("%s:%d: %s %s%s from the cold pass: a stub can only call a label"
-                                  % (SRC, i + 1, m.group(2), h, m.group(5)))
+                rest = m.group(5)
+                mo = re.match(r"^\+(\d+)(\s*)$", rest)
+                if rest.strip() and not mo:
+                    errors.append("%s:%d: %s %s%s from the cold pass: a stub can only call a label "
+                                  "or a label plus a number" % (SRC, i + 1, m.group(2), h, rest))
                 place = alias.get(h, h)
                 kind = "j4_" if place in NORETURN or h in NORETURN else "x4_"
-                stub = kind + h
+                stub = kind + h + ("_%s" % mo.group(1) if mo else "")      # (x4_pr2_2: pr2+2)
                 if stub not in seen4:
                     seen4[stub] = place
-                    out4.append((stub, h, place, kind))
-                new += code[pos:off] + m.group(1) + m.group(2) + m.group(3) + stub + m.group(5)
+                    out4.append((stub, h + ("+" + mo.group(1) if mo else ""), place, kind))
+                new += code[pos:off] + m.group(1) + m.group(2) + m.group(3) + stub + (mo.group(2) if mo else rest)
                 pos = off + len(st)
                 continue
             for a, b, name in tokens(st):
@@ -560,13 +573,13 @@ def glue(copies, errors, lines, bl, eff, copy_of, falls, hotcopies):
         labels], target)], one per place"""
         out, done = [], {}
         for stub, target, jumps in items:
-            i = where.get(target)
+            i = where.get(target.split("+")[0])
             ok = ("cold",) if side == "cold" else ("low", "hot", "hotx")
             if i is None or eff[barea[i]] not in ok:
                 errors.append("%s: no place in the source for the stub %s (%s is not defined "
                               "in elite-source.asm's %s blocks)" % (SRC, stub, target, side))
                 continue
-            key = (alias.get(target, target), jumps)
+            key = (alias.get(target, target) if "+" not in target else target, jumps)
             if key not in done:
                 done[key] = len(out)
                 out.append((jumps, [], target))
@@ -757,6 +770,12 @@ def data(errors, phase, sy=None):
             copy[k] = cur
         if cur == "hot":
             report.append("  HAZEL &%04X-&%04X, %d free; nothing in bank 4" % (HAZEL_START, at - 1, HAZEL_END - at))
+        # a block that assembles no bytes (macros: CHAR, TWOK ... for QQ18)
+        # goes with the next block that does, so that it is assembled before
+        # what uses it (bank 4's copy is assembled before HAZEL's)
+        for n in range(len(hot) - 2, -1, -1):
+            if sy["DFLOW_%d" % hot[n + 1]] == sy["DFLOW_%d" % hot[n]]:
+                copy[hot[n]] = copy[hot[n + 1]]
         last = "hot"
         for k in range(len(bl) - 1, -1, -1):   # (unnamed blocks: the next named one's copy)
             if bl[k][3] == "hot":
@@ -842,7 +861,7 @@ def main():
         if eff[k] == "config" or not ASM[k]:
             continue
         st = last_statement(lines, s, e)
-        if not falls_through(st, macros):
+        if not falls_through(st, macros) and s not in RUNSON:
             continue
         for k2 in range(k + 1, len(bl)):
             s2, e2, name2, area2 = bl[k2]
@@ -872,8 +891,10 @@ def main():
         for n, i in defined(lines[s:e]):
             if ACTIVE[s + i]:
                 blockof.setdefault(n, k)
-    for k in hot:
+    for k in range(len(bl)):
         s, e, name, area = bl[k]
+        if eff[k] == "config" or not ASM[k]:
+            continue
         for i in range(s, e):
             if not ACTIVE[i]:
                 continue
@@ -884,8 +905,9 @@ def main():
                 k3 = blockof.get(m.group(2))
                 if k3 is None or k3 == k:
                     continue
-                if k3 in pos:
-                    join(pos[k], pos[k3])
+                if pas(eff[k3]) == pas(eff[k]):
+                    if k in pos:
+                        join(pos[k], pos[k3])
                 else:
                     errors.append("%s:%d: %s branches to %s in another pass (%s)"
                                   % (SRC, i + 1, name, m.group(2), eff[k3]))
