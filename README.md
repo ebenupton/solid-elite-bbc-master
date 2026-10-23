@@ -2,20 +2,22 @@
 
 A port of Acornsoft's BBC Master Elite with solid, sunlit ships instead of wireframes, running on an unmodified BBC Master 128. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
 
+<p align="center">
+<img src="images/solid-elite-beach-ball.png" width="50%" alt="A beach ball planet in the front view, above the dashboard">
+<br>
+<em>A meridian planet as a beach ball: two great circles, projected exactly, split the disc into land and sea, and spin as the original's equator and meridian do.</em>
+</p>
+
 What's new:
 
 * **Solid ships, lit by the sun.** Every ship, the space station and the cargo are drawn with filled, dithered faces, shaded by the direction of the sun.
-* **Planets and suns as discs.** Planets are solid. Meridian planets, Lave's among them, are beach balls: two great circles projected exactly onto the disc, splitting it into land and sea, and spinning as the original's planets do. Crater planets have their craters drawn over them. Suns are solid discs with a lens flare when you look towards them.
+* **Planets and suns as discs.** Planets are solid. Meridian planets, Lave's among them, are beach balls (above): two great circles projected exactly onto the disc, splitting it into land and sea, and spinning as the original's planets do. Crater planets have their craters drawn over them. Suns are solid discs with a lens flare when you look towards them.
 * **Flicker-free, double-buffered flight.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades.
 * **A new dashboard** in the same palette, redrawing only what changes, split cleanly from the space view by a raster-timed interrupt.
-* **Kept solid rows when docking.** Close to the space station, screen rows that one face fills from edge to edge are kept from frame to frame instead of being erased and filled again, which makes the last seconds of docking up to 27% faster in single frames.
+* **Kept solid rows when docking.** Close to the space station, screen rows that one face fills from edge to edge are kept from frame to frame instead of being erased and filled again. The pixels are exactly the same, and the last seconds of docking run 7.6% to 10.6% faster, and up to 27% faster in single frames.
 * **A solid hangar** when you dock, and the Constrictor turning in solid in the mission briefing.
-* **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. With the original wireframe graphics they make the game 28% faster in flight. With all the extra drawing, the game runs at 86% of the original's speed in the gate's flight run (11.99 against 13.97 main-loop iterations a second). Most of the gap is the spinning beach-ball planet, which is on screen for about half of that run; with plain disc planets the port ran 23% faster than the original (17.24).
+* **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. With the original wireframe graphics they make the game 28% faster in flight.
 * **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's.
-
-**To play it**, download [solid-elite-bbc-master.ssd](solid-elite-bbc-master.ssd) and run it on a BBC Master 128, or in an emulator set to a Master 128 (for example [jsbeeb](https://bbc.xania.org/?model=Master) or [b2](https://github.com/tom-seddon/b2)): load the disc and press SHIFT-BREAK. It is the current build of this branch, rebuilt with every change (`make` writes it).
-
-To make room, the game is reorganised across all of the Master's memory: main RAM, shadow RAM, the sideways RAM banks, and the 8K and 4K paged areas (HAZEL and ANDY). The build emits the source in three passes: a low pass for what must sit below `&3000` (the interrupt and text code), a hot pass for the rest of the frequently-run code, flowed through main RAM and on into sideways bank 4, and a cold pass in bank 7 for the docked screens and other rarely-run code. The port's own glue sits below `&3000` too, with a small direct stub for each routine that is called between the hot and cold passes.
 
 <p align="center">
 <img src="images/solid-elite-ship-and-planet.png" width="24%" alt="A sunlit ship in front of a planet with a crater">
@@ -23,6 +25,41 @@ To make room, the game is reorganised across all of the Master's memory: main RA
 <img src="images/solid-elite-coriolis-station.png" width="24%" alt="Approaching a Coriolis station">
 <img src="images/solid-elite-combat.png" width="24%" alt="Lasers on a sunlit ship at close range">
 </p>
+
+## Playing it
+
+Download [solid-elite-bbc-master.ssd](solid-elite-bbc-master.ssd) and run it on a BBC Master 128, or in an emulator set to a Master 128 (for example [jsbeeb](https://bbc.xania.org/?model=Master) or [b2](https://github.com/tom-seddon/b2)): load the disc and press SHIFT-BREAK. The game needs sideways RAM in banks 4 to 7 (on a real Master, links LK18 and LK19 set to RAM), and says so if it is missing. The disc is the current build of this branch, rebuilt with every change.
+
+## Building it
+
+As for Mark's source (see [his build instructions](#building-bbc-master-elite-from-the-source) below), with BeebAsm 1.11 and Python 3:
+
+```
+make
+```
+
+`make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd` and copies it to `solid-elite-bbc-master.ssd` in the root. If `python` or `beebasm` is not on your path, pass `PYTHON=python3` or `BEEBASM=...`. The port is the SNG47 variant only, without the original's copy protection. `make verify` runs the gate (below), which needs Node.js and jsbeeb (see [6-harness](6-harness/README.md)).
+
+## The layout
+
+To make room, the game is reorganised across all of the Master's memory: main RAM, shadow RAM, the sideways RAM banks, and the 8K and 4K paged areas (HAZEL and ANDY). The build emits the source in three passes, each in the original's order:
+
+* a **low pass** in main RAM below `&3000`, of only the code that must be there: the interrupt and sound code, the character printer and its font, and the break handler, which run with any bank paged or with shadow RAM in place;
+* a **hot pass** of the rest of the frequently-run code, flowed by measured sizes through main RAM and on into sideways bank 4, Elite's home bank;
+* a **cold pass** in bank 7 for the docked screens and other rarely-run code.
+
+The port's own code sits below `&3000` too, in a **glue area** before the low pass, with a small direct stub for each routine that is called between the hot and cold passes. The game data is in HAZEL (what does not fit follows the hot code in bank 4), and the quarter-square multiplication tables are at main `&7000`, under the dashboard. The renderer has banks 5 and 6, ANDY, a window of bank 7 for the beach ball, and a shared workspace in main RAM from `&0E00`. [docs/memory-map.md](docs/memory-map.md) has the details.
+
+## Speed
+
+In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.99 main-loop iterations per emulated second, against the original's 13.97: 0.858 times its speed, with all the extra drawing. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). The docked screens draw with 4.8% fewer busy cycles than before the three passes.
+
+## Testing
+
+Every commit was checked against Acornsoft's release (SNG47), running both side by side in an emulated Master on the same inputs and comparing the game state at every main-loop iteration:
+
+* **The gate** ([6-harness](6-harness/README.md), `make verify`) flies both with a deterministic pilot for 10,000 iterations and requires the game state to be the original's at every one, then docks, launches and docks again, saves, loads and catalogues through the game's disc menu, and changes views in flight. The renderer's rasteriser is also tested on its own, primitive by primitive, against a pixel-exact model.
+* **Soak tests** replay long sessions played by Dom Pajak's [elite-agent](https://github.com/8bitkick/elite-agent) on both builds in lockstep. Overnight, 334 sessions (3.97 million iterations and over 80 game hours, with many commanders and play styles, and 3,236 save-file checks) ran with no divergence on the build before the three passes, and a one-hour soak of the final build (29 sessions, 326,642 iterations) found nothing.
 
 ## Credits
 
@@ -34,7 +71,7 @@ To make room, the game is reorganised across all of the Master's memory: main RA
 
 * **The port** (the changes on this branch) is by Eben Upton, written with [Claude Code](https://claude.com/claude-code).
 
-* **Regression testing** used **Dom Pajak**'s [elite-agent](https://github.com/8bitkick/elite-agent), a rule-based Elite player that plays the game through the keyboard and joystick. Every change was checked by running the port and the original side by side on the same inputs from elite-agent's play and comparing them at every iteration, and long elite-agent careers (one of them over 30 game hours) were played through the final build with no difference from the original.
+* **Regression testing** used **Dom Pajak**'s [elite-agent](https://github.com/8bitkick/elite-agent), a rule-based Elite player that plays the game through the keyboard and joystick. Every change was checked by running the port and the original side by side on the same inputs from elite-agent's play and comparing them at every iteration, and long elite-agent careers (one of them over 30 game hours) were played through the port with no difference from the original.
 
 This is an independent fork. It is not affiliated with or endorsed by Mark Moxon, Ian Bell, David Braben or Acornsoft, and problems with the port should be reported here, not to Mark.
 
@@ -47,10 +84,10 @@ The port is a series of commits on top of Mark's source, in five parts:
 1. **The memory map.** The game is laid out over main RAM, sideways RAM banks 4 and 7, and HAZEL, freeing main RAM `&4000-&6FFF`, banks 5 and 6 and ANDY for a renderer. The game is still the original, iteration for iteration and pixel for pixel.
 2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
 3. **The filled renderer.** Filled ships lit by the sun, disc planets and suns, a double-buffered CMYK screen, a lens flare, a filled hangar and the briefing's ship: 17.24 flight iterations per emulated second (1.234 times the original).
-4. **Beach balls, kept rows and a tidier map.** Meridian planets drawn as beach balls by a meridian window in bank 7, one small step per commit; kept solid rows for close-up docking; then a smaller shared workspace, one low area below `&3000`, HAZEL holding only the game's data, and the quarter-square tables named as such. The gate's flight run gives 11.98 iterations per emulated second (0.857 times the original), the beach ball costing most of the difference.
+4. **Beach balls, kept rows and a tidier map.** Meridian planets drawn as beach balls by a meridian window in bank 7, one small step per commit; kept solid rows for close-up docking; then a smaller shared workspace holding the kept rows' state, the port's own code below `&3000` as one area, the hangar's tables in bank 6, HAZEL holding only the game's data, and the quarter-square tables named as such. The gate's flight run gives 11.98 iterations per emulated second (0.857 times the original), the beach ball costing most of the difference.
 5. **Three passes.** The source is emitted in three passes, each in the original's order: a low pass of only what must be below `&3000`, after the port's glue area; a hot pass flowed by measured sizes through main RAM and then bank 4, where the code that runs with shadow RAM paged lands with no hand-made bank 4 copy; and a cold pass in bank 7. Calls between the hot and cold passes go through one direct stub per routine instead of generic far calls (85 cycles a call, against about 171), and the text printers and the routines that crossed most moved hot. The docked screens take 4.8% fewer busy cycles, and the gate's flight run gives 11.99 iterations per emulated second (0.858 times the original).
 
-Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. Every commit was checked this way. See [docs/README.md](docs/README.md) for the details.
+Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details, [docs/renderer.md](docs/renderer.md) for the renderer, [docs/speedups.md](docs/speedups.md) for the speed-ups and [docs/master-memory.md](docs/master-memory.md) for the hardware findings.
 
 ---
 
