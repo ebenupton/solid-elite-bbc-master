@@ -787,6 +787,19 @@ def main():
                 else:
                     errors.append("%s:%d: %s branches to %s in another pass (%s)"
                                   % (SRC, i + 1, name, m.group(2), eff[k3]))
+    # a block that starts by aligning itself (ALIGN n: the log tables) is
+    # measured without the measure's padding and placed at the next multiple
+    # of n, the padding counted in its container
+    align = {}
+    for k in hot:
+        s, e, name, area = bl[k]
+        for i in range(s, e):
+            c = code_part(lines[i])
+            if ACTIVE[i] and assembles(c, macros):
+                m = re.match(r"^ALIGN\s+&([0-9A-F]+)$", c, re.I)
+                if m:
+                    align[k] = int(m.group(1), 16)
+                break
     units = []                             # [first, last] positions in hot
     for n in range(len(hot)):
         if n and find(n) == find(n - 1):
@@ -804,25 +817,37 @@ def main():
         sy = measured()
         dn, b4, drep = data(errors, phase, sy)
         addr = [sy["FLOW_%d" % k] for k in hot] + [sy["FLOW_END"]]
+        bsize = []                         # each block's size, less any measure padding
+        for n, k in enumerate(hot):
+            pad = (-addr[n]) % align[k] if k in align else 0
+            bsize.append(addr[n + 1] - addr[n] - pad)
+
+        def fit(at, u0, u1):
+            """where the unit u0..u1 ends if it starts at at"""
+            for n in range(u0, u1 + 1):
+                if hot[n] in align:
+                    at += (-at) % align[hot[n]]
+                at += bsize[n]
+            return at
         conts = [["hot1", sy["LOW_END%"], 0x4000, []], ["hot2", sy["QS_RUN%"], 0x8000, []],
                  ["hot3", 0x8000, 0xC000 - b4, []]]
         used = {c[0]: 0 for c in conts}
         cur = 0
         for u0, u1 in units:
-            size = addr[u1 + 1] - addr[u0]
             xu = any(eff[hot[n]] == "hotx" for n in range(u0, u1 + 1))
             names = "%s..%s" % (bl[hot[u0]][2], bl[hot[u1]][2]) if u1 > u0 else bl[hot[u0]][2]
             if xu:
                 c = [c for c in conts if c[0] == HOTX][0]
-                if c[1] + used[c[0]] + size > c[2]:
-                    errors.append("the ACCCON X unit %s (%d bytes) does not fit in %s" % (names, size, c[0]))
+                if fit(c[1] + used[c[0]], u0, u1) > c[2]:
+                    errors.append("the ACCCON X unit %s does not fit in %s" % (names, c[0]))
             else:
-                while cur < len(conts) and conts[cur][1] + used[conts[cur][0]] + size > conts[cur][2]:
+                while cur < len(conts) and fit(conts[cur][1] + used[conts[cur][0]], u0, u1) > conts[cur][2]:
                     cur += 1
                 if cur == len(conts):
-                    errors.append("the hot pass does not fit: %s (%d bytes) has no room" % (names, size))
+                    errors.append("the hot pass does not fit: %s has no room" % names)
                     break
                 c = conts[cur]
+            size = fit(c[1] + used[c[0]], u0, u1) - (c[1] + used[c[0]])
             c[3].append((used[c[0]], size, names, xu))
             used[c[0]] += size
             for n in range(u0, u1 + 1):

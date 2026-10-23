@@ -60,8 +60,7 @@
                         \ &3000-&7FFF), from interrupts or from MOS vectors with
                         \ any ROM paged: the far calls, the renderer's glue and
                         \ hooks, NEWBRK, the IRQ and sound code, CHPR and its
-                        \ font, the log tables (LOINQ), HANGFLAG, ADDK (DIALS,
-                        \ PIX1) and UP (CATF, FLH, COMC)
+                        \ font and UP (CATF, FLH, COMC)
 
  INCLUDE "3-assembled-output/elite-source-hot1.asm"  \ the hot pass: main RAM, to &4000
 
