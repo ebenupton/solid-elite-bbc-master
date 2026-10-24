@@ -106,6 +106,13 @@ back buffer, two frames old:
 4. Fill the ships far to near, each face a dithered polygon in its lit
    colour, with their details and fins. Then draw the lines and the
    particles. All of these extend this buffer's dirty extent for each row.
+   A ship further away than the planet, with the first vertex of its first
+   visible face inside the planet's disc, is not drawn (`f_behind`).
+   `F_PLANET` records the planet's z for this as 16 bits; a planet 65536 or
+   more away (z's third byte non-zero) is recorded as `&FFxx`, further than
+   any ship drawn with faces (always nearer than 4096). Before that fix,
+   only z's low 16 bits were kept, so a planet 65536-69631 away hid a
+   station in front of it on a docking run (`6-harness/mstation.mjs`).
 5. Draw the lens flare, if the sun is on screen (below).
 6. Draw the text, in the cells whose character changed or whose pixels were
    drawn over, then the laser sights.
@@ -361,8 +368,9 @@ tables.
 ## Speed
 
 The gate's run gives 11.73 flight iterations per emulated second, against
-SNG47's 13.97 (0.840 times), at 170,501 cycles a flight iteration, with the
-frame rate capped at 25 frames a second; without the cap it gave 11.99
+SNG47's 13.97 (0.839 times), at 170,540 cycles a flight iteration, with the
+frame rate capped at 25 frames a second (170,501 before the depth test's fix
+to the planet's z moved bank 6's code by 6 bytes); without the cap it gave 11.99
 (0.858 times, 166,791 cycles), with a tenth of its frames shown for a single
 field. With the speed-ups of the port's second part and the original's
 wireframe drawing it is 17.86, and with plain disc planets in place of the

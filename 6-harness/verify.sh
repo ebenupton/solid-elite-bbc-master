@@ -17,8 +17,10 @@
 #  3. regressions, with real key presses: dock, launch, dock again
 #     (mredock.mjs); save, load, a failed load and a catalogue through the
 #     game's disc menu (msavetest.mjs, once the build has DOSCLI, its disc
-#     glue); and changes of view in flight against the reference over 1500
-#     iterations (mcompare.mjs --views).
+#     glue); once the build has the filled renderer, the station drawn in
+#     front of a planet just over 65536 away (mstation.mjs); and changes of
+#     view in flight against the reference over 1500 iterations
+#     (mcompare.mjs --views).
 #  4. speed: flight-loop iterations per emulated second over the whole run,
 #     reference and candidate, their ratio, and the candidate's cycles per
 #     flight iteration (reported, not gated; the per-window table is in the
@@ -92,6 +94,15 @@ if grep -q "'DOSCLI_C'" "$CSYMS"; then
     SAVE=savetest
 else
     SAVE="no savetest: the original's disc access"
+fi
+if grep -q "'F_PLANET'" "$CSYMS"; then
+    # the station in front of a planet just over 65536 away (a docking run
+    # with the planet behind it) must be drawn: F_PLANET once kept 16 bits of
+    # the planet's z, and f_behind hid the station behind it
+    node 6-harness/mstation.mjs --disc "$CAND" --syms "$CSYMS" --out "$LOG/station" > "$LOG/station.log" 2>&1
+    grep -E "^[0-9]+ iterations" "$LOG/station.log"
+    grep -q "^STATION PASS" "$LOG/station.log" || { echo "station: FAIL"; fail station; }
+    SAVE="$SAVE, station"
 fi
 node 6-harness/mcompare.mjs --iters 1500 $OPTS --views --maxsecs 400 --cand "$CAND" --csyms "$CSYMS" \
     --out "$LOG/views" > "$LOG/views.log" 2>&1

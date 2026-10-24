@@ -52,7 +52,7 @@ The port's own code sits below `&3000` too, in a **glue area** before the low pa
 
 ## Speed
 
-In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.73 main-loop iterations per emulated second, against the original's 13.97: 0.840 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): uncapped, the port ran at 11.99 (0.858), but 10.7% of its frames were then shown for a single field. With the cap none are, and frames that took longer than two fields are unaffected. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). The docked screens draw with 4.8% fewer busy cycles than before the three passes.
+In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.73 main-loop iterations per emulated second, against the original's 13.97: 0.839 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): uncapped, the port ran at 11.99 (0.858), but 10.7% of its frames were then shown for a single field. With the cap none are, and frames that took longer than two fields are unaffected. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). The docked screens draw with 4.8% fewer busy cycles than before the three passes.
 
 ## Testing
 

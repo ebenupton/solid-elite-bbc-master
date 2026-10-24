@@ -638,7 +638,11 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA F_PLR
  LDA TYPE
  STA F_PLT
- LDA INWK+7
+ LDA INWK+8             \ the planet's z is 24-bit, and a ship drawn with
+ BEQ P%+4               \ faces is nearer than 4096: a planet 65536 or more
+ LDA #&FF               \ away is held as z_hi = &FF, further than any such
+ ORA INWK+7             \ ship (with INWK+7 alone, a planet 65536-69631 away
+                        \ hid the station in front of it on a docking run)
  STA F_PLZH
  LDA INWK+6
  STA F_PLZL

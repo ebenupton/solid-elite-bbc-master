@@ -84,6 +84,7 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mcompare.mjs` | Compares the reference against a candidate and reports the first divergence, the speed per window and by pilot phase, and the cycles per flight iteration. |
 | `mredock.mjs` | The regression check for docking, launching and docking again, with real key presses. |
 | `msavetest.mjs` | Exercises the disc menu: save, load, a failed load, a catalogue and a launch. It junks the parts of HAZEL that DFS and the MOS may write at each disc command, then checks that the game data and the NMI handler survive. |
+| `mstation.mjs` | The regression check for the depth test: puts a docking scene (the planet at z = &10636, just over 65536, the station dead ahead in front of it) into a freshly launched game and checks that every frame recording the station draws it. F_PLANET once kept 16 bits of the planet's z, so the station was hidden behind the planet. |
 | `mboot.mjs` | Boots a build to the title screen and checks every image that the loader installs. |
 | `mtrace.mjs` | Traces chosen routines and variables over chosen iterations (`mcompare.mjs --trace`). |
 | `profile.mjs` | Profiles cycles by PC over exactly the gate's run, with `--pagex` for page-crossing cycles. |
