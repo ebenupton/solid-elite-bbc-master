@@ -373,8 +373,12 @@ ENDIF
  CPY #N%                \ Loop back for the next byte until we have done them
  BNE LOOP               \ all (the number of bytes was set in N% above)
 
- LDA #%00001111         \ Set the Access Control latch at SHEILA &34, as
- STA VIA+&34            \ follows:
+ LDA VIA+&34            \ Set the Access Control latch at SHEILA &34, as
+ AND #%00110000         \ follows:
+ ORA #%00001111
+ STA VIA+&34
+                        \ (Port: masked, so that ITU and IFJ, bits 4 and 5,
+                        \ are kept as the MOS set them)
                         \
                         \   * Bit 7 = IRR = 0: Do not IRQ the CPU with this
                         \   * Bit 6 = TST = 0: Must be set to 0
@@ -393,8 +397,12 @@ ENDIF
 
  JSR PLL1               \ Call PLL1 to draw Saturn
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control latch at
- STA VIA+&34            \ SHEILA &34, which changes the following:
+ LDA VIA+&34            \ Clear bits 1 and 2 of the Access Control latch at
+ AND #%00110000         \ SHEILA &34, which changes the following:
+ ORA #%00001001
+ STA VIA+&34
+                        \ (Port: masked, so that ITU and IFJ, bits 4 and 5,
+                        \ are kept as the MOS set them)
                         \
                         \   * Bit 2 = X = 0: &3000-&7FFF set to main RAM
                         \   * Bit 1 = E = 0: VDU shadow RAM locations accessible
@@ -438,8 +446,12 @@ ENDIF
  LDA FTAB+2,X           \ copy in &F4) and ACCCON
  STA LATCH
  STA VIA+&30
- LDA FTAB+3,X
+ LDA VIA+&34
+ AND #%00110000
+ ORA FTAB+3,X
  STA VIA+&34
+                        \ (Port: masked, so that ITU and IFJ, bits 4 and 5,
+                        \ are kept as the MOS set them)
 
  STZ ZP                 \ ZP(1 0) = &1300, the source
  LDA #&13
@@ -476,8 +488,12 @@ ENDIF
  ORA LEN+1
  BNE LDC
 
- LDA #%00001001         \ Main RAM back at &3000-&7FFF (ACCCON as the game has
- STA VIA+&34            \ it)
+ LDA VIA+&34            \ Main RAM back at &3000-&7FFF (ACCCON as the game has
+ AND #%00110000         \ it)
+ ORA #%00001001
+ STA VIA+&34
+                        \ (Port: masked, so that ITU and IFJ, bits 4 and 5,
+                        \ are kept as the MOS set them)
 
  CLI
 
@@ -540,8 +556,12 @@ ENDIF
                         \ copy at &4000 into place
 
  SEI
- LDA #%00001001
+ LDA VIA+&34
+ AND #%00110000
+ ORA #%00001001
  STA VIA+&34
+                        \ (Port: masked, so that ITU and IFJ, bits 4 and 5,
+                        \ are kept as the MOS set them)
 
  LDX #63
 .DFST

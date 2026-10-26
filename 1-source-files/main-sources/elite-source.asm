@@ -3114,8 +3114,10 @@ IF _COMPACT
 
 ENDIF
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00000110         \ Set bits 1 and 2 of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDX #&90               \ We want to save zero page from &0090 and up, so set an
                         \ index in X, starting from &90
@@ -3130,8 +3132,11 @@ ENDIF
  BNE sz1                \ Loop back until we have copied the last byte of zero
                         \ page
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00000110         \ Clear bits 1 and 2 of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00001001         \ (A as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  RTS                    \ Return from the subroutine
 
@@ -3190,8 +3195,10 @@ IF _COMPACT
 
 ENDIF
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00000110         \ Set bits 1 and 2 of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDX #&90               \ We want to swap zero page from &0090 and up, so set an
                         \ index in X, starting from &90
@@ -3208,8 +3215,11 @@ ENDIF
  CPX #&F0               \ Loop back until we have swapped up to location &00EF
  BNE sz2
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00000110         \ Clear bits 1 and 2 of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00001001         \ (A as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
                         \ Port: the original set the ROM Select latch to bank 6
                         \ here, to page the game's data back in after disc
@@ -3682,13 +3692,19 @@ ENDIF
 
  STY YSAV               \ Store Y in YSAV so we can retrieve it below
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00000110         \ Set bits 1 and 2 of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00001111         \ (A as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  JSR LOINQ              \ Draw a line from (X1, Y1) to (X2, Y2)
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00000110         \ Clear bits 1 and 2 of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00001001         \ (A as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDY YSAV               \ Retrieve the value of Y we stored above
 
@@ -5957,8 +5973,12 @@ ENDIF
  STY YSAV               \ Store Y into YSAV, so we can preserve it across the
                         \ call to this subroutine
 
- LDY #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PHA                    \ Set bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDX X1                 \ Set X = X1
 
@@ -6121,8 +6141,12 @@ ENDIF
 
 .HL6
 
- LDY #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PHA                    \ Clear bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDY YSAV               \ Restore Y from YSAV, so that it's preserved
 
@@ -6173,8 +6197,12 @@ ENDIF
  STA (SC),Y             \ SC(1 0), using EOR logic so it merges with whatever is
                         \ already on-screen
 
- LDY #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PHA                    \ Clear bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDY YSAV               \ Restore Y from YSAV, so that it's preserved
 
@@ -6590,8 +6618,12 @@ ENDIF
  STY T1                 \ Store Y in T1 so we can restore it at the end of the
                         \ subroutine
 
- LDY #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PHA                    \ Set bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  TAY                    \ Copy the screen y-coordinate from A into Y
 
@@ -6645,8 +6677,12 @@ ENDIF
  STA (SC),Y             \ remove it later without ruining the background that's
                         \ already on-screen
 
- LDY #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PHA                    \ Clear bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDY T1                 \ Restore Y from T1, so Y is preserved by the routine
 
@@ -6687,8 +6723,12 @@ ENDIF
  STA (SC),Y             \ remove it later without ruining the background that's
                         \ already on-screen
 
- LDY #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STY VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PHA                    \ Clear bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDY T1                 \ Restore Y from T1, so Y is preserved by the routine
 
@@ -7885,8 +7925,12 @@ ENDIF
  JSR G_DIRECT           \ Port: the renderer stops recording until the first
                         \ frame after the screen is cleared (gfx-frame.asm)
 
- LDX #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STX VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PHA                    \ Set bits 1 and 2 of the Access Control Register at
+ LDA #%00000110
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ PLA
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDX #&40               \ Set X to point to page &40, which is the start of the
                         \ screen memory at &4000
@@ -7905,8 +7949,11 @@ ENDIF
 
 .BOX
 
- LDX #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STX VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00000110         \ Set bits 1 and 2 of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDX #%00001111         \ (X as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDA COL                \ Store the current colour on the stack, so we can
  PHA                    \ restore it once we have drawn the border
@@ -7971,8 +8018,11 @@ ENDIF
  PLA                    \ Restore the original colour that we stored above
  STA COL
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00000110         \ Clear bits 1 and 2 of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00001001         \ (A as the original leaves it)
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  RTS                    \ Return from the subroutine
 
@@ -8108,8 +8158,10 @@ ENDIF
                         \ record mode return instead of clearing the screen
                         \ (gfx-hooks.asm)
 
- LDA #%00001111         \ Set bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+ LDA #%00000110         \ Set bits 1 and 2 of the Access Control Register at
+ TSB VIA+&34            \ SHEILA &34 to switch screen memory into &3000-&7FFF
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDA #&6A               \ Set SC+1 = &6A, for the high byte of SC(1 0)
  STA SC+1
@@ -8179,8 +8231,10 @@ ENDIF
  BNE CLYL               \ Loop back to blank another row, until we have done the
                         \ number of rows in X
 
- LDA #%00001001         \ Clear bits 1 and 2 of the Access Control Register at
- STA VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+ LDA #%00000110         \ Clear bits 1 and 2 of the Access Control Register at
+ TRB VIA+&34            \ SHEILA &34 to switch main memory back into &3000-&7FFF
+                        \ Port: bits 1 and 2 alone (TSB/TRB), so that ITU and
+                        \ IFJ (bits 4 and 5) are kept
 
  LDA #0                 \ Set A = 0 as this is a return value for this routine
 
