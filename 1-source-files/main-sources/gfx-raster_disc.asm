@@ -177,6 +177,7 @@
   LDA r_sbh_bdn,X          \ group r_bdn
   STA r_pt86+2
   STA r_pt92+2
+  STA r_pt102+2
   STA r_pt420+2
   STA r_pt98+2
   STA r_pt110+2
@@ -205,18 +206,6 @@
   STA r_pt135+2
   STA r_pt402+2
   STA r_pt403+2
-  LDA r_sbh_bdx2,X          \ group r_bdx2
-  STA r_pt95+2
-  STA r_pt102+2
-  STA r_pt136+2
-  STA r_pt404+2
-  STA r_pt405+2
-  LDA r_sbh_bdx3,X          \ group r_bdx3
-  STA r_pt96+2
-  STA r_pt103+2
-  STA r_pt137+2
-  STA r_pt406+2
-  STA r_pt407+2
 .pt
   LDX R_PRBUF
   LDA R_PRBMODE,X           \ plain last time: its rows had no boundaries
@@ -330,7 +319,7 @@
   JSR r_dpe
   LDX RZ_Y
   BRA nx
-.nz                       \ 1..4 boundaries
+.nz                       \ 1..4 boundaries (the stored count: 1..2, or &80)
 .^r_pt92 CMP r_bdn,X
   BNE ch
   TAY
@@ -341,16 +330,6 @@
   BEQ sm
   LDA R_NDX1,X
 .^r_pt94 CMP r_bdx1,X
-  BNE chb
-  DEY
-  BEQ sm
-  LDA R_NDX2,X
-.^r_pt95 CMP r_bdx2,X
-  BNE chb
-  DEY
-  BEQ sm
-  LDA R_NDX3,X
-.^r_pt96 CMP r_bdx3,X
   BEQ sm
 .chb
 .^r_pt408 LDA r_dl,X
@@ -523,100 +502,6 @@
 .g1
   JMP gen
 .n1
-  DEC RZ_T5               \ boundary 2
-  BMI done2
-.^r_pt404 LDY r_bdx2,X      \ Y = old, A = new
-  STY RZ_T0
-  LDA R_NDX2,X
-  CMP RZ_T0
-  BEQ s2
-.^r_pt405 STA r_bdx2,X
-  BCC l2
-  CPY RZ_T6               \ moved right: old .. new-1 in the colour left of it
-  BCC g2
-  STA RZ_T6
-  DEC A
-  TAY
-  LDX RZ_T0
-  STY RZ_T3               \ (extent of the writes)
-  LDA RZ_T4
-  BNE r2
-  STX RZ_T4
-.r2
-  LDA RZ_T2
-  JSR r_sw
-  LDX RZ_Y
-  BRA n2
-.l2
-  CMP RZ_T6               \ moved left: new .. old-1 in the colour right of it
-  BCC g2
-  STY RZ_T6
-  DEY
-  TAX
-  STY RZ_T3
-  LDA RZ_T4
-  BNE q2
-  STX RZ_T4
-.q2
-  LDA RZ_T1
-  JSR r_sw
-  LDX RZ_Y
-  BRA n2
-.s2
-  STA RZ_T6               \ unmoved: the next strip starts after it
-  BRA n2
-.done2
-  JMP done
-.g2
-  JMP gen
-.n2
-  DEC RZ_T5               \ boundary 3
-  BMI done3
-.^r_pt406 LDY r_bdx3,X      \ Y = old, A = new
-  STY RZ_T0
-  LDA R_NDX3,X
-  CMP RZ_T0
-  BEQ s3
-.^r_pt407 STA r_bdx3,X
-  BCC l3
-  CPY RZ_T6               \ moved right: old .. new-1 in the colour left of it
-  BCC g3
-  STA RZ_T6
-  DEC A
-  TAY
-  LDX RZ_T0
-  STY RZ_T3               \ (extent of the writes)
-  LDA RZ_T4
-  BNE r3
-  STX RZ_T4
-.r3
-  LDA RZ_T1
-  JSR r_sw
-  LDX RZ_Y
-  BRA n3
-.l3
-  CMP RZ_T6               \ moved left: new .. old-1 in the colour right of it
-  BCC g3
-  STY RZ_T6
-  DEY
-  TAX
-  STY RZ_T3
-  LDA RZ_T4
-  BNE q3
-  STX RZ_T4
-.q3
-  LDA RZ_T2
-  JSR r_sw
-  LDX RZ_Y
-  BRA n3
-.s3
-  STA RZ_T6               \ unmoved: the next strip starts after it
-  BRA n3
-.done3
-  JMP done
-.g3
-  JMP gen
-.n3
 .done
   LDY RZ_Y
   LDA RZ_T3
@@ -795,24 +680,18 @@
   STA r_ev+1
   LDA R_NDX1,X
   STA r_ev+2
-  LDA R_NDX2,X
-  STA r_ev+3
-  LDA R_NDX3,X
-  STA r_ev+4
+  LDA R_NDX2,X            \ (the third: one more than the two stored; a
+  STA r_ev+3              \ fourth never gets here, see CMP #4 below)
 .^r_pt134 LDA r_bdx0,X
   STA r_ev+8
 .^r_pt135 LDA r_bdx1,X
   STA r_ev+9
-.^r_pt136 LDA r_bdx2,X
-  STA r_ev+10
-.^r_pt137 LDA r_bdx3,X
-  STA r_ev+11
   LDA R_NDP,X
   AND #1
   STA r_np                \ (the colour at the left end, both sides)
-  LDA R_NDN,X
-  CMP #5
-  BCS gen0
+  LDA R_NDN,X             \ (four or more: the counts differ by two or more,
+  CMP #4                  \ as at most two are stored, and the early out has
+  BCS gen0                \ sent the row to r_dpgl already)
   STA r_cn
 .^r_pt130 CMP r_bdn,X
   BEQ same

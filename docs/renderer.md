@@ -260,7 +260,13 @@ of both it is colour B (green land), and elsewhere colour A. Each circle is
 projected exactly, so the boundaries meet the limb and each other without
 tears.
 
-The disc layer already draws up to four boundaries a row. What the beach
+The disc layer already draws up to four boundaries a row. It keeps two of
+them a row for each buffer (`R_BDN`, `R_BDP`, `R_BDX0`, `R_BDX1`), so that
+the row's next change can be drawn as strips; a row with three or four is
+stored as unknown (count `&80`), and its next change is repainted segment
+by segment. Over the gate's run 2.5% of the beach ball's rows have three
+boundaries and almost none four, and keeping only two is quicker (the rows'
+cycles fall 1.8%) and frees 1,039 bytes of bank 5. What the beach
 ball needs is the geometry, which is about 3K and has its own window: the
 meridian window, `gfx-merid.asm`, in bank 7 after the cold pass. It has two
 entry points, each behind one stub in the glue area:

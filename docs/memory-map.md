@@ -289,7 +289,7 @@ line.
 | Bank 7, the cold pass | `&8000-&A65C` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens |
 | Bank 7, the meridian window | `&A65D-&B573` (its own image, `MERID`) | the beach ball planet's boundaries (`gfx-merid.asm`: `PM_HOOK`, `PM_MERID` and their workspace), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FE4` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
-| Bank 5, the rasteriser | `&8000-&8FEF` (ROMSEL 5), `&9000-&BF94` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; `gfx-flare.asm`; `gfx-raster_lcold.asm`; then the rasteriser's private state, `R_PRBUF` to `R_PRCWB`) |
+| Bank 5, the rasteriser | `&8000-&8F00` (ROMSEL 5), `&9000-&BF94` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; `gfx-flare.asm`; `gfx-raster_lcold.asm`; then the rasteriser's private state, `R_PRBUF` to `R_PRCWB`) |
 | Bank 6, the frame layer | `&8000-&BFF9` | `gfx-frame.asm`, `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm`, `gfx-frame_cold.asm`, `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the half-widths, the display list (with `F_INIT`, `gfx-finit.asm`), the text map, the cells' shown states and the directly drawn stars; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
 | HAZEL | `&C000-&DD94` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints. `&DF00-&DFFF` is the MOS's |
 | Shadow `&3000-&3FFF` | `&3090-&30FF` | the zero-page save (`setzp`, `getzp`), as in the original; nothing else |
@@ -302,8 +302,9 @@ parts branch into one another and so move as a whole, leads the second.
 
 Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 810 at the end of bank 4,
-2,700 at the end of bank 7, 363 in HAZEL, 16 and 107 (and 252 in the row
-runs' tails) in bank 5, 27 in ANDY, 6 in bank 6 (12 before the depth
+2,700 at the end of bank 7, 363 in HAZEL, 255 and 107 in bank 5 (and 808
+below the per-x tables, freed when the disc layer went to two boundaries a
+row, and 256 in the row runs' tails), 27 in ANDY, 6 in bank 6 (12 before the depth
 test's fix to the planet's z), and 48 and 105 in `WP`'s
 pages and the shared workspace, with 65 more between it and the main code
 (79 before the 25 fps cap's 14 bytes in the glue area: `CODE%` moved down

@@ -199,19 +199,24 @@ r_opRTS = &60
 
 \ ============================================================================
 \ The boundary arrays of two-colour discs (R_DISCROWS, r_dbm): each buffer's
-\ last boundaries per row.  Each buffer's six arrays are contiguous, buffer
-\ 1's &500 after buffer 0's, so that the two arrays of a pair share their low
-\ byte (r_dbm patches only operands' high bytes, from r_sbh_bd*).  The most
-\ read, R_BDN, R_BDP and R_BDX0, are at low bytes &00, &40 and &00: reading
-\ them ,X never crosses a page.
+\ last boundaries per row, up to two (a row with more is stored as count
+\ &80, unknown: its next change is a full repaint; the gate's beach balls
+\ have three in 3-5% of their rows, four in none).  Each buffer's four
+\ arrays are contiguous, buffer 1's &300 after buffer 0's, so that the two
+\ arrays of a pair share their low byte (r_dbm patches only operands' high
+\ bytes, from r_sbh_bd*).  The most read, R_BDN and R_BDX0, are at low
+\ bytes &00 and &40: reading them ,X never crosses a page (R_BDP, at &80,
+\ does for rows 128 on).
 \ ============================================================================
-.R_BDN0  SKIP 192       \ boundaries per row, 0..4
+.R_BDN0  SKIP 192       \ boundaries per row, 0..2, or &80: more (unknown)
 .R_BDX10 SKIP 192       \ their x (raw), the second ...
-.R_BDX20 SKIP 192
 .R_BDP0  SKIP 192       \ bit 0: the colour at the span's left end
 .R_BDX00 SKIP 192       \ ... and the first
-.R_BDX30 SKIP 192
-\ (the 128 bytes up to buffer 1's arrays)
+.R_BDN1  SKIP 192       \ buffer 1's (= buffer 0's + &300)
+.R_BDX11 SKIP 192
+.R_BDP1  SKIP 192
+.R_BDX01 SKIP 192
+ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
 \ Row set-up.  Y = row (0..191; kept).  Sets RZ_Y, RZ_PA, RZ_PB, the run page
 \ (RZ_PP+1 and r_jsr+2).  Clobbers A.
 .r_rowset
@@ -253,13 +258,12 @@ r_opRTS = &60
   LDX R_XL
   JMP r_spc
 }
-\ r_bstore: Y = row: remember the row's new boundaries (raw) in this buffer
+\ r_bstore: Y = row: remember the row's new boundaries (raw) in this buffer;
+\ a row with more than two is stored as unknown (count &80)
 .r_bstore
   LDA R_NDN,Y
-  CMP #5
-  BCC bs1
-  LDA #4
-.bs1
+  CMP #3
+  BCS bsu
 .^r_pt98 STA r_bdn,Y
   LDA R_NDP,Y
   AND #1
@@ -268,20 +272,12 @@ r_opRTS = &60
 .^r_pt100 STA r_bdx0,Y
   LDA R_NDX1,Y
 .^r_pt101 STA r_bdx1,Y
-  LDA R_NDX2,Y
-.^r_pt102 STA r_bdx2,Y
-  LDA R_NDX3,Y
-.^r_pt103 STA r_bdx3,Y
+  RTS
+.bsu
+  LDA #&80
+.^r_pt102 STA r_bdn,Y
   RTS
 
-  SKIP R_BDN0 + &500 - P%
-.R_BDN1  SKIP 192
-.R_BDX11 SKIP 192
-.R_BDX21 SKIP 192
-.R_BDP1  SKIP 192
-.R_BDX01 SKIP 192
-.R_BDX31 SKIP 192
-ASSERT R_BDN1 = R_BDN0 + &500 AND R_BDX31 = R_BDX30 + &500
 ASSERT r_s1y = r_s0y + &300 AND r_s1x = r_s0x + &300
 ASSERT r_s1a = r_s0a + &300 AND r_s1b = r_s0b + &300
 
@@ -316,8 +312,6 @@ r_bdn = R_BDN0          \ per-buffer boundary rows (patched like r_dl)
 r_bdp = R_BDP0
 r_bdx0 = R_BDX00
 r_bdx1 = R_BDX10
-r_bdx2 = R_BDX20
-r_bdx3 = R_BDX30
 
 \ ============================================================================
 \ R_SETBUF: A = buffer.  Patches every buffer-dependent operand (high byte).
@@ -678,9 +672,11 @@ r_bdx3 = R_BDX30
 .r_tfree
 
 \ ============================================================================
-\ Page-aligned per-x tables
+\ Page-aligned per-x tables, at &9C00: the row runs after them start at &A000
+\ (a page whose number is a multiple of 32: asserted below)
 \ ============================================================================
-ALIGN &100
+ASSERT P% <= r_start + &C00
+SKIP r_start + &C00 - P%
 .r_tables
 .r_xo                   \ (8 * (x DIV 4)) AND &FF : edge byte offset
 FOR x, 0, 255
@@ -823,7 +819,7 @@ r_bb = r_ov + 16
 r_tl = r_ov + 17
 r_fe = r_ov + 20
 r_fo = r_ov + 21
-r_bv = r_ov + 22        \ boundaries: new (4), then old (4) at r_bv+4
+r_bv = r_ov + 22        \ r_segw: the new boundaries (4)
 r_ev = r_ov + 45        \ r_dpe: edges new (7), then old (7) at r_ev+7
 r_nn = r_ov + 30        \ new count / colour; old count / colour
 r_np = r_ov + 31
@@ -888,8 +884,6 @@ ASSERT LO(r_s0k) = LO(r_s1k)
 ASSERT LO(r_s0r) = LO(r_s1r)
 .r_sbh_s0b EQUB HI(r_s0b), HI(r_s1b)
 ASSERT LO(r_s0b) = LO(r_s1b)
-.r_sbh_bdx3 EQUB HI(R_BDX30), HI(R_BDX31)
-ASSERT LO(R_BDX30) = LO(R_BDX31)
 R_ENDPAGE 14
 .r_run15 R_RUN 15
 .r_pset
@@ -1030,8 +1024,6 @@ R_ENDPAGE 17
 .n4
   RTS
 }
-.r_sbh_bdx2 EQUB HI(R_BDX20), HI(R_BDX21)
-ASSERT LO(R_BDX20) = LO(R_BDX21)
 .r_sbh_bdx1 EQUB HI(R_BDX10), HI(R_BDX11)
 ASSERT LO(R_BDX10) = LO(R_BDX11)
 .r_sbh_bdx0 EQUB HI(R_BDX00), HI(R_BDX01)
