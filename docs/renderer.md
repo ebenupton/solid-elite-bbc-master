@@ -376,12 +376,13 @@ tables.
 
 ## Speed
 
-The gate's run gives 11.73 flight iterations per emulated second, against
-SNG47's 13.97 (0.839 times), at 170,540 cycles a flight iteration, with the
-frame rate capped at 25 frames a second (170,501 before the depth test's fix
-to the planet's z moved bank 6's code by 6 bytes); without the cap it gave 11.99
-(0.858 times, 166,791 cycles), with a tenth of its frames shown for a single
-field. With the speed-ups of the port's second part and the original's
+The gate's run gives 11.82 flight iterations per emulated second, against
+SNG47's 13.97 (0.846 times), at 169,148 cycles a flight iteration, with the
+frame rate capped at 25 frames a second. With the cap it first gave 11.73
+(170,540 cycles); the disc layer's two boundaries a row and its short paths
+for one-colour and emptied rows brought it to 11.82. Without the cap it gave
+11.99 (0.858 times, 166,791 cycles), with a tenth of its frames shown for a
+single field. With the speed-ups of the port's second part and the original's
 wireframe drawing it is 17.86, and with plain disc planets in place of the
 beach ball the renderer ran at 17.24 (115,992 cycles). So most of the cost
 is the beach ball: its geometry and its two-colour disc rows, every frame

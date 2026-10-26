@@ -40,7 +40,15 @@ Master Elite (the Acornsoft SNG47 release), in five parts:
    Since then the frame rate is capped at 25 frames a second
    ([renderer.md](renderer.md)): no frame is on show for a single field, and
    flight runs at 11.73 (0.840 times SNG47), as the frames that were quicker
-   than two fields now wait at their flip.
+   than two fields now wait at their flip. Lessons from the port to the
+   Tube then took some of that back: the beach ball's disc rows keep two
+   colour boundaries a row instead of four, one-colour and emptied rows take
+   the short paths, and the polygon fill has no empty-run test, for 11.82
+   (0.846 times SNG47). The ships' edge lists, which nothing reads, are no
+   longer assembled; with the two boundaries this freed 3.6K (HAZEL 1,919
+   bytes free, bank 4 1,850, bank 5 808 more). ACCCON's top bits are left
+   as the MOS set them, and BREAK now clears memory, so SHIFT-BREAK boots
+   the game again.
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -93,6 +101,7 @@ encrypt=no`.
 | End of part 5: three passes | 11.99 | 0.858 | 166,791 |
 | The 25 fps cap | 11.73 | 0.840 | 170,501 |
 | The planet's z in the depth test | 11.73 | 0.839 | 170,540 |
+| Lessons from the Tube | 11.82 | 0.846 | 169,148 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never
