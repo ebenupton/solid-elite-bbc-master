@@ -550,11 +550,9 @@
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
 .pb_l2_e
-  LDY R_XR
-  LDA r_j-4,Y
-  CMP r_j,X
-  BEQ pb_norun_e
-  LDY r_j,X
+  LDY R_XR                \ (no empty-run test: when no whole byte lies
+  LDA r_j-4,Y             \ between the ends, the entry is the plant and the
+  LDY r_j,X               \ JSR hits the RTS, as r_spc's)
   STY r_jsr2_e+1
   CMP RZ_PP
   BNE pb_plant_e
@@ -614,11 +612,9 @@
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
 .pb_l2_o
-  LDY R_XR
-  LDA r_j-4,Y
-  CMP r_j,X
-  BEQ pb_norun_o
-  LDY r_j,X
+  LDY R_XR                \ (no empty-run test: when no whole byte lies
+  LDA r_j-4,Y             \ between the ends, the entry is the plant and the
+  LDY r_j,X               \ JSR hits the RTS, as r_spc's)
   STY r_jsr2_o+1
   CMP RZ_PP
   BNE pb_plant_o
