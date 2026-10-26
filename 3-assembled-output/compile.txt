@@ -59597,7 +59597,7 @@ Saving file '3-assembled-output/BANK6.bin'
      0E5A   A2 00      LDX #&00
      0E5C   20 F4 FF   JSR &FFF4
      0E5F   A9 C8      LDA #&C8
-     0E61   A2 01      LDX #&01
+     0E61   A2 03      LDX #&03
      0E63   20 E4 10   JSR &10E4
      0E66   A9 0D      LDA #&0D
      0E68   A2 00      LDX #&00

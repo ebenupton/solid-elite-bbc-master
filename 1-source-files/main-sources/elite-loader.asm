@@ -329,9 +329,16 @@ IF _COMPACT
 
 ENDIF
 
- LDA #200               \ Call OSBYTE with A = 200, X = 1 and Y = 0 to disable
- LDX #1                 \ the ESCAPE key and disable memory clearing if the
- JSR OSB                \ BREAK key is pressed
+ LDA #200               \ Call OSBYTE with A = 200, X = 3 and Y = 0 to disable
+ LDX #3                 \ the ESCAPE key and clear memory if the BREAK key is
+ JSR OSB                \ pressed
+                        \
+                        \ Port: X = 3, not 1: a BREAK is then a power-on
+                        \ reset. With memory kept, the MOS's reset hung (a
+                        \ garbled screen, with or without SHIFT), most likely
+                        \ on its workspace in ANDY and HAZEL, where the
+                        \ rasteriser and the game's data are (the original,
+                        \ with X = 1, recovers from both)
 
  LDA #13                \ Call OSBYTE with A = 13, X = 0 and Y = 0 to disable
  LDX #0                 \ the "output buffer empty" event

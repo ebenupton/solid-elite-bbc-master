@@ -338,7 +338,12 @@ alignment pass has been made: nothing is padded to save a crossing.
 
 The loader (`M128Elt`, at `&0E00`, as in the original) first checks that
 sideways banks 4 to 7 are RAM. It sets up the screen as the original does,
-with the CMYK palette. Then it loads each file to `&1300` and copies it into
+with the CMYK palette. It disables ESCAPE as the original does, but with
+`*FX 200,3` rather than `*FX 200,1`, so that BREAK clears memory as a
+power-on reset does: BREAK then reaches BASIC and SHIFT-BREAK boots the
+game again. With memory kept, the MOS's reset hung with a garbled screen,
+most likely on its own workspace in ANDY and HAZEL, which the rasteriser
+and the game's data now hold. Then it loads each file to `&1300` and copies it into
 place, using its table `FTAB`:
 
 * BDATA, the dashboard image, goes to shadow `&7000-&7DFF`.
