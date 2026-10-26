@@ -645,6 +645,21 @@
 \ ============================================================================
 .r_dpeg
   JMP r_dpgl
+\ r_dpb: r_dp2 for a one-colour row in colour B (X = RZ_Y = row): R_DCE /
+\ R_DCO and R_DBE / R_DBO swapped round it.  Returns X = RZ_Y.
+.r_dpb
+  JSR r_dsw
+  JSR r_dp2+2
+.r_dsw                    \ swap the colour pairs (X kept)
+  LDA R_DCE
+  LDY R_DBE
+  STA R_DBE
+  STY R_DCE
+  LDA R_DCO
+  LDY R_DBO
+  STA R_DBO
+  STY R_DCO
+  RTS
 .r_dpe
 {
   STX RZ_Y
@@ -659,10 +674,12 @@
   LDA R_NDP,X             \ (R_NDP and r_bdp only ever hold 0 or 1)
 .^r_pt155 CMP r_bdp,X     \ (CMP, not EOR: A keeps R_NDP; C is dead here)
   BNE r_dpeg
-  ORA R_NDN,X             \ no boundaries, old or new, and colour A (R_DCE /
-  BNE e9                  \ R_DCO) both times: a one-colour row, which r_dp2
-  JMP r_dp2+2             \ does in less time (the stored boundaries, count 0,
-                          \ are never read; RZ_Y = X already: skip STX)
+  LDY R_NDN,X             \ no boundaries, old or new, and the same colour both
+  BNE e9                  \ times: a one-colour row, which r_dp2 does in less
+  LSR A                   \ time, in colour A (R_DCE / R_DCO) or, with the
+  BCS r_dpb               \ pairs swapped round it, B (the stored boundaries,
+  JMP r_dp2+2             \ count 0, are never read; RZ_Y = X already: skip
+                          \ STX)
 .ne
   INC A                   \ A = difference + 1: 0 or 2 (counts differing by
   CMP #3                  \ 1 either way) go on, the rest to r_dpgl
@@ -927,7 +944,15 @@
 .x
   RTS
 .full
+  LDA R_NDISCL,Y          \ the new span empty: only the old one to black,
+  CMP #&FF                \ whatever its colours, which r_dp2 does in less
+  BEQ ne                  \ time than r_drg
   JMP r_drg
+.ne
+  LDX RZ_Y
+  JSR r_dp2+2             \ (RZ_Y = X: skip STX)
+  LDY RZ_Y
+  JMP r_bstore            \ count 0, colour A, as r_drg would leave them
 .none
   LDA R_NDISCL,Y
   CMP R_CL
