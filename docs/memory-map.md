@@ -67,9 +67,11 @@ routine of the game stays at its place in the original's source.
    whatever bank is paged. The data sits in the original's order from
    `XX21` at `&C000`. `NWSHP` reads past `E%`, to `E%-1,Y`, for the planet
    and the sun, into the missile's blueprint, as in the original, so the
-   order matters. HAZEL holds nothing else. The hot data flows on into bank
-   4, after the hot code: `QQ18` (the recursive tokens, which the hot text
-   printers read), `SNE` and `ACT`, which only hot code reads, are there.
+   order matters. HAZEL holds nothing else. The hot data would flow on into
+   bank 4, after the hot code; since the ships' edge lists went (nothing
+   reads them, "Removed" below), all of it fits in HAZEL, `QQ18` (the
+   recursive tokens, which the hot text printers read), `SNE` and `ACT`
+   included.
 6. **HAZEL and disc access.** DFS and the MOS overwrite parts of HAZEL
    during a disc command and keep lasting state there. `DOSCLI`, through
    which every OSCLI goes, stashes all of HAZEL in screen buffer 0 (main
@@ -285,13 +287,13 @@ line.
 | The hot pass, in main RAM | main `&2E49-&3F92` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
-| Bank 4 | `&8000-&BCD5` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9073`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B8C6`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then the hot data that HAZEL has no room for: `QQ18`, `SNE`, `ACT` |
+| Bank 4 | `&8000-&B8C5` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9073`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B8C6`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none) |
 | Bank 7, the cold pass | `&8000-&A65C` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens |
 | Bank 7, the meridian window | `&A65D-&B573` (its own image, `MERID`) | the beach ball planet's boundaries (`gfx-merid.asm`: `PM_HOOK`, `PM_MERID` and their workspace), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FE4` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
 | Bank 5, the rasteriser | `&8000-&8F2F` (ROMSEL 5), `&9000-&BF94` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; `gfx-flare.asm`; `gfx-raster_lcold.asm`; then the rasteriser's private state, `R_PRBUF` to `R_PRCWB`) |
 | Bank 6, the frame layer | `&8000-&BFF9` | `gfx-frame.asm`, `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm`, `gfx-frame_cold.asm`, `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the half-widths, the display list (with `F_INIT`, `gfx-finit.asm`), the text map, the cells' shown states and the directly drawn stars; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
-| HAZEL | `&C000-&DD94` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints. `&DF00-&DFFF` is the MOS's |
+| HAZEL | `&C000-&D780` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints (without their edge lists), `QQ18`, `SNE`, `ACT`. `&DF00-&DFFF` is the MOS's |
 | Shadow `&3000-&3FFF` | `&3090-&30FF` | the zero-page save (`setzp`, `getzp`), as in the original; nothing else |
 | Buffer 1, the dashboard | shadow `&4000-&7DFF` | the screen |
 
@@ -301,8 +303,8 @@ parts branch into one another and so move as a whole, leads the second.
 `3-assembled-output/flow.txt` lists every unit.
 
 Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
-one of the hot pass's containers in main RAM), 810 at the end of bank 4,
-2,700 at the end of bank 7, 363 in HAZEL, 208 and 107 in bank 5 (and 808
+one of the hot pass's containers in main RAM), 1,850 at the end of bank 4,
+2,700 at the end of bank 7, 1,919 in HAZEL, 208 and 107 in bank 5 (and 808
 below the per-x tables, freed when the disc layer went to two boundaries a
 row, and 256 in the row runs' tails), 27 in ANDY, 6 in bank 6 (12 before the depth
 test's fix to the planet's z), and 48 and 105 in `WP`'s
@@ -320,7 +322,9 @@ after it. Aligning the log tables in bank 4 costs 140 bytes. The
 text printers and the routines that crossed most moved from bank 7 into the
 hot pass (bank 7's free space grew from 89 bytes to 2,700, and bank 4's
 fell from 3,853 to 810), and `SNE` and `ACT` followed `QQ18` into bank 4
-(HAZEL's free space grew from 283 to 363).
+(HAZEL's free space grew from 283 to 363). Dropping the ships' edge lists
+(2,596 bytes) brought `QQ18`, `SNE` and `ACT` back into HAZEL: HAZEL now
+has 1,919 bytes free and bank 4 1,850.
 
 The code moved, so the page crossings moved too. `6-harness/profile.mjs
 --pagex` counts 1,108 cycles a flight iteration in page crossings, against
@@ -385,7 +389,13 @@ takes its address and bank from the game's symbols
   `x4_CLYNS`). `TKN2` runs on into `QQ16`.
 * **Removed.** The original's unreachable code and unused tables, and
   Master's direct drawing of ships, which nothing uses any more. Each
-  original routine keeps its header with a "Port: removed" note.
+  original routine keeps its header with a "Port: removed" note. The ships'
+  edge lists are not assembled either (the `EDGE` macro assembles nothing,
+  with a "Port:" note): every ship is drawn from its faces, and a read
+  watch over the gate's run, the title's ships, the briefings, docking with
+  the hangar, the escape pod, death and redocking found no game code
+  reading them. The blueprints' headers, their edge counts and offsets
+  included, are as they were.
 * **Port additions outside the source**, each in its own file with a header
   saying why: the glue area (`elite-glue.asm`, with the stubs,
   `elite-stubs.asm`), the quarter-square tables (`elite-qs.asm`), the layout

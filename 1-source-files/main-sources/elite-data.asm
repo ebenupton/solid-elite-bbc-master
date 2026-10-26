@@ -442,8 +442,17 @@ ENDMACRO
 
 MACRO EDGE vertex1, vertex2, face1, face2, visibility
 
+                        \ Port: the edges are not assembled, as nothing reads
+                        \ them: every ship is drawn from its faces by the
+                        \ renderer (gfx-faces.asm), and LL9's edge drawing
+                        \ (parts 9 to 11) is removed. The blueprint's header
+                        \ is as it was: its number of edges (byte #9, which
+                        \ H_EE31 puts in XX20, as EE31 does) and its edges
+                        \ offset (bytes #3 and #16, now the faces' offset)
+ IF FALSE
  f = face1 + (face2 << 4)
  EQUB visibility, f, vertex1 << 2, vertex2 << 2
+ ENDIF
 
 ENDMACRO
 
