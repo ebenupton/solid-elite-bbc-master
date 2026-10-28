@@ -3,7 +3,7 @@
 // (a renderer optimisation must draw exactly the same pixels).
 //
 // node 6-harness/mfbcmp.mjs --out file.json [--disc d] [--syms s] [--iters N]
-//                         [--every K] [--seedfile f] [--frames]
+//                         [--every K] [--seedfile f] [--frames] [--mask r,c0,c1]
 // node 6-harness/mfbcmp.mjs --cmp a.json b.json
 //
 // At the end of each K-th iteration's frame (hframe's return from G_FRAME),
@@ -25,8 +25,11 @@ const a = Object.fromEntries(process.argv.slice(2).reduce((acc, v, i, arr) => { 
 if (a.cmp) {
     const A = JSON.parse(readFileSync(a.cmp, "utf8")), B = JSON.parse(readFileSync(process.argv[process.argv.indexOf(a.cmp) + 1], "utf8"));
     const diff = Object.keys(A).filter(k => B[k] !== undefined && A[k] !== B[k]);
-    console.log(`${Object.keys(A).length} frames compared, ${diff.length} differ${diff.length ? ": " + diff.slice(0, 30).join(" ") : ""}`);
-    process.exit(diff.length ? 1 : 0);
+    const outside = diff.filter(k => A[k].includes("/") && B[k].includes("/") && A[k].split("/")[1] !== B[k].split("/")[1]);
+    const masked = A[Object.keys(A)[0]]?.includes("/");
+    console.log(`${Object.keys(A).length} frames compared, ${diff.length} differ${diff.length ? ": " + diff.slice(0, 30).join(" ") : ""}` +
+        (masked ? `; ${outside.length} differ outside the masked cells${outside.length ? ": " + outside.slice(0, 30).join(" ") : ""}` : ""));
+    process.exit((masked ? outside.length : diff.length) ? 1 : 0);
 }
 const sy = loadSyms(a.syms || CAND_SYMS);
 const seed = a.seedfile ? JSON.parse(readFileSync(a.seedfile, "utf8")) : null;
@@ -34,7 +37,16 @@ const EVERY = +(a.every || 5), ITERS = +(a.iters || 3000);
 const H = sy.hframe + 7;   // hframe: PHP PHA PHX PHY JSR G_FRAME | PLY
 const FR = sy.f_reset;     // (bank 6: tested with ROMSEL)
 const res = {}; let cur = -1, inst = false, nIn = 0, seen = false;
-const hashBufs = cpu => { const h = createHash("sha1"); h.update(cpu.ramRomOs.subarray(0x4000, 0x7000)); h.update(cpu.ramRomOs.subarray(0xc000, 0xf000)); return h.digest("hex").slice(0, 16); };
+// --mask row,col0,col1: each frame's hash is followed by "/" and a second one
+// with those text cells (both buffers) blanked, to show that two builds differ
+// only there (--cmp then also counts the frames equal outside the cells)
+const MASK = a.mask ? String(a.mask).split(",").map(Number) : null;
+const maskCells = (buf, [r, c0, c1]) => { const b = Buffer.from(buf); for (const base of [0, 0x3000]) for (let c = c0; c <= c1; c++) b.fill(0, base + r * 512 + c * 16, base + r * 512 + c * 16 + 16); return b; };
+const hashBufs = cpu => {
+    const both = Buffer.concat([cpu.ramRomOs.subarray(0x4000, 0x7000), cpu.ramRomOs.subarray(0xc000, 0xf000)]);
+    const h = b => createHash("sha1").update(b).digest("hex").slice(0, 16);
+    return MASK ? h(both) + "/" + h(maskCells(both, MASK)) : h(both);
+};
 await runElite({ disc: a.disc || CAND_DISC, syms: sy, pilot: makePilot(), iters: ITERS, patch: patchCommander, seed,
     onIter: (i, s, r) => { if (i !== cur) nIn = 0; cur = i; const cpu = r.cpu; if (inst) return; inst = true;
         cpu.debugInstruction.add(pc => {
