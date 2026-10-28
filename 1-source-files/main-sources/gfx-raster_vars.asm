@@ -28,5 +28,5 @@
 .R_NDX2     SKIP 192
 .R_NDX3     SKIP 192
 \ (the rasteriser's private state, R_PRBUF..R_PRCWB, is in bank 5's shared
-\ region: gfx-raster_lcold.asm's end)
+\ region: gfx-raster_lcold.asm's end, below the per-x tables)
 ASSERT R_DIRTYL1 = R_DIRTYL0 + &300

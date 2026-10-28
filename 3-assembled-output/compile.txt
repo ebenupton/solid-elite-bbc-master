@@ -40295,11 +40295,11 @@ Shared workspace: &E00 -&1DD4  (free 5 , 30 , 70  and 65  to the main code at &1
      965F   60         RTS
 .R_SETBUF
      9660   29 01      AND #&01
-     9662   CD 7D BF   CMP &BF7D
+     9662   CD 7C 99   CMP &997C
      9665   D0 01      BNE &9668
      9667   60         RTS
 .go
-     9668   8D 7D BF   STA &BF7D
+     9668   8D 7C 99   STA &997C
      966B   AA         TAX
      966C   BD EC AE   LDA &AEEC,X
      966F   8D 94 82   STA &8294
@@ -42787,14 +42787,14 @@ End macro R_RUN
      AED1   B0 18      BCS &AEEB
 .ok2
      AED3   98         TYA
-     AED4   AC 7D BF   LDY &BF7D
-     AED7   D9 7E BF   CMP &BF7E,Y
+     AED4   AC 7C 99   LDY &997C
+     AED7   D9 7D 99   CMP &997D,Y
      AEDA   B0 03      BCS &AEDF
-     AEDC   99 7E BF   STA &BF7E,Y
+     AEDC   99 7D 99   STA &997D,Y
 .n3
-     AEDF   D9 80 BF   CMP &BF80,Y
+     AEDF   D9 7F 99   CMP &997F,Y
      AEE2   90 03      BCC &AEE7
-     AEE4   99 80 BF   STA &BF80,Y
+     AEE4   99 7F 99   STA &997F,Y
 .n4
      AEE7   A8         TAY
      AEE8   4C BF AF   JMP &AFBF
@@ -43246,15 +43246,15 @@ End macro R_RUN
 .r_pt08
      B2D0   99 B5 12   STA &12B5,Y
 .n2
-     B2D3   AE 7D BF   LDX &BF7D
+     B2D3   AE 7C 99   LDX &997C
      B2D6   98         TYA
-     B2D7   DD 7E BF   CMP &BF7E,X
+     B2D7   DD 7D 99   CMP &997D,X
      B2DA   B0 03      BCS &B2DF
-     B2DC   9D 7E BF   STA &BF7E,X
+     B2DC   9D 7D 99   STA &997D,X
 .n3
-     B2DF   DD 80 BF   CMP &BF80,X
+     B2DF   DD 7F 99   CMP &997F,X
      B2E2   90 03      BCC &B2E7
-     B2E4   9D 80 BF   STA &BF80,X
+     B2E4   9D 7F 99   STA &997F,X
 .n4
      B2E7   60         RTS
 .r_sbh_bdx1
@@ -43581,13 +43581,13 @@ End macro R_RUN
      B5D9   A9 00      LDA #&00
 .r_pt49
      B5DB   99 B5 12   STA &12B5,Y
-     B5DE   CC 8A BF   CPY &BF8A
+     B5DE   CC 89 99   CPY &9989
      B5E1   B0 03      BCS &B5E6
-     B5E3   8C 8A BF   STY &BF8A
+     B5E3   8C 89 99   STY &9989
 .w1
-     B5E6   CC 8B BF   CPY &BF8B
+     B5E6   CC 8A 99   CPY &998A
      B5E9   90 03      BCC &B5EE
-     B5EB   8C 8B BF   STY &BF8B
+     B5EB   8C 8A 99   STY &998A
 .w2
      B5EE   A6 08      LDX &08
      B5F0   4C 38 97   JMP &9738
@@ -43761,19 +43761,19 @@ Macro R_RUN:
      B7BE   00
 End macro R_RUN
 .r_crep5
-     B7BF   9C 94 BF   STZ &BF94
-     B7C2   AD 93 BF   LDA &BF93
-     B7C5   CD 92 BF   CMP &BF92
+     B7BF   9C 93 99   STZ &9993
+     B7C2   AD 92 99   LDA &9992
+     B7C5   CD 91 99   CMP &9991
      B7C8   90 03      BCC &B7CD
      B7CA   20 C5 8B   JSR &8BC5
 .c4
-     B7CD   AE 7D BF   LDX &BF7D
+     B7CD   AE 7C 99   LDX &997C
      B7D0   60         RTS
 .r_cwb5
-     B7D1   AD 94 BF   LDA &BF94
-     B7D4   CD 8B BF   CMP &BF8B
+     B7D1   AD 93 99   LDA &9993
+     B7D4   CD 8A 99   CMP &998A
      B7D7   90 03      BCC &B7DC
-     B7D9   8D 8B BF   STA &BF8B
+     B7D9   8D 8A 99   STA &998A
 .c5
      B7DC   60         RTS
 .r_bcols
@@ -43794,10 +43794,10 @@ End macro R_RUN
 Macro R_ENDPAGE:
 End macro R_ENDPAGE
 .R_STARERASE
-     B800   AE 7D BF   LDX &BF7D
-     B803   BD 86 BF   LDA &BF86,X
+     B800   AE 7C 99   LDX &997C
+     B803   BD 85 99   LDA &9985,X
      B806   8D F2 A0   STA &A0F2
-     B809   9E 86 BF   STZ &BF86,X
+     B809   9E 85 99   STZ &9985,X
      B80C   A2 00      LDX #&00
      B80E   EC F2 A0   CPX &A0F2
      B811   B0 33      BCS &B846
@@ -43835,9 +43835,9 @@ End macro R_ENDPAGE
 .edone
      B846   60         RTS
 .sdone
-     B847   AE 7D BF   LDX &BF7D
+     B847   AE 7C 99   LDX &997C
      B84A   AD F2 A0   LDA &A0F2
-     B84D   9D 86 BF   STA &BF86,X
+     B84D   9D 85 99   STA &9985,X
      B850   60         RTS
 .slow
      B851   86 18      STX &18
@@ -44924,190 +44924,191 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      BED6   0F
      BED7   00
      BED8   0F
-.rl_mdq
-     BED9   20 6C 98   JSR &986C
-     BEDC   18         CLC
-     BEDD   AD 62 98   LDA &9862
-     BEE0   6D F7 B0   ADC &B0F7
-     BEE3   8D 62 98   STA &9862
-     BEE6   AD 63 98   LDA &9863
-     BEE9   6D F8 B0   ADC &B0F8
-     BEEC   8D 63 98   STA &9863
-     BEEF   A2 00      LDX #&00
-     BEF1   AD F8 B0   LDA &B0F8
-     BEF4   10 01      BPL &BEF7
-     BEF6   CA         DEX
-.p
-     BEF7   8A         TXA
-     BEF8   6D 64 98   ADC &9864
-     BEFB   8D 64 98   STA &9864
-     BEFE   8A         TXA
-     BEFF   6D 65 98   ADC &9865
-     BF02   8D 65 98   STA &9865
-     BF05   4C A1 98   JMP &98A1
-.rl_mdqa
-     BF08   AD E9 B0   LDA &B0E9
-     BF0B   8D 6A 98   STA &986A
-     BF0E   AD EA B0   LDA &B0EA
-     BF11   8D 6B 98   STA &986B
-     BF14   AD EB B0   LDA &B0EB
-     BF17   8D 66 98   STA &9866
-     BF1A   AD EC B0   LDA &B0EC
-     BF1D   8D 67 98   STA &9867
-     BF20   4C D9 BE   JMP &BED9
-.rl_long
-     BF23   8D F8 B0   STA &B0F8
-     BF26   A5 1C      LDA &1C
-     BF28   8D F7 B0   STA &B0F7
-     BF2B   AD F9 B0   LDA &B0F9
-     BF2E   4A         LSR A
-     BF2F   AA         TAX
-.lp
-     BF30   DA         PHX
-     BF31   A6 18      LDX &18
-     BF33   A4 19      LDY &19
-     BF35   20 BF AF   JSR &AFBF
-     BF38   FA         PLX
-     BF39   C6 1E      DEC &1E
-     BF3B   F0 3F      BEQ &BF7C
-     BF3D   F6 18      INC &18,X
-     BF3F   18         CLC
-     BF40   AD F7 B0   LDA &B0F7
-     BF43   6D EB B0   ADC &B0EB
-     BF46   8D F7 B0   STA &B0F7
-     BF49   AD F8 B0   LDA &B0F8
-     BF4C   6D EC B0   ADC &B0EC
-     BF4F   8D F8 B0   STA &B0F8
-     BF52   30 DC      BMI &BF30
-     BF54   38         SEC
-     BF55   AD F7 B0   LDA &B0F7
-     BF58   ED E9 B0   SBC &B0E9
-     BF5B   8D F7 B0   STA &B0F7
-     BF5E   AD F8 B0   LDA &B0F8
-     BF61   ED EA B0   SBC &B0EA
-     BF64   8D F8 B0   STA &B0F8
-     BF67   8A         TXA
-     BF68   49 01      EOR #&01
-     BF6A   AA         TAX
-     BF6B   2C FA B0   BIT &B0FA
-     BF6E   30 04      BMI &BF74
-     BF70   F6 18      INC &18,X
-     BF72   80 02      BRA &BF76
-.md
-     BF74   D6 18      DEC &18,X
-.mn
-     BF76   8A         TXA
-     BF77   49 01      EOR #&01
-     BF79   AA         TAX
-     BF7A   80 B4      BRA &BF30
-.done
-     BF7C   60         RTS
-.R_PRBUF
-     BF7D
-.R_PRDYT
-     BF7E
-.R_PRDYB
-     BF80
-.R_PRDST
-     BF82
-.R_PRDSB
-     BF84
-.R_PRSCNT
-     BF86
-.R_PRECNT
-     BF88
-.R_PRWT
-     BF8A
-.R_PRWB
-     BF8B
-.R_PRBMODE
-     BF8C
-.R_PRNT
-     BF8E
-.R_PRNB
-     BF8F
-.R_PRLO
-     BF90
-.R_PRHI
-     BF91
-.R_PRDYA
-     BF92
-.R_PRDYZ
-     BF93
-.R_PRCWB
-     BF94
 .B5_END
+.rl_mdq
+     98D8   20 6C 98   JSR &986C
+     98DB   18         CLC
+     98DC   AD 62 98   LDA &9862
+     98DF   6D F7 B0   ADC &B0F7
+     98E2   8D 62 98   STA &9862
+     98E5   AD 63 98   LDA &9863
+     98E8   6D F8 B0   ADC &B0F8
+     98EB   8D 63 98   STA &9863
+     98EE   A2 00      LDX #&00
+     98F0   AD F8 B0   LDA &B0F8
+     98F3   10 01      BPL &98F6
+     98F5   CA         DEX
+.p
+     98F6   8A         TXA
+     98F7   6D 64 98   ADC &9864
+     98FA   8D 64 98   STA &9864
+     98FD   8A         TXA
+     98FE   6D 65 98   ADC &9865
+     9901   8D 65 98   STA &9865
+     9904   4C A1 98   JMP &98A1
+.rl_mdqa
+     9907   AD E9 B0   LDA &B0E9
+     990A   8D 6A 98   STA &986A
+     990D   AD EA B0   LDA &B0EA
+     9910   8D 6B 98   STA &986B
+     9913   AD EB B0   LDA &B0EB
+     9916   8D 66 98   STA &9866
+     9919   AD EC B0   LDA &B0EC
+     991C   8D 67 98   STA &9867
+     991F   4C D8 98   JMP &98D8
+.rl_long
+     9922   8D F8 B0   STA &B0F8
+     9925   A5 1C      LDA &1C
+     9927   8D F7 B0   STA &B0F7
+     992A   AD F9 B0   LDA &B0F9
+     992D   4A         LSR A
+     992E   AA         TAX
+.lp
+     992F   DA         PHX
+     9930   A6 18      LDX &18
+     9932   A4 19      LDY &19
+     9934   20 BF AF   JSR &AFBF
+     9937   FA         PLX
+     9938   C6 1E      DEC &1E
+     993A   F0 3F      BEQ &997B
+     993C   F6 18      INC &18,X
+     993E   18         CLC
+     993F   AD F7 B0   LDA &B0F7
+     9942   6D EB B0   ADC &B0EB
+     9945   8D F7 B0   STA &B0F7
+     9948   AD F8 B0   LDA &B0F8
+     994B   6D EC B0   ADC &B0EC
+     994E   8D F8 B0   STA &B0F8
+     9951   30 DC      BMI &992F
+     9953   38         SEC
+     9954   AD F7 B0   LDA &B0F7
+     9957   ED E9 B0   SBC &B0E9
+     995A   8D F7 B0   STA &B0F7
+     995D   AD F8 B0   LDA &B0F8
+     9960   ED EA B0   SBC &B0EA
+     9963   8D F8 B0   STA &B0F8
+     9966   8A         TXA
+     9967   49 01      EOR #&01
+     9969   AA         TAX
+     996A   2C FA B0   BIT &B0FA
+     996D   30 04      BMI &9973
+     996F   F6 18      INC &18,X
+     9971   80 02      BRA &9975
+.md
+     9973   D6 18      DEC &18,X
+.mn
+     9975   8A         TXA
+     9976   49 01      EOR #&01
+     9978   AA         TAX
+     9979   80 B4      BRA &992F
+.done
+     997B   60         RTS
+.R_PRBUF
+     997C
+.R_PRDYT
+     997D
+.R_PRDYB
+     997F
+.R_PRDST
+     9981
+.R_PRDSB
+     9983
+.R_PRSCNT
+     9985
+.R_PRECNT
+     9987
+.R_PRWT
+     9989
+.R_PRWB
+     998A
+.R_PRBMODE
+     998B
+.R_PRNT
+     998D
+.R_PRNB
+     998E
+.R_PRLO
+     998F
+.R_PRHI
+     9990
+.R_PRDYA
+     9991
+.R_PRDYZ
+     9992
+.R_PRCWB
+     9993
+.B5_GAP
 .R_DISCROWS
      8000   AD 33 11   LDA &1133
      8003   C5 0C      CMP &0C
      8005   B0 02      BCS &8009
      8007   A5 0C      LDA &0C
 .t1
-     8009   8D 8E BF   STA &BF8E
+     8009   8D 8D 99   STA &998D
      800C   AD 34 11   LDA &1134
      800F   C5 0D      CMP &0D
      8011   90 02      BCC &8015
      8013   A5 0D      LDA &0D
 .t2
-     8015   8D 8F BF   STA &BF8F
-     8018   CD 8E BF   CMP &BF8E
+     8015   8D 8E 99   STA &998E
+     8018   CD 8D 99   CMP &998D
      801B   B0 08      BCS &8025
      801D   A9 FF      LDA #&FF
-     801F   8D 8E BF   STA &BF8E
-     8022   9C 8F BF   STZ &BF8F
+     801F   8D 8D 99   STA &998D
+     8022   9C 8E 99   STZ &998E
 .t3
      8025   20 8B 87   JSR &878B
      8028   A9 FF      LDA #&FF
-     802A   8D 8A BF   STA &BF8A
-     802D   9C 8B BF   STZ &BF8B
-     8030   AE 7D BF   LDX &BF7D
-     8033   BD 82 BF   LDA &BF82,X
-     8036   DD 7E BF   CMP &BF7E,X
+     802A   8D 89 99   STA &9989
+     802D   9C 8A 99   STZ &998A
+     8030   AE 7C 99   LDX &997C
+     8033   BD 81 99   LDA &9981,X
+     8036   DD 7D 99   CMP &997D,X
      8039   90 03      BCC &803E
-     803B   BD 7E BF   LDA &BF7E,X
+     803B   BD 7D 99   LDA &997D,X
 .t4
-     803E   CD 8E BF   CMP &BF8E
+     803E   CD 8D 99   CMP &998D
      8041   90 03      BCC &8046
-     8043   AD 8E BF   LDA &BF8E
+     8043   AD 8D 99   LDA &998D
 .t5
-     8046   8D 90 BF   STA &BF90
-     8049   BD 84 BF   LDA &BF84,X
-     804C   DD 80 BF   CMP &BF80,X
+     8046   8D 8F 99   STA &998F
+     8049   BD 83 99   LDA &9983,X
+     804C   DD 7F 99   CMP &997F,X
      804F   B0 03      BCS &8054
-     8051   BD 80 BF   LDA &BF80,X
+     8051   BD 7F 99   LDA &997F,X
 .t6
-     8054   CD 8F BF   CMP &BF8F
+     8054   CD 8E 99   CMP &998E
      8057   B0 03      BCS &805C
-     8059   AD 8F BF   LDA &BF8F
+     8059   AD 8E 99   LDA &998E
 .t7
-     805C   8D 91 BF   STA &BF91
-     805F   BD 7E BF   LDA &BF7E,X
-     8062   8D 92 BF   STA &BF92
-     8065   BD 80 BF   LDA &BF80,X
-     8068   8D 93 BF   STA &BF93
+     805C   8D 90 99   STA &9990
+     805F   BD 7D 99   LDA &997D,X
+     8062   8D 91 99   STA &9991
+     8065   BD 7F 99   LDA &997F,X
+     8068   8D 92 99   STA &9992
      806B   20 BF B7   JSR &B7BF
-     806E   AD 8E BF   LDA &BF8E
-     8071   9D 82 BF   STA &BF82,X
-     8074   AD 8F BF   LDA &BF8F
-     8077   9D 84 BF   STA &BF84,X
+     806E   AD 8D 99   LDA &998D
+     8071   9D 81 99   STA &9981,X
+     8074   AD 8E 99   LDA &998E
+     8077   9D 83 99   STA &9983,X
      807A   A9 FF      LDA #&FF
-     807C   9D 7E BF   STA &BF7E,X
-     807F   9E 80 BF   STZ &BF80,X
-     8082   AD 91 BF   LDA &BF91
-     8085   CD 90 BF   CMP &BF90
+     807C   9D 7D 99   STA &997D,X
+     807F   9E 7F 99   STZ &997F,X
+     8082   AD 90 99   LDA &9990
+     8085   CD 8F 99   CMP &998F
      8088   B0 03      BCS &808D
      808A   4C 32 81   JMP &8132
 .go
-     808D   AE 91 BF   LDX &BF91
+     808D   AE 90 99   LDX &9990
      8090   E8         INX
      8091   86 20      STX &20
-     8093   AD 8E BF   LDA &BF8E
+     8093   AD 8D 99   LDA &998D
      8096   C5 20      CMP &20
      8098   90 02      BCC &809C
      809A   A5 20      LDA &20
 .pa
      809C   8D B1 80   STA &80B1
-     809F   AE 90 BF   LDX &BF90
+     809F   AE 8F 99   LDX &998F
      80A2   EC B1 80   CPX &80B1
      80A5   B0 0D      BCS &80B4
      80A7   A9 FF      LDA #&FF
@@ -45119,14 +45120,14 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      80B0   E0 00      CPX #&00
      80B2   D0 F5      BNE &80A9
 .pb
-     80B4   AD 8E BF   LDA &BF8E
+     80B4   AD 8D 99   LDA &998D
      80B7   C9 FF      CMP #&FF
      80B9   F0 22      BEQ &80DD
-     80BB   AE 8F BF   LDX &BF8F
+     80BB   AE 8E 99   LDX &998E
      80BE   E8         INX
-     80BF   EC 90 BF   CPX &BF90
+     80BF   EC 8F 99   CPX &998F
      80C2   B0 03      BCS &80C7
-     80C4   AE 90 BF   LDX &BF90
+     80C4   AE 8F 99   LDX &998F
 .pc
      80C7   E4 20      CPX &20
      80C9   B0 12      BCS &80DD
@@ -45141,48 +45142,48 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      80D9   E0 00      CPX #&00
      80DB   D0 F5      BNE &80D2
 .pf5
-     80DD   AE 7D BF   LDX &BF7D
+     80DD   AE 7C 99   LDX &997C
      80E0   AD F5 17   LDA &17F5
-     80E3   1D 8C BF   ORA &BF8C,X
+     80E3   1D 8B 99   ORA &998B,X
      80E6   F0 03      BEQ &80EB
      80E8   4C 35 81   JMP &8135
 .plain
-     80EB   AD 93 BF   LDA &BF93
-     80EE   CD 92 BF   CMP &BF92
+     80EB   AD 92 99   LDA &9992
+     80EE   CD 91 99   CMP &9991
      80F1   90 35      BCC &8128
-     80F3   AD 92 BF   LDA &BF92
-     80F6   CD 90 BF   CMP &BF90
+     80F3   AD 91 99   LDA &9991
+     80F6   CD 8F 99   CMP &998F
      80F9   B0 06      BCS &8101
-     80FB   AD 90 BF   LDA &BF90
-     80FE   8D 92 BF   STA &BF92
+     80FB   AD 8F 99   LDA &998F
+     80FE   8D 91 99   STA &9991
 .s1
-     8101   AD 93 BF   LDA &BF93
-     8104   CD 91 BF   CMP &BF91
+     8101   AD 92 99   LDA &9992
+     8104   CD 90 99   CMP &9990
      8107   90 06      BCC &810F
-     8109   AD 91 BF   LDA &BF91
-     810C   8D 93 BF   STA &BF93
+     8109   AD 90 99   LDA &9990
+     810C   8D 92 99   STA &9992
 .s2
-     810F   AE 90 BF   LDX &BF90
-     8112   AD 92 BF   LDA &BF92
+     810F   AE 8F 99   LDX &998F
+     8112   AD 91 99   LDA &9991
      8115   20 C2 87   JSR &87C2
-     8118   AE 92 BF   LDX &BF92
-     811B   AD 93 BF   LDA &BF93
+     8118   AE 91 99   LDX &9991
+     811B   AD 92 99   LDA &9992
      811E   1A         INC A
      811F   20 EC 87   JSR &87EC
-     8122   AE 93 BF   LDX &BF93
+     8122   AE 92 99   LDX &9992
      8125   E8         INX
      8126   80 03      BRA &812B
 .alla
-     8128   AE 90 BF   LDX &BF90
+     8128   AE 8F 99   LDX &998F
 .tail
-     812B   AD 91 BF   LDA &BF91
+     812B   AD 90 99   LDA &9990
      812E   1A         INC A
      812F   20 C2 87   JSR &87C2
 .stars
 .r_dstars
      8132   4C D1 B7   JMP &B7D1
 .r_dbm
-     8135   AE 7D BF   LDX &BF7D
+     8135   AE 7C 99   LDX &997C
      8138   EC C2 AA   CPX &AAC2
      813B   D0 03      BNE &8140
      813D   4C A3 81   JMP &81A3
@@ -45221,44 +45222,44 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      819D   8D 59 83   STA &8359
      81A0   8D 65 83   STA &8365
 .pt
-     81A3   AE 7D BF   LDX &BF7D
-     81A6   BD 8C BF   LDA &BF8C,X
+     81A3   AE 7C 99   LDX &997C
+     81A6   BD 8B 99   LDA &998B,X
      81A9   D0 12      BNE &81BD
-     81AB   AE 90 BF   LDX &BF90
+     81AB   AE 8F 99   LDX &998F
 .m0
 .r_pt110
      81AE   9E 00 90   STZ &9000,X
 .r_pt111
      81B1   9E 80 91   STZ &9180,X
-     81B4   EC 91 BF   CPX &BF91
+     81B4   EC 90 99   CPX &9990
      81B7   E8         INX
      81B8   90 F4      BCC &81AE
-     81BA   AE 7D BF   LDX &BF7D
+     81BA   AE 7C 99   LDX &997C
 .m1
      81BD   AD F5 17   LDA &17F5
-     81C0   9D 8C BF   STA &BF8C,X
+     81C0   9D 8B 99   STA &998B,X
      81C3   A9 01      LDA #&01
      81C5   8D CB AA   STA &AACB
      81C8   AD F5 17   LDA &17F5
      81CB   D0 0B      BNE &81D8
-     81CD   AE 90 BF   LDX &BF90
-     81D0   AC 91 BF   LDY &BF91
+     81CD   AE 8F 99   LDX &998F
+     81D0   AC 90 99   LDY &9990
      81D3   20 F8 81   JSR &81F8
      81D6   80 38      BRA &8210
 .z0
-     81D8   AE 90 BF   LDX &BF90
-     81DB   AC 8E BF   LDY &BF8E
+     81D8   AE 8F 99   LDX &998F
+     81DB   AC 8D 99   LDY &998D
      81DE   F0 0C      BEQ &81EC
      81E0   88         DEY
-     81E1   CC 91 BF   CPY &BF91
+     81E1   CC 90 99   CPY &9990
      81E4   90 03      BCC &81E9
-     81E6   AC 91 BF   LDY &BF91
+     81E6   AC 90 99   LDY &9990
 .z4
      81E9   20 F8 81   JSR &81F8
 .z5
-     81EC   AE 8F BF   LDX &BF8F
+     81EC   AE 8E 99   LDX &998E
      81EF   E8         INX
-     81F0   AC 91 BF   LDY &BF91
+     81F0   AC 90 99   LDY &9990
      81F3   20 F8 81   JSR &81F8
      81F6   80 18      BRA &8210
 .zr
@@ -45277,8 +45278,8 @@ raster.asm: 11207  bytes from &9000  to &BBC7
 .zx
      820F   60         RTS
 .z9
-     8210   AE 90 BF   LDX &BF90
-     8213   AD 91 BF   LDA &BF91
+     8210   AE 8F 99   LDX &998F
+     8213   AD 90 99   LDA &9990
      8216   1A         INC A
      8217   20 20 82   JSR &8220
      821A   9C CB AA   STZ &AACB
@@ -45315,15 +45316,15 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      824F   E0 00      CPX #&00
      8251   D0 D3      BNE &8226
      8253   CA         DEX
-     8254   EC 8B BF   CPX &BF8B
+     8254   EC 8A 99   CPX &998A
      8257   90 03      BCC &825C
-     8259   8E 8B BF   STX &BF8B
+     8259   8E 8A 99   STX &998A
 .e1
 .st
      825C   A2 00      LDX #&00
-     825E   EC 8A BF   CPX &BF8A
+     825E   EC 89 99   CPX &9989
      8261   B0 03      BCS &8266
-     8263   8E 8A BF   STX &BF8A
+     8263   8E 89 99   STX &9989
 .e2
      8266   60         RTS
 .smd
@@ -45891,11 +45892,11 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8652   99 00 1D   STA &1D00,Y
      8655   AD CB AB   LDA &ABCB
      8658   99 00 10   STA &1000,Y
-     865B   CC 8A BF   CPY &BF8A
+     865B   CC 89 99   CPY &9989
      865E   B0 03      BCS &8663
-     8660   8C 8A BF   STY &BF8A
+     8660   8C 89 99   STY &9989
 .wz
-     8663   8C 8B BF   STY &BF8B
+     8663   8C 8A 99   STY &998A
 .none
      8666   60         RTS
 .r_dpgl
@@ -46039,12 +46040,12 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8785   AD CE AB   LDA &ABCE
      8788   4C 22 96   JMP &9622
 .r_wclear
-     878B   AD 8B BF   LDA &BF8B
-     878E   CD 8A BF   CMP &BF8A
+     878B   AD 8A 99   LDA &998A
+     878E   CD 89 99   CMP &9989
      8791   90 2E      BCC &87C1
      8793   09 07      ORA #&07
      8795   AA         TAX
-     8796   AD 8A BF   LDA &BF8A
+     8796   AD 89 99   LDA &9989
      8799   29 F8      AND #&F8
      879B   8D BE 87   STA &87BE
 .lp
@@ -46279,11 +46280,11 @@ raster.asm: 11207  bytes from &9000  to &BBC7
 .fin2
      891C   AD CB AB   LDA &ABCB
      891F   9D 00 10   STA &1000,X
-     8922   EC 8A BF   CPX &BF8A
+     8922   EC 89 99   CPX &9989
      8925   B0 03      BCS &892A
-     8927   8E 8A BF   STX &BF8A
+     8927   8E 89 99   STX &9989
 .w1
-     892A   8E 8B BF   STX &BF8B
+     892A   8E 8A 99   STX &998A
 .none
      892D   60         RTS
 .onew0
@@ -46588,41 +46589,41 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8BAC   F0 16      BEQ &8BC4
      8BAE   AD CB AB   LDA &ABCB
      8BB1   99 00 10   STA &1000,Y
-     8BB4   CC 8A BF   CPY &BF8A
+     8BB4   CC 89 99   CPY &9989
      8BB7   B0 03      BCS &8BBC
-     8BB9   8C 8A BF   STY &BF8A
+     8BB9   8C 89 99   STY &9989
 .w1
-     8BBC   CC 8B BF   CPY &BF8B
+     8BBC   CC 8A 99   CPY &998A
      8BBF   90 03      BCC &8BC4
-     8BC1   8C 8B BF   STY &BF8B
+     8BC1   8C 8A 99   STY &998A
 .nw
      8BC4   60         RTS
 .r7_crep
-     8BC5   9C 94 BF   STZ &BF94
-     8BC8   AD 93 BF   LDA &BF93
-     8BCB   CD 92 BF   CMP &BF92
+     8BC5   9C 93 99   STZ &9993
+     8BC8   AD 92 99   LDA &9992
+     8BCB   CD 91 99   CMP &9991
      8BCE   90 32      BCC &8C02
-     8BD0   AE 7D BF   LDX &BF7D
-     8BD3   BD 82 BF   LDA &BF82,X
-     8BD6   CD 8E BF   CMP &BF8E
+     8BD0   AE 7C 99   LDX &997C
+     8BD3   BD 81 99   LDA &9981,X
+     8BD6   CD 8D 99   CMP &998D
      8BD9   90 03      BCC &8BDE
-     8BDB   AD 8E BF   LDA &BF8E
+     8BDB   AD 8D 99   LDA &998D
 .b1
      8BDE   85 24      STA &24
-     8BE0   BD 84 BF   LDA &BF84,X
-     8BE3   CD 8F BF   CMP &BF8F
+     8BE0   BD 83 99   LDA &9983,X
+     8BE3   CD 8E 99   CMP &998E
      8BE6   B0 03      BCS &8BEB
-     8BE8   AD 8F BF   LDA &BF8F
+     8BE8   AD 8E 99   LDA &998E
 .b2
      8BEB   85 25      STA &25
-     8BED   AC 92 BF   LDY &BF92
+     8BED   AC 91 99   LDY &9991
      8BF0   C5 24      CMP &24
      8BF2   B0 0F      BCS &8C03
-     8BF4   AD 93 BF   LDA &BF93
+     8BF4   AD 92 99   LDA &9992
      8BF7   20 8C 8C   JSR &8C8C
      8BFA   A9 FF      LDA #&FF
-     8BFC   8D 90 BF   STA &BF90
-     8BFF   9C 91 BF   STZ &BF91
+     8BFC   8D 8F 99   STA &998F
+     8BFF   9C 90 99   STZ &9990
 .none
      8C02   60         RTS
 .band
@@ -46636,15 +46637,15 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8C13   E4 25      CPX &25
      8C15   E8         INX
      8C16   90 F2      BCC &8C0A
-     8C18   AC 92 BF   LDY &BF92
+     8C18   AC 91 99   LDY &9991
 .k9
      8C1B   C4 24      CPY &24
      8C1D   B0 0E      BCS &8C2D
      8C1F   A5 24      LDA &24
      8C21   3A         DEC A
-     8C22   CD 93 BF   CMP &BF93
+     8C22   CD 92 99   CMP &9992
      8C25   90 03      BCC &8C2A
-     8C27   AD 93 BF   LDA &BF93
+     8C27   AD 92 99   LDA &9992
 .p1
      8C2A   20 8C 8C   JSR &8C8C
 .p2
@@ -46652,59 +46653,59 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8C2F   1A         INC A
      8C30   F0 15      BEQ &8C47
      8C32   A8         TAY
-     8C33   CC 92 BF   CPY &BF92
+     8C33   CC 91 99   CPY &9991
      8C36   B0 03      BCS &8C3B
-     8C38   AC 92 BF   LDY &BF92
+     8C38   AC 91 99   LDY &9991
 .p3
-     8C3B   AD 93 BF   LDA &BF93
+     8C3B   AD 92 99   LDA &9992
      8C3E   84 1A      STY &1A
      8C40   C5 1A      CMP &1A
      8C42   90 03      BCC &8C47
      8C44   20 8C 8C   JSR &8C8C
 .nar
-     8C47   AD 90 BF   LDA &BF90
+     8C47   AD 8F 99   LDA &998F
      8C4A   C5 24      CMP &24
      8C4C   B0 05      BCS &8C53
      8C4E   A5 24      LDA &24
-     8C50   8D 90 BF   STA &BF90
+     8C50   8D 8F 99   STA &998F
 .n1
-     8C53   AD 91 BF   LDA &BF91
+     8C53   AD 90 99   LDA &9990
      8C56   C5 25      CMP &25
      8C58   90 05      BCC &8C5F
      8C5A   A5 25      LDA &25
-     8C5C   8D 91 BF   STA &BF91
+     8C5C   8D 90 99   STA &9990
 .n2
-     8C5F   AD 92 BF   LDA &BF92
-     8C62   CD 90 BF   CMP &BF90
+     8C5F   AD 91 99   LDA &9991
+     8C62   CD 8F 99   CMP &998F
      8C65   B0 06      BCS &8C6D
-     8C67   AD 90 BF   LDA &BF90
-     8C6A   8D 92 BF   STA &BF92
+     8C67   AD 8F 99   LDA &998F
+     8C6A   8D 91 99   STA &9991
 .n3
-     8C6D   AD 93 BF   LDA &BF93
-     8C70   CD 91 BF   CMP &BF91
+     8C6D   AD 92 99   LDA &9992
+     8C70   CD 90 99   CMP &9990
      8C73   90 06      BCC &8C7B
-     8C75   AD 91 BF   LDA &BF91
-     8C78   8D 93 BF   STA &BF93
+     8C75   AD 90 99   LDA &9990
+     8C78   8D 92 99   STA &9992
 .n4
-     8C7B   AD 93 BF   LDA &BF93
-     8C7E   CD 92 BF   CMP &BF92
+     8C7B   AD 92 99   LDA &9992
+     8C7E   CD 91 99   CMP &9991
      8C81   B0 08      BCS &8C8B
      8C83   A9 FF      LDA #&FF
-     8C85   8D 92 BF   STA &BF92
-     8C88   9C 93 BF   STZ &BF93
+     8C85   8D 91 99   STA &9991
+     8C88   9C 92 99   STZ &9992
 .n5
      8C8B   60         RTS
 .rep
-     8C8C   8D 94 BF   STA &BF94
+     8C8C   8D 93 99   STA &9993
      8C8F   1A         INC A
      8C90   85 1E      STA &1E
-     8C92   CC 8A BF   CPY &BF8A
+     8C92   CC 89 99   CPY &9989
      8C95   B0 03      BCS &8C9A
-     8C97   8C 8A BF   STY &BF8A
+     8C97   8C 89 99   STY &9989
 .r1
      8C9A   4C 9D 8C   JMP &8C9D
 .r7_rowrep
-     8C9D   AE 7D BF   LDX &BF7D
+     8C9D   AE 7C 99   LDX &997C
      8CA0   BD 28 8E   LDA &8E28,X
      8CA3   8D 66 8D   STA &8D66
      8CA6   8D 73 8D   STA &8D73
@@ -46938,13 +46939,13 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8E3A   A9 FF      LDA #&FF
      8E3C   8D B9 1B   STA &1BB9
      8E3F   8D 33 11   STA &1133
-     8E42   8D 8A BF   STA &BF8A
+     8E42   8D 89 99   STA &9989
      8E45   9C 34 11   STZ &1134
      8E48   9C F5 17   STZ &17F5
      8E4B   9C B8 1B   STZ &1BB8
      8E4E   9C C8 0F   STZ &0FC8
-     8E51   9C 8B BF   STZ &BF8B
-     8E54   9C 7D BF   STZ &BF7D
+     8E51   9C 8A 99   STZ &998A
+     8E54   9C 7C 99   STZ &997C
      8E57   A9 01      LDA #&01
 .ib
      8E59   48         PHA
@@ -46966,7 +46967,7 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8E78   60         RTS
 .R_RESETBUF
      8E79   A0 BF      LDY #&BF
-     8E7B   AE 7D BF   LDX &BF7D
+     8E7B   AE 7C 99   LDX &997C
      8E7E   D0 17      BNE &8E97
 .c0
      8E80   A9 FF      LDA #&FF
@@ -46993,13 +46994,13 @@ raster.asm: 11207  bytes from &9000  to &BBC7
      8EAC   4C AF 8E   JMP &8EAF
 .r7_reset1
      8EAF   A9 FF      LDA #&FF
-     8EB1   9D 7E BF   STA &BF7E,X
-     8EB4   9D 82 BF   STA &BF82,X
-     8EB7   9E 80 BF   STZ &BF80,X
-     8EBA   9E 84 BF   STZ &BF84,X
-     8EBD   9E 86 BF   STZ &BF86,X
-     8EC0   9E 88 BF   STZ &BF88,X
-     8EC3   9E 8C BF   STZ &BF8C,X
+     8EB1   9D 7D 99   STA &997D,X
+     8EB4   9D 81 99   STA &9981,X
+     8EB7   9E 7F 99   STZ &997F,X
+     8EBA   9E 83 99   STZ &9983,X
+     8EBD   9E 85 99   STZ &9985,X
+     8EC0   9E 87 99   STZ &9987,X
+     8EC3   9E 8B 99   STZ &998B,X
      8EC6   60         RTS
 .k_rows
      8EC7   8D 2D 8F   STA &8F2D
@@ -47063,7 +47064,7 @@ raster.asm: 11207  bytes from &9000  to &BBC7
 .k_mask
      8F2F   00
 .B5LO_END
-Bank 5: rasteriser: disc window &8000-&8F2F  (free 208 ), shared &9000-&BF94  free 107  (+ 808  at &98D8 )
+Bank 5: rasteriser: disc window &8000-&8F2F  (free 208 ), shared &9000-&BED8  free 295  (+ 620  at &9994 )
 Saving file '3-assembled-output/BANK5.bin'
 .MERID_START
 .PM_HOOK
@@ -49346,16 +49347,16 @@ Saving file '3-assembled-output/MERID.bin'
      81C4   8C CC 0F   STY &0FCC
      81C7   C8         INY
      81C8   8C CD 0F   STY &0FCD
-     81CB   AE 7D BF   LDX &BF7D
+     81CB   AE 7C 99   LDX &997C
      81CE   AD CB 0F   LDA &0FCB
-     81D1   DD 7E BF   CMP &BF7E,X
+     81D1   DD 7D 99   CMP &997D,X
      81D4   B0 03      BCS &81D9
-     81D6   9D 7E BF   STA &BF7E,X
+     81D6   9D 7D 99   STA &997D,X
 .d1
      81D9   AD CC 0F   LDA &0FCC
-     81DC   DD 80 BF   CMP &BF80,X
+     81DC   DD 7F 99   CMP &997F,X
      81DF   90 03      BCC &81E4
-     81E1   9D 80 BF   STA &BF80,X
+     81E1   9D 7F 99   STA &997F,X
 .d2
      81E4   2C 9F 21   BIT &219F
      81E7   10 06      BPL &81EF
@@ -50412,7 +50413,7 @@ Saving file '3-assembled-output/MERID.bin'
      8A07   85 1C      STA &1C
      8A09   A5 18      LDA &18
      8A0B   85 21      STA &21
-     8A0D   AE 7D BF   LDX &BF7D
+     8A0D   AE 7C 99   LDX &997C
      8A10   A5 19      LDA &19
      8A12   A4 1B      LDY &1B
      8A14   C5 1B      CMP &1B
@@ -50420,14 +50421,14 @@ Saving file '3-assembled-output/MERID.bin'
      8A18   A8         TAY
      8A19   A5 1B      LDA &1B
 .t0
-     8A1B   DD 7E BF   CMP &BF7E,X
+     8A1B   DD 7D 99   CMP &997D,X
      8A1E   B0 03      BCS &8A23
-     8A20   9D 7E BF   STA &BF7E,X
+     8A20   9D 7D 99   STA &997D,X
 .t2
      8A23   98         TYA
-     8A24   DD 80 BF   CMP &BF80,X
+     8A24   DD 7F 99   CMP &997F,X
      8A27   90 03      BCC &8A2C
-     8A29   9D 80 BF   STA &BF80,X
+     8A29   9D 7F 99   STA &997F,X
 .t4
      8A2C   60         RTS
 .rl_lswap
@@ -50513,17 +50514,17 @@ Saving file '3-assembled-output/MERID.bin'
 .yb1
      8AC1   C5 20      CMP &20
      8AC3   90 15      BCC &8ADA
-     8AC5   AE 7D BF   LDX &BF7D
-     8AC8   DD 80 BF   CMP &BF80,X
+     8AC5   AE 7C 99   LDX &997C
+     8AC8   DD 7F 99   CMP &997F,X
      8ACB   90 03      BCC &8AD0
-     8ACD   9D 80 BF   STA &BF80,X
+     8ACD   9D 7F 99   STA &997F,X
 .yb2
      8AD0   A5 20      LDA &20
-     8AD2   DD 7E BF   CMP &BF7E,X
+     8AD2   DD 7D 99   CMP &997D,X
      8AD5   B0 03      BCS &8ADA
-     8AD7   9D 7E BF   STA &BF7E,X
+     8AD7   9D 7D 99   STA &997D,X
 .yno
-     8ADA   AE 7D BF   LDX &BF7D
+     8ADA   AE 7C 99   LDX &997C
      8ADD   EC E0 B0   CPX &B0E0
      8AE0   F0 03      BEQ &8AE5
      8AE2   20 91 8D   JSR &8D91
@@ -50659,7 +50660,7 @@ Saving file '3-assembled-output/MERID.bin'
      8C12   49 FF      EOR #&FF
      8C14   6D EC B0   ADC &B0EC
      8C17   8D F8 B0   STA &B0F8
-     8C1A   20 08 BF   JSR &BF08
+     8C1A   20 07 99   JSR &9907
      8C1D   AD 62 98   LDA &9862
      8C20   CD F3 B0   CMP &B0F3
      8C23   AD 63 98   LDA &9863
@@ -50722,7 +50723,7 @@ Saving file '3-assembled-output/MERID.bin'
      8CB0   AD EE B0   LDA &B0EE
      8CB3   49 FF      EOR #&FF
      8CB5   8D F8 B0   STA &B0F8
-     8CB8   20 08 BF   JSR &BF08
+     8CB8   20 07 99   JSR &9907
      8CBB   AD 62 98   LDA &9862
      8CBE   CD F5 B0   CMP &B0F5
      8CC1   AD 63 98   LDA &9863
@@ -50767,7 +50768,7 @@ Saving file '3-assembled-output/MERID.bin'
      8D27   8D 66 98   STA &9866
      8D2A   AD EA B0   LDA &B0EA
      8D2D   8D 67 98   STA &9867
-     8D30   20 D9 BE   JSR &BED9
+     8D30   20 D8 98   JSR &98D8
 .qd
      8D33   38         SEC
      8D34   AD F5 B0   LDA &B0F5
@@ -50806,7 +50807,7 @@ Saving file '3-assembled-output/MERID.bin'
      8D75   ED EA B0   SBC &B0EA
      8D78   AE EA B0   LDX &B0EA
      8D7B   F0 03      BEQ &8D80
-     8D7D   4C 23 BF   JMP &BF23
+     8D7D   4C 22 99   JMP &9922
 .short
      8D80   A5 18      LDA &18
      8D82   85 21      STA &21
@@ -50837,7 +50838,7 @@ Saving file '3-assembled-output/MERID.bin'
      8DC7   8D A4 8F   STA &8FA4
      8DCA   60         RTS
 .rl_line
-     8DCB   AE 7D BF   LDX &BF7D
+     8DCB   AE 7C 99   LDX &997C
      8DCE   EC E0 B0   CPX &B0E0
      8DD1   F0 03      BEQ &8DD6
      8DD3   20 91 8D   JSR &8D91
@@ -59875,7 +59876,7 @@ Saving file '3-assembled-output/BANK6.bin'
      10C4   05
      10C5   09
      10C6   00 80
-     10C8   95 3F
+     10C8   D9 3E
      10CA   66 11
      10CC   06
      10CD   09

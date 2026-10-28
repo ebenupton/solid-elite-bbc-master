@@ -115,16 +115,20 @@ CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables
 ORG &9000               \ the row runs, the boundary arrays, the stars, the lens
 INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ flare ...), then the disc window at &8000
 INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (its step in bank 6: gfx-flare6.asm)
-INCLUDE "1-source-files/main-sources/gfx-raster_lcold.asm"   \ R_LINE's cold part
 .B5_END
 ASSERT B5_END <= &C000
+CLEAR r_tfree, r_tables \ (gfx-raster.asm skips it)
+ORG r_tfree             \ R_LINE's cold part, in the room below the per-x
+INCLUDE "1-source-files/main-sources/gfx-raster_lcold.asm"   \ tables (gfx-raster.asm's r_tfree)
+.B5_GAP
+ASSERT B5_GAP <= r_tables
 ORG &8000
 INCLUDE "1-source-files/main-sources/gfx-raster_disc.asm"
 INCLUDE "1-source-files/main-sources/gfx-raster_kept.asm"   \ kept solid rows: bank 5's part
 
 .B5LO_END
 ASSERT B5LO_END <= &9000
-PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", &9000-B5LO_END, "), shared &9000-", ~B5_END-1, " free ", &C000-B5_END, " (+ ", r_tables-r_tfree, " at ", ~r_tfree, ")"
+PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", &9000-B5LO_END, "), shared &9000-", ~B5_END-1,  " free ", &C000-B5_END, " (+ ", r_tables-B5_GAP, " at ", ~B5_GAP, ")"
 SAVE "3-assembled-output/BANK5.bin", &8000, B5_END, &8000
 
 CLEAR COLD_END%, &C000  \ bank 7 after the cold area (ROMSEL MERIDBANK): the

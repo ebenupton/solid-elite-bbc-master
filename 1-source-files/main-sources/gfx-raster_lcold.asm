@@ -5,7 +5,8 @@
 \ rp_mul16 and rp_div32) and rl_long (lines with d > 255).  They use the
 \ shared region (the arithmetic, r_pset, R_LINE's variables in a run page's
 \ tail) and the zero page, nothing of the polygon window's.  INCLUDE it in
-\ bank 5's assembly, after gfx-raster.asm.
+\ bank 5's assembly, after gfx-raster.asm (elite-gfx.asm: in the room below
+\ the per-x tables, from r_tfree).
 \ ============================================================================
 
 \ rl_mdq: (rp_ma * rp_mb + rl_t) DIV / MOD rp_v -> quotient rp_m0,m1,
@@ -99,7 +100,7 @@
   RTS
 }
 
-\ The rasteriser's private state (here, last in bank 5's shared region, which
+\ The rasteriser's private state (here, in bank 5's shared region, which
 \ both its windows see; only the rasteriser reads or writes it, and R_INIT
 \ sets it up): the state the disc window and the polygon window share
 .R_PRBUF    SKIP 1
