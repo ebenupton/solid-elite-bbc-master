@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1E16          \ The address where the code will be run (Port: the
+ CODE% = &1DF8          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low

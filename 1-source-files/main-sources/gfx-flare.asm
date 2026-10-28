@@ -32,14 +32,19 @@
 \ after any shape (the disc rows repainted, the rest blacked, the text and
 \ sights redrawn over it): the flare keeps no state on the screen.
 \
-\ Memory: this file is in bank 5, after the rasteriser (its half-width
-\ table fl_htab and its variables are in run pages' tails in gfx-raster.asm).
+\ Memory: this file is in bank 7, in the meridian window (ROMSEL MERIDBANK,
+\ as T_FLARE pages it), with its half-width table fl_htab and its variables
+\ (it was in bank 5, after the rasteriser, until R_DISC2 needed the room).
+\ It writes only the screen, the dirty extents (main RAM) and its own
+\ state; T_FLARE does the rest in bank 5 when R_FLARE returns with C set
+\ (the sun in sight): k_clear in K mode, and the rows written (Y .. X, if
+\ any) into the repair's row range through R_MARKDIRTY.
 \ The frame layer's f_flt (gfx-flare6.asm, bank 6) makes the tests that need
 \ bank 6's state (the view, the sun's centre on the screen, not behind the
 \ planet: F_HW) and enters R_FLARE through T_FLARE. ACCCON X is as the frame
 \ layer has it, mapping the back buffer at &4000-&7FFF, so fl_or writes
-\ either buffer with no switching. Everything this code reads is in bank 5,
-\ HAZEL, the zero page or main RAM below &3000. (It was in shadow RAM, run
+\ either buffer with no switching. Everything this code reads is in bank 7,
+\ the zero page or main RAM below &3000. (It was in shadow RAM, run
 \ with ACCCON X set, until it moved here.)
 \
 \ ******************************************************************************
@@ -179,13 +184,11 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  DEX
  BPL flv1
 .fl_seen
- LDY fl_vn              \ none in sight: no flare
- BNE P%+3
+ LDY fl_vn              \ none in sight: no flare (C clear)
+ BNE P%+4
+ CLC
  RTS
- BIT KMODE              \ (K mode: the flare's rows are not kept)
- BPL P%+5
- JSR k_clear            \ bankcheck: ok (T_FLARE pages bank 5: the disc window)
- LDY fl_vn
+ LDY fl_vn              \ (K mode: T_FLARE forgets the kept rows)
  LDX fl_vred,Y          \ the flare turned down by the probes in sight: 0
 .flm1                   \ for all 9, else -1, -2 or -3
  LDA fl_dx              \ level 3 if |dx| + |dy| < 96, 2 if < 192, else 1:
@@ -231,17 +234,12 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  BRA flm3
 
 .flm9
- LDY fl_ymin            \ the rows written, for the repair's row range
- CPY fl_ymax
- BEQ P%+4
- BCS fl_rts
- LDA #255               \ (an empty extent: only the row range grows)
- STA R_XL
- STZ R_XR
- JSR R_MARKDIRTY
- LDY fl_ymax
- JMP R_MARKDIRTY
-.fl_rts
+ LDA #255               \ the sun in sight: C set, and the rows written, Y ..
+ STA R_XL               \ X (none if Y > X), which T_FLARE puts into the
+ STZ R_XR               \ repair's row range (an empty extent: only the range
+ LDY fl_ymin            \ grows)
+ LDX fl_ymax
+ SEC
  RTS
 
 .flm8                   \ the sums for the next ghost: S -= (k - k') 32 D
@@ -646,3 +644,23 @@ fl_mt = P% - 4          \ row masks of densities 1, 2, 4, 6, 8 / 16 (4x4
                                     \ (0: no flare)
 .fl_ring                \ (dx, dy) of 9 points of a quarter circle of radius 15
  EQUB 15, 0, 15, 3, 14, 6, 12, 8, 11, 11, 8, 12, 6, 14, 3, 15, 0, 15
+
+\ The flare's half-widths and variables
+.fl_htab                \ the half-widths: the widest x with x^2 + d^2 <= r^2
+MACRO FLHW r            \ + r, d = 0..r (one page: fl_hw's high byte is
+ FOR d, 0, r            \ fixed)
+  EQUB INT(SQR(r * r + r - d * d))
+ NEXT
+ENDMACRO
+.fl_h3  FLHW 3
+.fl_h4  FLHW 4
+.fl_h5  FLHW 5
+.fl_h7  FLHW 7
+.fl_h10 FLHW 10
+.fl_h18 FLHW 18
+ASSERT HI(fl_htab) = HI(P% - 1)
+.fl_ml  SKIP 2          \ 32 D (x, y), low and high bytes
+.fl_mh  SKIP 2
+.fl_sl  SKIP 2          \ the centres' sums S (x, y)
+.fl_sh  SKIP 2
+.fl_lev SKIP 1          \ the level less 3, turned down by the probes (-5..0)

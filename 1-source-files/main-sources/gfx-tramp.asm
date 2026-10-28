@@ -67,11 +67,29 @@
  JSR R_SPAN
  JMP tback
 
-.T_FLARE                \ (the lens flare, gfx-flare.asm; X and Y passed)
+.T_FLARE                \ (the lens flare, gfx-flare.asm: bank 7; X and Y
+ LDA #MERIDBANK         \ passed)
+ STA &F4
+ STA &FE30
+ JSR R_FLARE            \ (C set: the sun was in sight, and Y .. X the rows
+ BCC tfl9               \ written, none if Y > X)
  LDA #RASTBANK
  STA &F4
  STA &FE30
- JSR R_FLARE            \ (K mode: R_FLARE forgets the kept rows)
+ STX tA
+ BIT KMODE              \ K mode: the flare's rows are not kept
+ BPL tfl1
+ PHY
+ JSR k_clear
+ PLY
+.tfl1
+ CPY tA                 \ the rows written, if any, into the repair's row
+ BEQ P%+4               \ range
+ BCS tfl9
+ JSR R_MARKDIRTY        \ (R_FLARE set R_XL, R_XR)
+ LDY tA
+ JSR R_MARKDIRTY
+.tfl9
  JMP tback
 
 .T_MARKDIRTY

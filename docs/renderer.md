@@ -150,18 +150,18 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 |---|---|---|
 | The shared workspace | main `&0E00-&1DD4`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
-| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the lens flare, and the arithmetic and cold parts of both windows that use nothing of either window |
+| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, `gfx-light.asm`), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
 build. ANDY is paged in only by the trampolines: `T_POLY` and `T_LINE` page
 ROMSEL `&85`, and the rest page bank 5. The meridian window is paged in
-only by its two stubs, `G_MERHOOK` and `T_MERID`. `&F4` always matches
+only by its stubs, `G_MERHOOK`, `T_MERID`, `T_KPRE` and `T_FLARE`. `&F4` always matches
 ROMSEL.
 
 ## The rasteriser
@@ -248,7 +248,11 @@ the sun: six dithered discs and two dotted rings. They are ORed in their
 inks, so the light adds up. Three levels of brightness depend on how far the
 sun is from the centre. The flare extends each row's dirty extent, so the
 next frame on the buffer repairs it like any other shape. It never touches
-game state. `f_flt` (bank 6) makes the tests and `R_FLARE` (bank 5) draws.
+game state. `f_flt` (bank 6) makes the tests and `R_FLARE` (in the
+meridian window, bank 7) draws. `T_FLARE` pages bank 7 for it, then makes
+the flare's two bank 5 calls: `R_MARKDIRTY` for the rows written, which
+`R_FLARE` returns (C set if the sun was in sight, the rows in Y to X), and
+in K mode `k_clear`.
 
 The flare is turned down, or off, as the sun is hidden. Before drawing any
 ghost, `R_FLARE` probes the back buffer as drawn so far (the planet, ships,
@@ -263,8 +267,7 @@ with R capped at 127).
   compared pixel by pixel with its own colour byte (`fl_pxm`). ACCCON X is
   the frame layer's, so the reads see this buffer.
 * With no probe in sight there is no flare, and nothing is marked dirty. In
-  K mode the kept rows are forgotten only when the flare draws (`k_clear`,
-  after the probes).
+  K mode the kept rows are forgotten only when the flare draws.
 * Otherwise every ghost's density steps down 0 (all nine in sight), 1 (seven
   or eight), 2 (four to six) or 3 (one to three) more rungs of its ladder
   (`fl_vred`).

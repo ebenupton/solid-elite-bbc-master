@@ -17,8 +17,8 @@
 \ (the ship blueprints, elite-data.asm: elite-layout.asm). Produces:
 \
 \   BANK5.bin  sideways RAM bank 5: the rasteriser's shared region and
-\              disc window (gfx-raster.asm, gfx-flare.asm,
-\              gfx-raster_lcold.asm; gfx-raster_disc.asm, gfx-raster_kept.asm)
+\              disc window (gfx-raster.asm, gfx-raster_lcold.asm;
+\              gfx-raster_disc.asm, gfx-raster_kept.asm)
 \   RASTA.bin  ANDY: the rasteriser's polygon window (gfx-raster_poly.asm,
 \              gfx-raster_line.asm)
 \   BANK6.bin  sideways RAM bank 6: the frame layer (gfx-frame.asm),
@@ -26,8 +26,9 @@
 \              the flare's step and the hangar, its state, then the
 \              hangar's tables (gfx-hangar6.asm)
 \   MERID.bin  sideways RAM bank 7 after the cold pass: the meridian
-\              window, the beach ball planet's boundaries (gfx-merid.asm)
-\              and the kept solid rows' polygon part (gfx-kept7.asm)
+\              window: the beach ball planet's boundaries (gfx-merid.asm),
+\              the kept solid rows' polygon part (gfx-kept7.asm) and the
+\              lens flare (gfx-flare.asm)
 \
 \ (all in 3-assembled-output)
 \
@@ -119,8 +120,7 @@ ASSERT HI(R_WR) = HI(R_WR + 191)
 
 CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables,
 ORG &9000               \ the row runs, the boundary arrays, the stars, the lens
-INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ flare ...), then the disc window at &8000
-INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (its step in bank 6: gfx-flare6.asm)
+INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ ...), then the disc window at &8000
 .B5_END
 ASSERT B5_END <= &C000
 CLEAR r_tfree, r_tables \ (gfx-raster.asm skips it)
@@ -142,6 +142,8 @@ ORG COLD_END%           \ meridian window, the beach ball planet's boundaries
 .MERID_START
 INCLUDE "1-source-files/main-sources/gfx-merid.asm"
 INCLUDE "1-source-files/main-sources/gfx-kept7.asm"    \ kept solid rows: the polygons' part (docs/renderer.md)
+INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (T_FLARE; its step in bank 6:
+                               \ gfx-flare6.asm)
 .MERID_END
 ASSERT MERID_END <= &C000
 PRINT "Bank 7: meridian window ", ~MERID_START, "-", ~MERID_END-1, ", bank 7 free ", &C000-MERID_END
@@ -163,7 +165,7 @@ INCLUDE "1-source-files/main-sources/gfx-faces.asm"
 INCLUDE "1-source-files/main-sources/gfx-light6.asm"   \ the lighting tables (and the first ramps)
 INCLUDE "1-source-files/main-sources/gfx-light.asm"    \ the lighting's L_SUN and L_REC
 INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
-INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 5)
+INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 7)
 INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are at bank 6's end)
 .B6_CODE_END
 .F_HW   SKIP 256        \ planet half-widths
