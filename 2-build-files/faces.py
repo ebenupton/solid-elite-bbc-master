@@ -71,12 +71,30 @@ def parse(mem, a):
     return dict(addr=a, scale=h[18], gun=h[6], visdist=h[13], verts=verts, edges=edges, faces=faces)
 
 
+def _ref_mem():
+    """The released SNG47's data (4-reference-binaries/sng47/BDATA.unprot.bin, at
+    &7000, XX21 at &8000): the blueprints with their edge lists, which the
+    build no longer assembles (elite-data.asm's EDGE macro)."""
+    mem = bytearray(0x10000)
+    d = open(os.path.join(ROOT, '4-reference-binaries', 'sng47', 'BDATA.unprot.bin'), 'rb').read()
+    mem[0x7000:0x7000 + len(d)] = d
+    return mem, 0x8000
+
+
 def load_ships():
     mem, xx21 = _mem()
+    rmem, rxx21 = _ref_mem()
     out = []
     for t in range(1, NTYPES + 1):
         a = mem[xx21 + 2 * (t - 1)] | mem[xx21 + 2 * (t - 1) + 1] << 8
         s = parse(mem, a)
+        # the edges from the reference's copy of the blueprint (the build's
+        # edge offset now points at its faces); its vertices and faces must
+        # be the build's
+        ra = rmem[rxx21 + 2 * (t - 1)] | rmem[rxx21 + 2 * (t - 1) + 1] << 8
+        r = parse(rmem, ra)
+        assert (r['verts'], r['faces'], r['scale']) == (s['verts'], s['faces'], s['scale']), t
+        s['edges'] = r['edges']
         s['name'] = NAMES[t]
         if len(s['faces']) == 1 and all(e['f1'] == e['f2'] == 15 for e in s['edges']):
             # the alloy plate: one face, its edges all on "face 15" (always

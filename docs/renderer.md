@@ -380,10 +380,11 @@ the tool again after changing it:
   that share a plane are merged when one of them has no closed outline of
   its own, as the Adder's back has), turns detail edges into filled details,
   fins and lines, finds each ship's symmetries, and gives the faces colours
-  so that adjacent faces never match. It prints a report per ship. It reads
-  the blueprints' edge lists, which the game no longer assembles: build
-  with the `EDGE` macro's `IF FALSE` (`elite-data.asm`) set to `IF TRUE`
-  before running it.
+  so that adjacent faces never match. It prints a report per ship. The
+  game no longer assembles the blueprints' edge lists (the `EDGE` macro,
+  `elite-data.asm`), so it takes each blueprint's edges from the released
+  SNG47's data (`4-reference-binaries/sng47/BDATA.unprot.bin`), and asserts
+  that the vertices, faces and normal scale there are the build's.
 * `lightramps.py` is the lighting model that chooses the nine ramps and
   writes `gfx-light6.asm` (through `faces.py`); run alone, it renders the
   ramps (and, with `anim`, a tumbling preview of each ship) into
