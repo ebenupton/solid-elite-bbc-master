@@ -388,6 +388,13 @@ feed a spinning planet's rows through `R_DISCROWS`. `6-harness/mplanet.mjs`
 poses planet scenes and dumps each frame with the planet routines' cycles,
 for `2-build-files/planetvis.py` to render.
 
+`images/planets` holds a still of each style, made by
+`2-build-files/stills.sh` from posed scenes: `beach.png`, `caps.png` and
+`caps2.png` (Leesti's craters), `nobands.png` (a banded seed as the default
+build draws it), `bands.png` and `bands2.png`, `moon1.png` to `moon3.png`,
+and `ring.png`, `ring2.png`, `ringmoon.png` and `ringmoon2.png` (the bands
+and rings from a build with `make bands=on rings=on`).
+
 ## The moon
 
 A quarter of the systems (by the seed: `h` = `s0_hi EOR s1_hi EOR s2_hi`,
@@ -560,7 +567,11 @@ with ships, lines, dots, text, stars, resets and K mode, against the model
 every frame. `6-harness/msunnear.mjs` poses the scene (a big planet, the sun
 rising from behind its limb, the station crossing), `msunprof.mjs` profiles
 a stretch of the gate's run, and `2-build-files/sunnear.py` renders the
-frames, a sheet and a movie.
+frames, a sheet and a movie: `images/sunnear/sunnear.gif` (the sun rising
+from behind the planet's limb with the flare's probes going 0 to 9, then
+the station crossing it), `sheet.png`, and `spawn.png`, the frame after the
+station appears in the game's own way (`msunnear.mjs --spawn`), with the
+sun drawn where the game's own sun was.
 
 ## The hangar
 
