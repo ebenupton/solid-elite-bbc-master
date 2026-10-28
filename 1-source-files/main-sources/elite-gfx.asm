@@ -103,6 +103,12 @@ ALIGN &100
 .F_DSS      SKIP NDSTAR     \ the directly drawn stars' sizes (bank 6's: 0 = none,
                             \ cleared with R_SS by F_INIT and f_direct0)
 ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
+.GFAR       SKIP 1          \ non-zero: LL9 has shown a face of the ship it is
+                            \ drawing without testing its normal (S_SHIP)
+.GHAND      SKIP 1          \ the ship's handedness (SHAND): %01000000 as ZINF's,
+                            \ %01100000 as TIDY's (L_REC, f_winding)
+.GSPLV      SKIP 4          \ part 5's XX2 for the splinter's faces (SPLV)
+.GSHT       SKIP 4          \ SHAND's workspace
 .WS_GAP                     \ (free to the main code)
 SKIP CODE% - P%
 .WS_END

@@ -29,6 +29,14 @@ NTYPES = 33
 # Vertex face lists as the build's blueprints have them, where they differ
 # from the data (none: Master Elite's blueprints are used unchanged)
 PATCH = {}
+# Ships whose blueprint normals are not their faces': the face list takes
+# each face's outward normal from its vertices instead. The splinter's faces
+# data offset is 24 bytes out (SHIP_SPLINTER, as released), so LL9 reads its
+# four normals from the shuttle's header and vertex 0 (39 to 88 degrees off);
+# H_SPL (gfx-hooks.asm) makes LL9 show all four faces, and the frame layer
+# culls them by their winding, so these normals only order the polygons and
+# light them.
+GEOM_NORMALS = {8: 'the faces data offset is 24 bytes out: LL9 reads the shuttle\'s header'}
 
 
 def _mem():
@@ -103,8 +111,31 @@ def load_ships():
                 e['f1'], e['f2'] = 0, 15
         for v, fl in PATCH.get(t, {}).items():
             s['verts'][v]['faces'] = fl
+        if t in GEOM_NORMALS:
+            _geom_normals(s, GEOM_NORMALS[t])
         out.append((t, s))
     return out
+
+
+def _geom_normals(s, why):
+    """Each face's normal from its vertices (those whose face lists name it):
+    the plane through them, pointing away from the ship's centre, of
+    magnitude 64 (rounded). For a convex ship only."""
+    V = [(v['x'], v['y'], v['z']) for v in s['verts']]
+    c = [sum(p[i] for p in V) / len(V) for i in range(3)]
+    for f, face in enumerate(s['faces']):
+        vs = [i for i, v in enumerate(s['verts']) if f in v['faces']]
+        assert len(vs) >= 3, (f, vs)
+        a, b, d = (V[i] for i in vs[:3])
+        n = [(b[1] - a[1]) * (d[2] - a[2]) - (b[2] - a[2]) * (d[1] - a[1]),
+             (b[2] - a[2]) * (d[0] - a[0]) - (b[0] - a[0]) * (d[2] - a[2]),
+             (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])]
+        if sum(n[i] * (a[i] - c[i]) for i in range(3)) < 0:
+            n = [-x for x in n]
+        m = math.sqrt(sum(x * x for x in n))
+        old = face['n']
+        face['n'] = tuple(int(round(x * 64 / m)) for x in n)
+        s.setdefault('notes0', []).append(f'face {f}: normal {old} -> {face["n"]} from its vertices {vs} ({why})')
 
 
 # ---------------------------------------------------------------------------
@@ -1130,7 +1161,7 @@ def report(ships):
     out = []
     for t, s in ships:
         out.append('%d %s: hues %s + %s' % ((t, s['name']) + SHIP_HUES[t]))
-        for n in s['notes']:
+        for n in s.get('notes0', []) + s['notes']:
             out.append('   ' + n)
         for n in s['notes2']:
             out.append('   ' + n)

@@ -43345,6 +43345,9 @@ ENDMACRO
  LDA #255               \ Set the X-th byte of XX2 to 255 to denote that this
  STA XX2,X              \ face is visible
 
+ STA GFAR               \ Port: the renderer culls such a face by its winding,
+                        \ for which S_SHIP works out the ship's handedness
+
  TYA                    \ Set Y = Y + 4 to point to the next face
  ADC #4
  TAY
@@ -43655,6 +43658,11 @@ ENDMACRO
 \ ******************************************************************************
 
 .LL42
+
+ LDA TYPE               \ Port: the splinter's faces are shown, and put back
+ CMP #SPL               \ once the renderer has them (SPLV, S_SHIP)
+ BNE P%+5
+ JSR SPLV
 
                         \ The first task is to set up the inverse matrix, ready
                         \ for us to send to the dot product routine at LL51.
@@ -44575,6 +44583,202 @@ ENDMACRO
 
                         \ Port: removed (the edge loop of part 10, and LL81's
                         \ call of LSCLR after it)
+
+\ ******************************************************************************
+\
+\       Name: SPLV
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: show all the splinter's faces for LL9's vertices and the
+\             renderer
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: called from LL9's part 6 (LL42) for the splinter. Its blueprint's faces
+\ data offset is 24 bytes out (SHIP_SPLINTER, as released), so part 5 tested
+\ its faces against normals read from the shuttle's header and first vertex,
+\ and part 6 would skip each vertex whose three faces those hid: the renderer
+\ was given faces it should not show, with stale vertices, and not the faces
+\ it should. Instead all four faces are shown (XX2 = 255, as for a face too
+\ far away to test), so part 6 projects all four vertices and the renderer
+\ culls the faces by their winding (gfx-faces.asm holds the splinter's own
+\ normals and windings, faces.py). Part 5's XX2 is kept in GSPLV, and S_SHIP
+\ puts it back once the renderer has its copy: the game's state is as the
+\ original leaves it. Not when the splinter is exploding: part 4 has shown
+\ every face, and DOEXP, not S_SHIP, ends LL9.
+\
+\ ******************************************************************************
+
+.SPLV
+
+ LDA XX1+31             \ Exploding: nothing to do
+ AND #%00100000
+ BNE spv9
+
+ LDX #3                 \ Keep XX2 for the four faces in GSPLV, and show them
+.spv1
+ LDA XX2,X
+ STA GSPLV,X
+ LDA #255
+ STA XX2,X
+ DEX
+ BPL spv1
+
+ STA GFAR               \ Faces to cull by their winding (A = 255)
+
+.spv9
+
+ RTS
+
+\ ******************************************************************************
+\
+\       Name: S_SHIP
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: record the ship for the renderer, with its handedness
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: called from H_EE31 (gfx-hooks.asm), at the end of LL9, in place of
+\ G_SHIP. If the ship has a face that LL9 showed without testing its normal
+\ (XX2 = 255: a face beyond its visibility distance, or the splinter's), the
+\ renderer culls it by its winding on screen, and the face lists' windings
+\ are those of ZINF's handedness (sidev = nosev x roofv): first set GHAND to
+\ the ship's handedness (SHAND), as TIDY gives a ship the other one (sidev =
+\ roofv x nosev). Then record the ship (G_SHIP), and for the splinter put
+\ back the XX2 that part 5 left (SPLV).
+\
+\ ******************************************************************************
+
+.S_SHIP
+
+ LDA GFAR               \ No face to cull by its winding: just record the ship
+ BNE ssh1
+ JMP G_SHIP
+
+.ssh1
+
+ STZ GFAR
+
+ JSR SHAND              \ GHAND = the ship's handedness
+
+ JSR G_SHIP             \ Record the ship
+
+ LDA TYPE               \ The splinter: put back part 5's XX2 for its faces
+ CMP #SPL
+ BNE ssh9
+ LDX #3
+.ssh2
+ LDA GSPLV,X
+ STA XX2,X
+ DEX
+ BPL ssh2
+
+.ssh9
+
+ RTS
+
+\ ******************************************************************************
+\
+\       Name: SHAND
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: the handedness of the ship's orientation vectors
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: set GHAND to %01000000 if sidev = nosev x roofv (as ZINF sets them up),
+\ or %01100000 if sidev = roofv x nosev (as TIDY leaves them), for the ship in
+\ INWK. The renderer's lighting puts GHAND into a face's byte when it culls
+\ the face by its winding (gfx-light.asm), and bit 5 reverses the winding test
+\ (f_winding, gfx-frame.asm).
+\
+\ The vectors are orthonormal, so sidev is one cross product or the other: the
+\ sign of the component i of sidev that is largest (at least 1 / sqrt 3) is
+\ compared with that of (nosev x roofv)_i = n_j r_k - n_k r_j, worked out from
+\ the high bytes (96 = 1): its two products are at most 36 / 256, and the
+\ difference at least 20, well clear of FMLTU's rounding.
+\
+\ ******************************************************************************
+
+.shdj
+
+ EQUB 2, 0, 4, 0, 0     \ For i = x, y, z (X = 0, 2, 4): the offset of j (y, z, x)
+
+.shdk
+
+ EQUB 4, 0, 0, 0, 2     \ and of k (z, x, y)
+
+.SHAND
+
+ LDX #0                 \ Set X = 2 * i for the largest |sidev_i|
+ LDA INWK+22
+ AND #%01111111
+ STA T
+ LDA INWK+24
+ AND #%01111111
+ CMP T
+ BCC shd1
+ STA T
+ LDX #2
+.shd1
+ LDA INWK+26
+ AND #%01111111
+ CMP T
+ BCC shd2
+ LDX #4
+.shd2
+
+ LDY shdj,X             \ GSHT = n_j * r_k
+ LDA INWK+10,Y
+ STA GSHT+1
+ LDY shdk,X
+ LDA INWK+16,Y
+ JSR shdm
+ STA GSHT
+
+ LDY shdk,X             \ A = n_k * r_j
+ LDA INWK+10,Y
+ STA GSHT+1
+ LDY shdj,X
+ LDA INWK+16,Y
+ JSR shdm
+
+ EOR #&FF               \ A = GSHT - A = (nosev x roofv)_i
+ SEC
+ ADC GSHT
+
+ EOR INWK+22,X          \ Bit 7 set if its sign is not sidev_i's
+ AND #%10000000
+
+ LSR A                  \ GHAND = %01000000, or %01100000 if bit 7 was set
+ LSR A
+ ORA #%01000000
+ STA GHAND
+
+ RTS
+
+.shdm
+
+                        \ A = GSHT+1 * A / 256 as a signed byte, for the
+                        \ sign-magnitude high bytes A and GSHT+1 (X is kept)
+
+ STA GSHT+2
+ EOR GSHT+1             \ Bit 7 of GSHT+3 = the product's sign
+ STA GSHT+3
+ LDA GSHT+1
+ AND #%01111111
+ STA Q
+ LDA GSHT+2
+ AND #%01111111
+ JSR FMLTU              \ A = |GSHT+1| * |A| / 256
+ BIT GSHT+3
+ BPL shm1
+ EOR #&FF
+ INC A
+.shm1
+
+ RTS
 
 \ ******************************************************************************
 \

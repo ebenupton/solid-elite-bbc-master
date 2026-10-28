@@ -1762,15 +1762,9 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  INX
  CPX fz_n
  BCC fsh_v
- BIT fz_t               \ far ships (XX2 = 255, bit 6 of the copy: Elite skipped
- BVC fsh_draw           \ the normal test) cull back faces by their winding on
-                        \ screen, except the station (mirrored until its first TIDY)
- LDX f_si
- LDA F_STYP,X
- CMP #SST
- BEQ fsh_draw
- CMP #DOD               \ (Master port: the Dodo station too)
- BEQ fsh_draw
+ BIT fz_t               \ far faces (XX2 = 255, bit 6 of the copy: Elite skipped
+ BVC fsh_draw           \ the normal test) are culled by their winding on
+                        \ screen, in the ship's handedness (bit 5)
  JSR f_winding
  BCC fsh_next
 .fsh_draw
@@ -3344,8 +3338,11 @@ F_NPT = P%-1            \ only caller, reloads Y on every path
  RTS
 
 \ f_winding: the face just gathered into R_PXL/R_PYL (low bytes; a far ship is
-\ small, so differences fit in 8 bits): C set if it is clockwise on screen
-\ (front-facing), i.e. (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0) > 0
+\ small, so differences fit in 8 bits), whose byte in the record's XX2 copy
+\ is fz_t: C set if it is front-facing, i.e. clockwise on screen, (x1 - x0) *
+\ (y2 - y0) - (y1 - y0) * (x2 - x0) > 0, as the face lists' windings are for
+\ a ship with ZINF's handedness; anticlockwise if bit 5 of fz_t is set (the
+\ ship has TIDY's handedness, mirrored: GHAND, S_SHIP)
 
 .f_winding
  LDA R_PXL+1
@@ -3376,9 +3373,14 @@ F_NPT = P%-1            \ only caller, reloads Y on every path
  SBC fw_t
  BVC P%+4
  EOR #&80
- BMI fwn9               \ negative: back face
+ STA fw_h               \ (bit 7: the sign)
  ORA fw_l
  BEQ fwn9               \ zero: edge-on
+ LDA fz_t               \ bit 5 of the face's byte (bit 7 here): the ship is
+ ASL A                  \ mirrored from the face lists' handedness (L_REC)
+ ASL A
+ EOR fw_h
+ BMI fwn9               \ negative (positive if mirrored): back face
  SEC
  RTS
 .fwn9

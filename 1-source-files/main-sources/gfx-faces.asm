@@ -217,10 +217,10 @@ FC_PLANE = &05 : FC_PLANO = &5A
 
 \ Splinter (type 8): hues tan + grey
 .FC_S8_F
- EQUB 3 + 16 * 8, 61 AND &FF, 0 AND &FF, 0 AND &FF, 4, 8, 12    \ face 0: grey
- EQUB 3 + 16 * 7, 34 AND &FF, 49 AND &FF, -12 AND &FF, 12, 0, 8    \ face 1: tan
- EQUB 3 + 16 * 7, 0 AND &FF, 61 AND &FF, 0 AND &FF, 12, 0, 4    \ face 2: tan
- EQUB 3 + 16 * 8, 10 AND &FF, 14 AND &FF, 58 AND &FF, 8, 0, 4    \ face 3: grey
+ EQUB 3 + 16 * 7, 47 AND &FF, 3 AND &FF, -39 AND &FF, 12, 4, 8    \ face 0: tan
+ EQUB 3 + 16 * 7, 26 AND &FF, -7 AND &FF, 55 AND &FF, 8, 0, 12    \ face 1: tan
+ EQUB 3 + 16 * 8, -53 AND &FF, 28 AND &FF, -10 AND &FF, 12, 0, 4    \ face 2: grey
+ EQUB 3 + 16 * 8, -2 AND &FF, -34 AND &FF, -50 AND &FF, 8, 4, 0    \ face 3: grey
 .FC_S8_D
  EQUB 0                       \ fins
  EQUB 0                       \ details

@@ -216,7 +216,7 @@
  LDX #DOD
 .hee3
  STX GTYPE
- JSR G_SHIP
+ JSR S_SHIP             \ record it (G_SHIP), with its handedness
 
  BIT XX1+31             \ firing its lasers at us? (as EE31)
  BVC hee9

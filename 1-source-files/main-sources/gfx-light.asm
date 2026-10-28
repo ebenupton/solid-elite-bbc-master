@@ -46,7 +46,9 @@
 \   0                    hidden (as before)
 \   &80 + level          visible
 \   &C0 + level          visible, XX2 was 255 (Elite skipped the normal
-\                        test: the frame layer culls it by its winding)
+\                        test: the frame layer culls it by its winding),
+\                        plus &20 if the ship is mirrored from the face
+\                        lists' handedness (GHAND: TIDY's, not ZINF's)
 \ so the frame layer reads a face's level from the copy, and a hidden face's
 \ level is 0 (ambient), which the fins standing on it take.
 \
@@ -481,8 +483,9 @@
  ORA #&80               \ visible
  LDY lr_r
  INY
- BNE P%+4
- ORA #&40               \ XX2 = 255: cull by winding
+ BNE P%+5
+ ORA GHAND              \ XX2 = 255: cull by winding (bit 6), and bit 5 if
+                        \ the ship is mirrored (GHAND, set by S_SHIP)
  LDX lr_f
 .lrw
  STA &FFFF,X            \ (patched)
