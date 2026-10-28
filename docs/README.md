@@ -1,7 +1,7 @@
 # BBC Master Elite: the port
 
 This branch is a series of changes to Mark Moxon's annotated source for BBC
-Master Elite (the Acornsoft SNG47 release), in five parts:
+Master Elite (the Acornsoft SNG47 release), in six parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM
    banks 4 and 7, and HAZEL. This leaves main RAM `&4000-&6FFF` and banks 5
@@ -49,6 +49,15 @@ Master Elite (the Acornsoft SNG47 release), in five parts:
    bytes free, bank 4 1,850, bank 5 808 more). ACCCON's top bits are left
    as the MOS set them, and BREAK now clears memory, so SHIFT-BREAK boots
    the game again.
+6. **Planets** ([renderer.md](renderer.md)). One circle engine draws every
+   planet's surface: the beach ball, true spherical craters, and banded
+   planets and rings behind the `bands=on` and `rings=on` build options. A
+   quarter of the systems have a moon, fixed in space and solid; the sun is
+   drawn near the planet while the station has its slot; every disc is
+   drawn incrementally; and stars go only into wholly black screen bytes.
+   Flight runs at 10.29 iterations per emulated second (0.736 times SNG47),
+   most of the cost in the crater system, whose two true craters cost more
+   than the original's polygon crater.
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -108,6 +117,7 @@ encrypt=no`.
 | The 25 fps cap | 11.73 | 0.840 | 170,501 |
 | The planet's z in the depth test | 11.73 | 0.839 | 170,540 |
 | Lessons from the Tube | 11.82 | 0.846 | 169,148 |
+| Part 6: planets | 10.29 | 0.736 | - |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never

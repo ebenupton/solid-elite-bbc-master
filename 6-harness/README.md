@@ -110,6 +110,7 @@ moon=scenery`.
 | `msunnear.mjs` | The sun near the planet: a posed scene (a big planet, the sun rising from behind its limb, the station crossing it; `--spawn`: the station appearing in the game's own way), each frame's back buffer dumped with the probes in sight and the cycles of the sun's routines, for `2-build-files/sunnear.py` to render (frames, a sheet and a movie). |
 | `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: `S_SUN`, the disc layer, the second disc, the lens flare and the whole frame. |
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
+| `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
 | `mflips.mjs` | The flip-interval distribution: how many fields each frame of the space view is shown for, over the gate's run (or the title screen, `--title SECS`), per pilot phase. With the 25 fps cap the shortest is 2. |
 | `verify.sh` | The gate. |
 

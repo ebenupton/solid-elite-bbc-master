@@ -3,7 +3,7 @@
 A port of Acornsoft's BBC Master Elite with solid, sunlit ships instead of wireframes, running on an unmodified BBC Master 128. It is built on, and would not exist without, [Mark Moxon](https://github.com/markmoxon)'s [fully documented source code for BBC Master Elite](https://github.com/markmoxon/elite-source-code-bbc-master).
 
 <p align="center">
-<img src="images/solid-elite-beach-ball.png" width="50%" alt="A beach ball planet in the front view, above the dashboard">
+<img src="images/solid-elite-beach-ball-planet.png" width="50%" alt="A beach ball planet in the front view, above the dashboard">
 <br>
 <em>A meridian planet as a beach ball: two great circles, projected exactly, split the disc into land and sea, and spin as the original's equator and meridian do.</em>
 </p>
@@ -11,19 +11,28 @@ A port of Acornsoft's BBC Master Elite with solid, sunlit ships instead of wiref
 What's new:
 
 * **Solid ships, lit by the sun.** Every ship, the space station and the cargo are drawn with filled, dithered faces, shaded by the direction of the sun.
-* **Planets and suns as discs.** Planets are solid. Meridian planets, Lave's among them, are beach balls (above): two great circles projected exactly onto the disc, splitting it into land and sea, and spinning as the original's planets do. Crater planets have their craters drawn over them. Suns are solid discs with a lens flare when you look towards them.
+* **Solid planets, drawn by one circle engine.** Every feature of a planet's surface is a circle on its sphere, projected exactly onto the disc and cut cleanly by its limb. Meridian planets, Lave's among them, are beach balls (above): two great circles splitting the disc into land and sea, spinning as the original's planets do. Crater planets have up to three true spherical craters, green on a blue sea, chosen by the system's seed.
+* **Moons.** A quarter of the systems have a moon: scenery fixed in space beside the planet, light grey with a crater of its own, and solid: fly into it and you die, as you would flying into the planet.
+* **Suns, near and far.** Suns are solid discs with a lens flare when you look towards them, turned down or off as the sun is hidden behind the planet or a ship. Near the planet, where the original gives the sun's slot to the space station and the sun vanishes, the sun is still drawn where it would be, so it rises and sets behind the planet's limb; the bigger of the two discs is drawn in front.
+* **Every disc incremental.** Like the original's sun, the planet, the sun behind it and the moon keep what they drew and redraw only the rows that changed, and stars never show through a fill.
+* **Bands and rings, as options.** Banded planets and dotted planet rings are in the code, off by default, and built with `make bands=on` and `make rings=on`.
 * **Flicker-free, double-buffered flight, at up to 25 frames a second.** The space view is drawn into one screen while the other is on show, using the Master's shadow RAM, with a single custom four-colour palette (black, cyan, magenta and yellow) dithered into shades. Every frame is on show for at least two fields, so motion never judders between one field and two; a quicker frame waits at its flip while the game works on the next.
 * **A new dashboard** in the same palette, redrawing only what changes, split cleanly from the space view by a raster-timed interrupt.
 * **Kept solid rows when docking.** Close to the space station, screen rows that one face fills from edge to edge are kept from frame to frame instead of being erased and filled again. The pixels are exactly the same, and the last seconds of docking run 7.6% to 10.6% faster, and up to 27% faster in single frames.
 * **A solid hangar** when you dock, and the Constrictor turning in solid in the mission briefing.
 * **Faster game logic.** Two dozen speed-ups to the multiplication, division, square root, stardust, keyboard-scanning, planet-drawing and ship-handling routines, one idea per commit. With the original wireframe graphics they make the game 28% faster in flight.
-* **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's.
+* **The original game, exactly.** The game logic is Acornsoft's: given the same keypresses, the port plays out the same game as the original, iteration for iteration, and its save files are byte-identical with the original's. The one exception is the solid moon, which the original does not have: flying into it ends the game there (`make moon=scenery` builds the port without it).
 
 <p align="center">
-<img src="images/solid-elite-ship-and-planet.png" width="24%" alt="A sunlit ship in front of a planet with a crater">
+<img src="images/solid-elite-craters.png" width="24%" alt="A planet with three green craters on a blue sea">
+<img src="images/solid-elite-moon.png" width="24%" alt="A beach ball planet and its grey moon">
+<img src="images/solid-elite-sun-near-planet.png" width="24%" alt="The sun rising behind the planet's limb, with the lens flare">
 <img src="images/solid-elite-sun-and-flare.png" width="24%" alt="The sun and its lens flare">
+<br>
 <img src="images/solid-elite-coriolis-station.png" width="24%" alt="Approaching a Coriolis station">
 <img src="images/solid-elite-combat.png" width="24%" alt="Lasers on a sunlit ship at close range">
+<br>
+<em>A crater planet with three craters; a beach ball and its moon; the sun rising behind the planet's limb, the lens flare turned down where the planet covers it; the sun and its full flare; a Coriolis station; combat.</em>
 </p>
 
 ## Playing it
@@ -48,17 +57,17 @@ To make room, the game is reorganised across all of the Master's memory: main RA
 * a **hot pass** of the rest of the frequently-run code, flowed by measured sizes through main RAM and on into sideways bank 4, Elite's home bank;
 * a **cold pass** in bank 7 for the docked screens and other rarely-run code.
 
-The port's own code sits below `&3000` too, in a **glue area** before the low pass, with a small direct stub for each routine that is called between the hot and cold passes. The game data is all in HAZEL, without the ships' edge lists, which nothing reads now that every ship is drawn from its faces; and the quarter-square multiplication tables are at main `&7000`, under the dashboard. The renderer has banks 5 and 6, ANDY, a window of bank 7 for the beach ball, and a shared workspace in main RAM from `&0E00`. Leaving out the edge lists freed 2,596 bytes, and keeping two colour boundaries a row for the beach ball instead of four freed 1,039 more in bank 5: HAZEL now has 1,919 bytes free, bank 4 1,850, and bank 5 808 below its per-x tables and 208 in its disc window, room for what comes next. [docs/memory-map.md](docs/memory-map.md) has the details.
+The port's own code sits below `&3000` too, in a **glue area** before the low pass, with a small direct stub for each routine that is called between the hot and cold passes. The game data is all in HAZEL, without the ships' edge lists, which nothing reads now that every ship is drawn from its faces; and the quarter-square multiplication tables are at main `&7000`, under the dashboard. The renderer has banks 5 and 6, ANDY, a window of bank 7 for the planets' surfaces and the lens flare, the end of bank 4 for its routines that run with the game (the sun near the planet, the light, and the moon's collision test), and a shared workspace in main RAM from `&0E00`. Leaving out the edge lists freed 2,596 bytes, and keeping two colour boundaries a row for the beach ball instead of four freed 1,039 more in bank 5; the planets, the moon and the sun near the planet have since taken most of the room, leaving 1,223 bytes free in HAZEL, 1,218 in bank 7 and 221 in bank 6. [docs/memory-map.md](docs/memory-map.md) has the details.
 
 ## Speed
 
-In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 11.82 main-loop iterations per emulated second, against the original's 13.97: 0.846 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): before the cap, the port ran at 11.99 (0.858), but 10.7% of its frames were then shown for a single field, and the cap alone took it to 11.73. With the cap none are, and frames that took longer than two fields are unaffected. Most of the gap is the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave; with plain disc planets the port ran 23% faster than the original (17.24). Lessons from the port to the Tube took back some of the cap's cost: the beach ball's disc rows keep two colour boundaries a row instead of four, and its one-colour and emptied rows take the short paths (11.73 to 11.82), and the polygon fill no longer tests each span for an empty run (docking 0.5% faster). The docked screens draw with 4.7% fewer busy cycles than before the three passes.
+In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 10.29 main-loop iterations per emulated second, against the original's 13.97: 0.736 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): before the cap, the port ran at 11.99 (0.858), but 10.7% of its frames were then shown for a single field, and the cap alone took it to 11.73. With the cap none are, and frames that took longer than two fields are unaffected. Before the planets' circle engine it ran at 11.82 (0.846); most of that difference is the crater system's stretch of the run, where two true spherical craters cost more than the original's polygon crater did. Most of the gap is the planets: the spinning beach ball, which is on screen for about half of that run, as the pilot starts at Lave, and the crater system's craters; with plain disc planets the port ran 23% faster than the original (17.24). Lessons from the port to the Tube took back some of the cap's cost: the beach ball's disc rows keep two colour boundaries a row instead of four, and its one-colour and emptied rows take the short paths (11.73 to 11.82), and the polygon fill no longer tests each span for an empty run (docking 0.5% faster). The docked screens draw with 4.7% fewer busy cycles than before the three passes.
 
 ## Testing
 
 Every commit was checked against Acornsoft's release (SNG47), running both side by side in an emulated Master on the same inputs and comparing the game state at every main-loop iteration:
 
-* **The gate** ([6-harness](6-harness/README.md), `make verify`) flies both with a deterministic pilot for 10,000 iterations and requires the game state to be the original's at every one, then docks, launches and docks again, saves, loads and catalogues through the game's disc menu, and changes views in flight. The renderer's rasteriser is also tested on its own, primitive by primitive, against a pixel-exact model.
+* **The gate** ([6-harness](6-harness/README.md), `make verify`) flies both with a deterministic pilot for 10,000 iterations and requires the game state to be the original's at every one, then docks, launches and docks again, saves, loads and catalogues through the game's disc menu, saves the same commander on the original and the port and compares the files byte for byte, changes views in flight, and checks in flight the ship poses that an audit of the ships' faces flagged. The build itself proves that no star can show through a fill. The renderer's rasteriser is also tested on its own, primitive by primitive, against a pixel-exact model.
 * **Soak tests** replay long sessions played by Dom Pajak's [elite-agent](https://github.com/8bitkick/elite-agent) on both builds in lockstep. Overnight, 334 sessions (3.97 million iterations and over 80 game hours, with many commanders and play styles, and 3,236 save-file checks) ran with no divergence on the build before the three passes, a one-hour soak of the three-pass build (29 sessions, 326,642 iterations) found nothing, and a half-hour campaign with the 25 fps cap (19 sessions, 207,193 iterations, flight, combat, docking and the disc menu, 163 save-file checks) found nothing either.
 
 ## Credits
@@ -79,15 +88,16 @@ The copyright position is unchanged from Mark's repository: the original game an
 
 ## The port
 
-The port is a series of commits on top of Mark's source, in five parts:
+The port is a series of commits on top of Mark's source, in six parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM banks 4 and 7, and HAZEL, freeing main RAM `&4000-&6FFF`, banks 5 and 6 and ANDY for a renderer. The game is still the original, iteration for iteration and pixel for pixel.
 2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
 3. **The filled renderer.** Filled ships lit by the sun, disc planets and suns, a double-buffered CMYK screen, a lens flare, a filled hangar and the briefing's ship: 17.24 flight iterations per emulated second (1.234 times the original).
 4. **Beach balls, kept rows and a tidier map.** Meridian planets drawn as beach balls by a meridian window in bank 7, one small step per commit; kept solid rows for close-up docking; then a smaller shared workspace holding the kept rows' state, the port's own code below `&3000` as one area, the hangar's tables in bank 6, HAZEL holding only the game's data, and the quarter-square tables named as such. The gate's flight run gives 11.98 iterations per emulated second (0.857 times the original), the beach ball costing most of the difference.
 5. **Three passes.** The source is emitted in three passes, each in the original's order: a low pass of only what must be below `&3000`, after the port's glue area; a hot pass flowed by measured sizes through main RAM and then bank 4, where the code that runs with shadow RAM paged lands with no hand-made bank 4 copy; and a cold pass in bank 7. Calls between the hot and cold passes go through one direct stub per routine instead of generic far calls (85 cycles a call, against about 171), and the text printers and the routines that crossed most moved hot. The docked screens take 4.8% fewer busy cycles, and the gate's flight run gives 11.99 iterations per emulated second (0.858 times the original).
+6. **Planets.** One circle engine for every planet's surface: the beach ball, true spherical craters, and banded planets and rings behind build options; a moon in a quarter of the systems, fixed in space and solid; the sun drawn near the planet while the station has its slot; every disc drawn incrementally; and stars only into wholly black screen bytes. The gate's flight run gives 10.29 iterations per emulated second (0.736 times the original).
 
-Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details, [docs/renderer.md](docs/renderer.md) for the renderer, [docs/speedups.md](docs/speedups.md) for the speed-ups and [docs/master-memory.md](docs/master-memory.md) for the hardware findings.
+Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration (in a system with a moon, until you fly into it), and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details, [docs/renderer.md](docs/renderer.md) for the renderer, [docs/speedups.md](docs/speedups.md) for the speed-ups and [docs/master-memory.md](docs/master-memory.md) for the hardware findings, and [docs/source-diff.md](docs/source-diff.md) for how far the source is from Mark's.
 
 ---
 
