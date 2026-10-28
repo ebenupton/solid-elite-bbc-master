@@ -23,7 +23,7 @@ function jsrIn(target, after) {
     }
     throw new Error("JSR not found");
 }
-const AFT = { discs: jsrIn(sy.f_discs), disc2: jsrIn(sy.f_disc2), flt: jsrIn(sy.f_flt), stars: jsrIn(sy.f_stars) };
+const AFT = { discs: jsrIn(sy.f_discs), disc2: jsrIn(sy.f_disc2), flt: jsrIn(sy.f_flt), stars: sy.ff_stars9 };
 const M6 = mapOfLabel(sy, "F_PLR");
 const pilot = makePilot();
 const seed = a.seedfile ? JSON.parse(readFileSync(a.seedfile, "utf8")) : null;

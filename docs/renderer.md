@@ -104,7 +104,7 @@ At the end of each flight iteration, `H_MFRAME` (after `M%`, in `TT100` and
 back buffer, two frames old:
 
 1. Wait until the previous flip has happened.
-2. Erase this buffer's old stars, which were plotted only on black pixels.
+2. Erase this buffer's old stars, which were plotted only into black bytes.
 3. Per row, update the disc layer (the bigger of the planet and the sun,
    which is the nearer). From this buffer's old disc span, its old dirty
    extent and the new span, write the disc's colour where it is not
@@ -125,7 +125,8 @@ back buffer, two frames old:
 5. Draw the lens flare, if the sun is on screen (below).
 6. Draw the text, in the cells whose character changed or whose pixels were
    drawn over, then the laser sights.
-7. Plot the stars last, on black pixels only.
+7. Plot the stars last, only into screen bytes that are wholly black (see
+   "Stars behind fills").
 8. Request a flip at the next vsync. `H_VSYNC`, from `IRQ1`, shows the
    front buffer.
 
@@ -189,7 +190,8 @@ offset of a span's first byte and left after its last, with the row in Y.
   rounding, and then takes the same loops.
 * `R_DISCROWS` draws the disc layer row by row, from the old and new spans
   and the dirty extents.
-* Stars are plotted on black pixels only and erased the next time.
+* Stars are plotted only into wholly black screen bytes, and erased the
+  next time.
 * Every span extends its row's dirty extent for this buffer. The repair
   blacks the old extents that nothing new covers.
 
@@ -197,6 +199,35 @@ offset of a span's first byte and left after its last, with the row in Y.
 pixel-exact model, with this port's memory layout. It also checks that
 nothing outside the screen, the rasteriser's memory and its zero page is
 written. The gate runs it with `--quick`.
+
+## Stars behind fills
+
+`R_STARPLOT` plots a star's pixels in a screen byte only when the whole
+byte is black, not just the star's own pixels. Every fill the frame layer
+draws other than pure black (the ships' lit ramps and unlit colours, the
+planet's and the sun's discs and colour B, the second disc, the moon, the
+hangar's panels, the distant dots) has a coloured pixel in every byte of
+every row of its dither, so no star shows through a fill's black pixels;
+at a fill's edge a star lands only on black, within three pixels of the
+edge. The test is also cheaper than testing the star's own pixels, by
+about 6 cycles a star.
+
+The one pure black fill, a station's docking slot, is handled apart:
+`f_poly2` copies the slot's four vertices to `F_SLV` (bank 6) when it fills
+it, and `F_FRAME` then plots the stars through `f_slot`
+(`gfx-frame_cold.asm`), which takes the stars in the vertices' bounding box
+out of `R_SS` for the plot and puts them back; `f_reset` (and `F_INIT`) mark
+`F_SLV` empty. Without a slot the cost is one test a frame. The hangar's
+black lines are the other black fill, and its frames plot no stars.
+
+`2-build-files/starocc.py` proves the premise at every build (the Makefile
+fails if it does not pass): from the bank 6 image, the symbols and the
+sources, it checks every colour the build can give a fill (each writer of
+the colour bytes must be of a source it knows), and that the docking slots
+are the only black polygon details, each with four vertices.
+`test_raster.py` models the rule, and `6-harness/mstarocc.mjs` puts a grid
+of stars over the planet's sea, a dark ship, the docking slot and the sun
+beside the planet, and screenshots them.
 
 ## Kept solid rows
 

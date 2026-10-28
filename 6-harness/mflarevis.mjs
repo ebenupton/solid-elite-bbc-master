@@ -2,7 +2,7 @@
 // then hold the keys off and put the sun (slot 1) on a path in front of the
 // ship each iteration (as the flare's scratch scene.mjs before it); optionally a
 // ship (--ship slot) in front of the sun, on its own path. At each frame's
-// end (F_FRAME after f_stars, bank 6) the back buffer is dumped with the
+// end (F_FRAME's ff_stars9, after the stars, bank 6) the back buffer is dumped with the
 // probes in sight (fl_vn at fl_seen, bank 5), the probes' cycles (R_FLARE to
 // fl_seen) and f_flt's cycles (the flare, to f_text2).
 //
@@ -28,7 +28,7 @@ function jsrIn(target) {
     }
     throw new Error("JSR not found");
 }
-const FEND = jsrIn(sy.f_stars) + 3;
+const FEND = sy.ff_stars9;
 const FLT = sy.f_flt, FTX = sy.f_text2, RFL = sy.R_FLARE, SEEN = sy.fl_seen ?? -1;
 const lerp = (p, q, t) => +p + (q - p) * t;
 function target(k) {

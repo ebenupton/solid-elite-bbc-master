@@ -8,7 +8,7 @@
 // spun by --spin degrees an iteration about the game's spin axis), or lets
 // the game spin it (--pose free); --keep leaves the planet where the game has
 // it (with --pose free: the gate's own frames, measured). At each frame's
-// end (F_FRAME after f_stars, bank 6) the back buffer is dumped, with the
+// end (F_FRAME's ff_stars9, after the stars, bank 6) the back buffer is dumped, with the
 // frame's cycles in the planet's routines: G_PFHOOK (the game-context hook),
 // T_CAPS (the detail's rows), T_DISCROWS (the disc layer), f_moon, T_MCAPS
 // and f_ring when the build has them, and the whole F_FRAME.
@@ -34,7 +34,7 @@ function jsrIn(target, from, span) {
     }
     throw new Error("JSR not found");
 }
-const FEND = jsrIn(sy.f_stars, sy.F_FRAME, 0x200) + 3;
+const FEND = sy.ff_stars9;
 const lerp = (p, q, t) => +p + (q - p) * t;
 function target(k) {
     const t = N > 1 ? k / (N - 1) : 0;

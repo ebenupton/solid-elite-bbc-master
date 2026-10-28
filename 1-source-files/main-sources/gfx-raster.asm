@@ -100,11 +100,19 @@
 \              Clipped.  Extends DIRTY.
 \ R_STARERASE  black every star pixel R_STARPLOT set last time in this buffer.
 \ R_STARPLOT   plot stars R_SX/SY/SS (R_SN of them) in R_SCOL.  A star row's
-\              pixels within one screen byte are set only if all of them are
-\              black there (else that byte is left alone); remembered for
-\              R_STARERASE.  It must be the frame's last drawing (after the
-\              text overlay): stars then only ever replace black that stays
-\              black, so neither plotting nor erasing them touches R_WL/R_WR.
+\              pixels within one screen byte are set only if the whole byte
+\              is black there (else that byte is left alone); remembered for
+\              R_STARERASE.  Every fill the frame layer can draw that is not
+\              pure black has a non-black pixel in every byte of every row
+\              (2-build-files/starocc.py proves it over all of them), so no
+\              star shows through one, even where its dither has black
+\              pixels.  The one pure black fill, a station's docking slot,
+\              is left in F_SLV by f_poly2: the frame layer takes the stars
+\              in its bounding box out of R_SS for the plot (f_slot, bank
+\              6).  It must be the frame's last drawing
+\              (after the text overlay): stars then only ever replace black
+\              that stays black, so neither plotting nor erasing them
+\              touches R_WL/R_WR.
 \ R_DISCROWS   the incremental disc layer for the current buffer (see below).
 \              Enter with C clear: with C set it is R_DISC2, the second disc
 \              behind the layer (gfx-raster_disc2.asm, in bank 5), after it.
@@ -1284,13 +1292,11 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
   CPX #&80
   ADC #0
   STA RZ_PP+1
-  LDA (RZ_PP)             \ all black there?
-  AND RZ_SB
+  LDA (RZ_PP)             \ the whole byte black?
   BNE nx
   LDX r_k                 \ (< 48 always: R_SN <= 24, <= 2 records a star)
   LDA R_SCOL
   AND RZ_SB
-  ORA (RZ_PP)
   STA (RZ_PP)
   LDA RZ_PP
 .^r_pt414 STA r_s0y,X
@@ -1323,8 +1329,8 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
 }
 
 \ one row of a star: row RZ_SA+1, pixel RZ_SA (and RZ_SA+1 if size >= 2).
-\ Each of the (one or two) bytes it touches is set only if all its star
-\ pixels there are black; the byte address and inverse masks are recorded.
+\ Each of the (one or two) bytes it touches is set only if the whole byte is
+\ black; the byte address and inverse masks are recorded.
 .r_strow
 {
   LDY RZ_SA+1
@@ -1429,11 +1435,10 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
   STA RZ_T0
   LDA RZ_SB
   BEQ ba
-  AND (RZ_PP)
+  LDA (RZ_PP)             \ (the whole byte black)
   BNE ba
   LDA R_SCOL
   AND RZ_SB
-  ORA (RZ_PP)
   STA (RZ_PP)
   LDA RZ_SB
   EOR #&FF
@@ -1442,13 +1447,11 @@ ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR
   LDA #&FF                \ byte B (next column)
   LDY RZ_SB+1
   BEQ bb
-  TYA
   LDY #8
-  AND (RZ_PP),Y
+  LDA (RZ_PP),Y           \ (the whole byte black)
   BNE bf
   LDA R_SCOL
   AND RZ_SB+1
-  ORA (RZ_PP),Y
   STA (RZ_PP),Y
   LDA RZ_SB+1
   EOR #&FF

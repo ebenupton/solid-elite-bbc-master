@@ -37,6 +37,8 @@
  LDY fin3+2
  CPY #&70
  BNE fin3
+ LDA #&80               \ no docking slot (F_SLV: f_poly2, f_slot)
+ STA F_SLV+16
  LDA #0
  STA F_NSHIP
  STA F_NLINE

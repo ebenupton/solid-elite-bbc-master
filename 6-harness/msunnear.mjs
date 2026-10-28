@@ -4,7 +4,7 @@
 // the game has no sun and S_SUN draws it), then at each MLOOP puts the planet,
 // the station and the sun where the script says, with the speed 0 and no keys
 // (so S_SUN does not turn D): the sun as S_SUN's D = sun - planet (ss_d, in
-// the shared workspace) and SS_OK. At each frame's end (F_FRAME after f_stars,
+// the shared workspace) and SS_OK. At each frame's end (F_FRAME's ff_stars9, after the stars,
 // bank 6) the back buffer is dumped, with the sun and the planet as recorded
 // and the lens flare's probes in sight (fl_vn at fl_seen, in the flare's
 // bank).
@@ -35,7 +35,7 @@ const OUT = a.out || `${WORK}sunnear`; mkdirSync(OUT, { recursive: true });
 const RISE = +(a.rise || 64), FLY = +(a.fly || 56), HOLD = +(a.hold || 12);
 const N = a.spawn ? 40 : HOLD + RISE + HOLD + FLY + HOLD;
 
-// FEND: the instruction after F_FRAME's JSR f_stars (as mflarevis.mjs finds it)
+// FEND: F_FRAME's ff_stars9, after the stars
 const lst = readFileSync(SYMS.replace(/symbols\.txt$/, "compile.txt"), "utf8").split("\n");
 function jsrIn(target) {
     const t = target.toString(16).toUpperCase().padStart(4, "0");
@@ -45,7 +45,7 @@ function jsrIn(target) {
     }
     throw new Error("JSR not found");
 }
-const FEND = jsrIn(sy.f_stars) + 3;
+const FEND = sy.ff_stars9;
 const AFT = { discs: jsrIn(sy.f_discs) + 3, disc2: jsrIn(sy.f_disc2) + 3, flt: jsrIn(sy.f_flt) + 3 };
 
 // the scene (front view; screen x = 128 + 256 x / z, y = 96 - 256 y / z, a

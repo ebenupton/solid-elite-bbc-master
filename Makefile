@@ -105,7 +105,9 @@ PYTHON?=python
 #     the game's images: BCODE, HICODE, BANK4, HAZEL and COLD7
 #
 #   * 2-build-files/layout-info.py takes the addresses the loader needs from
-#     the game's symbols, and bankcheck.py checks the banking rules
+#     the game's symbols, bankcheck.py checks the banking rules, and
+#     starocc.py proves that no star can show through a fill (R_STARPLOT's
+#     rule); the build fails if either fails
 #
 #   * then the loader, the README, the commander checksum and the disc
 
@@ -159,6 +161,7 @@ all:
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -d > 3-assembled-output/symbols.txt
 	$(PYTHON) 2-build-files/layout-info.py
 	$(PYTHON) 2-build-files/bankcheck.py
+	$(PYTHON) 2-build-files/starocc.py 3-assembled-output
 	$(BEEBASM) -i 1-source-files/main-sources/elite-loader.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt
 	$(PYTHON) 2-build-files/elite-checksum.py -u -rel1 -c 3-assembled-output/compile.txt

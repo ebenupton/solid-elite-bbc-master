@@ -380,6 +380,25 @@ class Machine(tr.Machine):
         return self.cycles
 
 
+def star_ref(ref, x, y, s, scol):
+    """A star (R_STARPLOT): per row, per byte, its in-window pixels are set to
+    scol only if the whole byte is black. (The docking slot's box is the frame
+    layer's: f_slot takes those stars out of R_SS before the plot.)"""
+    rows = [y] + ([y + 1] if s == 3 and y < 255 else [])
+    xs = [x] + ([x + 1] if s >= 2 and x < 255 else [])
+    for py in rows:
+        if not (ref.ct <= py <= ref.cb):
+            continue
+        byts = {}
+        for px in xs:
+            if ref.cl <= px <= ref.cr:
+                byts.setdefault(px >> 2, []).append(px)
+        for c, pxs in byts.items():
+            if all(ref.getpix(4 * c + p, py) == 0 for p in range(4)):
+                for px in pxs:
+                    ref.setpix(px, py, scol, scol)
+
+
 def set_col(self, ce, co):
     self.m.wzp('R_COLE', ce)
     self.m.wzp('R_COLO', co)
@@ -1281,6 +1300,7 @@ tr.check_patch_sites = check_patch_sites
 tr.Machine = Machine
 tr.Tester.set_col = set_col
 tr.Tester.draw_line = draw_line
+tr.star_ref = star_ref
 
 if __name__ == '__main__':
     tr.main()

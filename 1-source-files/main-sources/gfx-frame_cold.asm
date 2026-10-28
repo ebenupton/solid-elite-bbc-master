@@ -94,6 +94,12 @@
  LDA #1                 \ (beyond it, A = 1: the edge from vertex 0 to 1 only)
  BCC fpo2
  JSR T_POLY
+ LDX #51                \ its vertices for R_STARPLOT, which plots no star
+.fpo3                   \ over it (F_SLV: black, the screen cannot tell)
+ LDA R_PXL,X
+ STA F_SLV,X
+ DEX
+ BPL fpo3
  LDA fz_n
 .fpo2
  PHA
@@ -361,3 +367,99 @@
 .fsgs3
  PLY
  JMP fsg3
+
+\ ------------------------------------------------------------------------------
+\ f_slot: the stars (T_STARPLOT) when a station's docking slot was filled this
+\ frame. The slot is the frame's only pure black fill (2-build-files/
+\ starocc.py), so the screen cannot tell a star there from one on the
+\ background: f_poly2 copies the slot's four vertices, as T_POLY filled them,
+\ to F_SLV (R_PXL .. R_PYH + 3's layout: x low at +0, x high at +16, y low at
+\ +32, y high at +48). The stars with a pixel in the vertices' bounding box
+\ (clamped to 0..255) are taken out of R_SS for this plot and put back after
+\ it (the hooks write R_SS only when a star moves); f_reset then marks F_SLV
+\ empty (x high of vertex 0 &80, which no projected vertex is).
+\ ------------------------------------------------------------------------------
+
+.f_slot
+{
+  LDA #&FF                \ r_sbb: x min, x max, y min, y max
+  STA r_sbb
+  STA r_sbb+2
+  STZ r_sbb+1
+  STZ r_sbb+3
+  LDX #35                 \ the y of vertices 3..0 (F_SLV+32..35), then the x
+.v                        \ (F_SLV+3..0)
+  LDY #2
+  CPX #32
+  BCS v1
+  LDY #0
+.v1
+  LDA F_SLV+16,X          \ the coordinate clamped to 0..255
+  BEQ v3
+  ASL A                   \ (C = its sign: off the screen's top or left, 0;
+  LDA #&FF                \ else 255)
+  ADC #0
+  BRA v4
+.v3
+  LDA F_SLV,X
+.v4
+  CMP r_sbb,Y
+  BCS v5
+  STA r_sbb,Y
+.v5
+  CMP r_sbb+1,Y
+  BCC v6
+  STA r_sbb+1,Y
+.v6
+  DEX
+  BMI v7
+  CPX #31
+  BNE v
+  LDX #3
+  BRA v
+.v7
+  LDA r_sbb               \ a star's pixels are x..x+1, y..y+1: it meets
+  BEQ v8                  \ the box if x >= x min - 1 (and y likewise)
+  DEC r_sbb
+.v8
+  LDA r_sbb+2
+  BEQ v9
+  DEC r_sbb+2
+.v9
+  LDX R_SN                \ the stars in the box out of R_SS (R_SN >= 1:
+.s                        \ the frame layer's NOST + 1)
+  DEX
+  BMI s3
+  LDA R_SS,X
+  STA r_ssv,X
+  BEQ s
+  LDA R_SX,X
+  CMP r_sbb
+  BCC s
+  CMP r_sbb+1
+  BEQ s1
+  BCS s
+.s1
+  LDA R_SY,X
+  CMP r_sbb+2
+  BCC s
+  CMP r_sbb+3
+  BEQ s2
+  BCS s
+.s2
+  STZ R_SS,X
+  BRA s
+.s3
+  JSR T_STARPLOT          \ plot the rest
+  LDX R_SN                \ and put R_SS back
+.r
+  DEX
+  BMI r1
+  LDA r_ssv,X
+  STA R_SS,X
+  BRA r
+.r1
+  RTS
+.r_sbb  SKIP 4
+.r_ssv  SKIP NDSTAR
+}

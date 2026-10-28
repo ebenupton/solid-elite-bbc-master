@@ -220,6 +220,9 @@ ASSERT F_ST = F_TM + &300
                         \ workspace)
  INCLUDE "1-source-files/main-sources/gfx-hangar6.asm"   \ the hangar's tables (f_hback; data
                         \ before them stays at its place)
+.F_SLV  SKIP 52         \ the docking slot's vertices, as R_PXL .. R_PYH + 3
+                        \ (f_poly2, f_slot: gfx-frame_cold.asm; x high of
+                        \ vertex 0, F_SLV+16, &80: none)
 .B6_END
 PRINT "Bank 6: frame layer &8000-", ~B6_CODE_END-1, ", data ", ~F_HW, "-", ~B6_END-1, " free ", &C000-B6_END
 ASSERT B6_END <= &C000

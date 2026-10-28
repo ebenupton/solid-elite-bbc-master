@@ -764,8 +764,17 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  JSR f_lasers           \ our laser beams and the sights
  JSR f_flt              \ the lens flare (gfx-flare6.asm), then the text on top
  JSR f_sight2           \ and the sights
- JSR f_stars            \ stardust, on black only (last: erasing it next
-                        \ time restores black, so it needs no WL/WR)
+.ff_stars
+ LDA #NOST+1            \ stardust, on black only (last: erasing it next
+ STA R_SN               \ time restores black, so it needs no WL/WR): stars
+ LDA F_SLV+16           \ 1..NOST (NOSTM is only ever NOST = 20), recorded by
+ CMP #&80               \ the hooks straight into R_SX/R_SY/R_SS (R_SS = 0:
+ BEQ ffs1               \ none); with a docking slot filled this frame,
+ JSR f_slot             \ f_slot (gfx-frame_cold.asm) plots them
+ BRA ff_stars9
+.ffs1
+ JSR T_STARPLOT
+.ff_stars9              \ (the frame's drawing done: the harness's frame end)
 
  FOR z, 15, 0, -1        \ restore the zero page (pushed at ff1)
   PLA
@@ -790,6 +799,8 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA &FE4E
 
 .f_reset
+ LDA #&80               \ no docking slot (f_poly2 records one, f_slot uses it)
+ STA F_SLV+16
  LDA #0                 \ empty the per-frame lists
  STA GLASV              \ (Master port: the beams show for one frame per LASLI)
  STA f_bomb             \ (and no bomb bolt yet)
@@ -2169,11 +2180,6 @@ ASSERT LT_HL1 = LT_HL0 + 17 AND LT_HL2 = LT_HL0 + 34 AND LT_HL3 = LT_HL0 + 51
 .fla2
 .fla9
  RTS
-
-.f_stars                \ stars 1..NOSTM (NOSTM is only ever NOST = 18), recorded
- LDA #NOST+1            \ by the hooks straight into R_SX/R_SY/R_SS (R_SS = 0: none)
- STA R_SN               \ (Master port: NOST = 20)
- JMP T_STARPLOT
 
 \ ------------------------------------------------------------------------------
 \ Text overlay
