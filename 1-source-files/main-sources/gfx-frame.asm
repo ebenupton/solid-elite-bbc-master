@@ -188,6 +188,8 @@ DLMAX = 3               \ (TTX66K's ee3: TT11, three digits)
  BMI fch3
  CMP f_tmp
  BEQ fch2               \ the same character: remove it
+ JSR f_eor              \ the one this cell's character replaced since the
+ BCS fch8               \ frame: EOR takes it out again, the cell is unchanged
  JSR f_mark             \ another: replace it (erased in both buffers)
  BRA fch4
 .fch3
@@ -212,6 +214,60 @@ DLMAX = 3               \ (TTX66K's ee3: TT11, three digits)
  STA F_TCH,X
 .fch9
  RTS
+
+\ f_eor: character f_tmp printed over the cell at f_tcol, f_row, which holds
+\ another, A. CHPR draws by EOR, and TT107 prints the countdown's next
+\ number over the current one and then the current one again, to take it
+\ out: so when a cell was given its character over f_tmp since the last
+\ frame, printing f_tmp again leaves the cell as it is (C set). Otherwise
+\ (C clear) the replacement of A is noted in a ring of RPN cells (the
+\ countdown replaces at most three at a time; f_text1 forgets them).
+
+RPN = 4
+
+.f_eor
+ STA f_eok
+ LDX f_rpn
+ CPX #RPN+1
+ BCC P%+4
+ LDX #RPN
+.feo1
+ DEX
+ BMI feo4
+ LDA f_rpr,X
+ CMP f_row
+ BNE feo1
+ LDA f_rpc,X
+ CMP f_tcol
+ BNE feo1
+ LDA f_rpk,X
+ CMP f_tmp
+ BNE feo1
+ LDA #&FF               \ (taken out: forgotten)
+ STA f_rpr,X
+ SEC
+ RTS
+.feo4
+ LDA f_rpn
+ INC f_rpn
+ BNE P%+5
+ DEC f_rpn              \ (saturates at 255)
+ AND #RPN-1
+ TAX
+ LDA f_row
+ STA f_rpr,X
+ LDA f_tcol
+ STA f_rpc,X
+ LDA f_eok
+ STA f_rpk,X
+ CLC
+ RTS
+
+.f_rpn  EQUB 0          \ cells noted since the last frame (to 255)
+.f_rpr  SKIP RPN        \ their rows (&FF: none), columns and replaced
+.f_rpc  SKIP RPN        \ characters
+.f_rpk  SKIP RPN
+.f_eok  EQUB 0
 
 .f_tmclr                \ the cell (not empty) cleared: it remembers its
  JSR f_tmget            \ character, which each buffer shows or not as before
@@ -2204,6 +2260,7 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
  STA f_mrt,X
  STZ f_mrb,X
 .ft10
+ STZ f_rpn              \ (f_eor's replacements: a frame apart, not EOR's)
  LDA F_BACK             \ this buffer's bit in F_TCH, and the other's
  INC A
  STA f_tbit
