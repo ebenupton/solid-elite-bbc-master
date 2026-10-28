@@ -75,11 +75,12 @@ would have drawn, then returns from the routine itself:
 * `LL9` records each ship. `EE31` jumps to `H_EE31`, which records the
   ship's projected vertices, its face visibility and its laser beam if it
   is firing at us. `SHPPT` records a distant ship's dot.
-* `CIRCLE` records the planet's disc. A crater planet's crater starts a new
-  curve (`H_PCURVE`), and `BLINE` records its points. A meridian planet's
-  equator and meridian are not worked out at all: `PL9` calls `H_MERID`,
-  which hands the planet's orientation to the meridian window instead (see
-  "Planet surfaces"). `SUN` records the sun's half-widths.
+* `CIRCLE` records the planet's disc, and `H_CIRC` hands the planet's
+  orientation to the meridian window, which makes its surface detail (see
+  "Planet surfaces"). A meridian planet's equator and meridian and a crater
+  planet's crater are not worked out at all: `H_MERID` returns from `PL9`,
+  and `H_PCURVE` from `PLS22`, leaving the game's variables as the
+  original's loops leave them; `BLINE` records nothing. `SUN` records the sun's half-widths.
 * `PIXEL2` records a star and `PIXEL` an explosion particle. `PIX1` no longer
   erases a star's old position, a choice that `pxpat` patches once per star
   pass.
@@ -298,8 +299,16 @@ A meridian planet (type 128, Lave's among them) is drawn as the
 Demonstration Disc port's beach ball rather than with Elite's equator and
 meridian: the great circles normal to its `roofv` and `sidev` vectors, with
 base colour 1, so that where a point is on the same side of both it is
-colour B (green land), and elsewhere colour A. A crater planet keeps the
-original's crater path (`PLS22`'s polygon, recorded through `BLINE`).
+colour B (green land), and elsewhere colour A (the sea, `FC_PLANE` and
+`FC_PLANO`).
+
+A crater planet's craters are true spherical caps, {p : m.p >= r c}, each
+drawn where it is seen and cut by the limb where it is not, on a blue body
+(base colour 0) in the land's green (`FC_PLLE`, `FC_PLLO`). There are up to
+three, from the system's seed (`QQ2`): the first on `roofv`, 30 degrees
+across, as Elite's crater; then, as the seed's bits have it, one on `nosev`
+tilted towards `sidev` and one on `sidev` tilted towards `roofv`, 15 to 30
+degrees across. No two axes are within 63 degrees, so they never overlap.
 
 The disc layer already draws up to four boundaries a row. It keeps two of
 them a row for each buffer (`R_BDN`, `R_BDP`, `R_BDX0`, `R_BDX1`), so that
@@ -313,10 +322,11 @@ after the cold pass, with the circle engine (`gfx-merid.asm`) and the
 styles (`gfx-planet7.asm`). It has two entry points, each behind one stub
 in the glue area:
 
-* `PF_HOOK` runs in game context. `H_MERID` calls it through `G_PFHOOK`
-  from `PL9` (from `K`, `K3` and `K4`, before `PLS1` overwrites `K`), in
-  place of the equator and meridian (`PLS4`, `PLS1`, `PLS5`, `PLS22` and
-  `BLINE` no longer run for these planets). It makes the planet's class
+* `PF_HOOK` runs in game context, for every planet. `H_CIRC` calls it
+  through `G_PFHOOK` (from `K`, `K3` and `K4`), in place of the equator and
+  meridian (`PLS4`, `PLS1`, `PLS5` and `BLINE` no longer run for meridian
+  planets) and the crater (`PL26`'s ellipse is neither worked out nor
+  recorded). It makes the planet's class
   (`PF_CLS`: 0 a meridian planet, 1 craters, 2 bands; bit 7 when it made the
   detail this frame, which `H_CIRC` clears) and its circles' records.
   `pc_circ` makes one circle's record (24 bytes) from its axis, its cosine
@@ -346,9 +356,12 @@ and the beach ball's rows are those of `6-harness/planet_analytic.py`
 pixel for pixel (but for a pair of equal boundaries where both of a row's
 crossings meet, which the engine leaves out). `test_raster.py`'s `merid`
 test runs `PF_HOOK` and `PC_ROWS` against both models on random planets
-(with Master Elite's own zero-page addresses for `K3` and `K4`), `caps` runs
-the engine alone on random circles, and its `beachball` frames feed the
-window's rows through `R_DISCROWS`.
+(with Master Elite's own zero-page addresses for `K3` and `K4`), `pfhook`
+runs `PF_HOOK` on random crater and meridian planets, `caps` runs the
+engine alone on random circles, and its `beachball` and `capball` frames
+feed a spinning planet's rows through `R_DISCROWS`. `6-harness/mplanet.mjs`
+poses planet scenes and dumps each frame with the planet routines' cycles,
+for `2-build-files/planetvis.py` to render.
 
 ## The hangar
 

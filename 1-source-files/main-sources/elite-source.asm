@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1E01          \ The address where the code will be run (Port: the
+ CODE% = &1E0E          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low
@@ -13669,10 +13669,10 @@ ENDIF
 
                         \ Port: the demo port's BLINE (e9770fa w_0047, bebd95c,
                         \ f50a805 w_0045): the new point's y goes straight
-                        \ into K5(3 2) (for the next call and for F_PPOINT,
-                        \ which reads it there) and XX12, after the previous
-                        \ point's y is copied to XX15(3 2) for LL145; the new
-                        \ point's x is copied K6 -> K5 and XX15(5 4) in one
+                        \ into K5(3 2) (for the next call) and XX12, after
+                        \ the previous point's y is copied to XX15(3 2) for
+                        \ LL145; the new point's x is copied K6 -> K5 and
+                        \ XX15(5 4) in one
                         \ go, so BL7 no longer copies K6 to K5 (K6(3 2) is no
                         \ longer written: nothing else reads it)
 
@@ -13683,17 +13683,12 @@ ENDIF
 
  TXA                    \ Set K5(3 2) = XX12(1 0) = (T X) + K4(1 0)
  ADC K4                 \   = y-coord of centre + y-coord of new point
- STA XX12               \ (XX12 for LL145, as recording the point keeps it)
+ STA XX12               \ (XX12 for LL145)
  STA K5+2
  LDA K4+1
  ADC T
  STA XX12+1
  STA K5+3
-
- LDA QQ11               \ Port: in record mode, record the point (F_PPOINT
- ORA GFORCE             \ reads its y from K5(3 2); this was the H_BPT hook,
- BNE P%+5               \ inlined)
- JSR G_PPOINT
 
  LDA K5                 \ Set XX15(1 0) = K5(1 0) = x of the previous point
  STA XX15

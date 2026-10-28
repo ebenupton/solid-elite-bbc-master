@@ -290,7 +290,18 @@ def truth(bx, by, r, axes, x, y):
 
 # ------------------------------------------------------------ the game's caps
 
+PFS_C = (247, 241, 232, 222)
 PFN = (10923, 9770, 10596, 7723)      # 2^24 / the nominal length (>> 3) of pf_tilt's sums
+
+
+def pf_kn(y, f):
+    return PFN[0 if not y else 3 if f & 8 else 2 if f & 4 else 1]
+
+
+def _tc(inwk, o):
+    lo, hi = inwk[o], inwk[o + 1]
+    m = lo | ((hi & 0x7F) << 8)
+    return -m if hi & 0x80 else m
 
 
 def pf_tilt(inwk, x, y, f):
@@ -311,9 +322,24 @@ def pf_tilt(inwk, x, y, f):
     return out
 
 
-
 def pf_records(inwk, qq2, typ):
     """PF_HOOK's style: (base, [(vec, c8, cneg, kn)]): a meridian planet's
     beach ball (its two great circles, normal to roofv and sidev: colour B
-    where the surface is on the same side of both)"""
-    return 1, [(pf_tilt(inwk, 15, 0, 0), 0, 0, PFN[0]), (pf_tilt(inwk, 21, 0, 0), 0, 0, PFN[0])]
+    where the surface is on the same side of both), or pf_caps'"""
+    if typ == 128:
+        return 1, [(pf_tilt(inwk, 15, 0, 0), 0, 0, PFN[0]), (pf_tilt(inwk, 21, 0, 0), 0, 0, PFN[0])]
+    return 0, pf_caps(inwk, qq2)
+
+
+def pf_caps(inwk, qq2):
+    """pf_craters: the crater planet's caps [(vec, c8, cneg, kn)] from its
+    orientation (INWK) and the system's seed (QQ2)"""
+    caps = [(pf_tilt(inwk, 15, 0, 0), 222, 0, PFN[0])]
+    n = qq2[4] & 3
+    if n:
+        f = (qq2[4] >> 2) & 7
+        caps.append((pf_tilt(inwk, 9, 21, f), PFS_C[qq2[5] & 3], 0, pf_kn(21, f)))
+        if n == 2:
+            f = qq2[4] >> 5
+            caps.append((pf_tilt(inwk, 21, 15, f), PFS_C[(qq2[5] >> 2) & 3], 0, pf_kn(15, f)))
+    return caps

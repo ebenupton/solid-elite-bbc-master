@@ -39,7 +39,8 @@
  RTS
 
 \ H_CIRC: CIRCLE in record mode records the planet disc instead (PL9 is about
-\ to draw the planet's circle) and returns from CIRCLE as CIRCLE2 would:
+\ to draw the planet's circle) and its surface detail (G_PFHOOK), and
+\ returns from CIRCLE as CIRCLE2 would:
 \ C clear, LSX2 = 0 (the ball line heap in use), FLAG = 0, STP = 8, 4 or 2
 \ by the radius and CNT = the first multiple of STP above 64. If the circle
 \ isn't on screen (CHKON), C set as CIRCLE returns
@@ -54,8 +55,8 @@
  JSR CHKON
  BCC P%+3
  RTS
- STZ PF_CLS             \ (no surface detail yet: PF_HOOK sets it)
  JSR G_PLANET
+ JSR G_PFHOOK           \ the planet's class and surface detail (gfx-planet7.asm)
  LDA #0
  STA LSX2
  STA FLAG
@@ -88,30 +89,41 @@
  PLA
  JMP WP1
 
-\ H_PCURVE: PLS22 is about to compute an ellipse (TGT segments): start a new
-\ curve (BLINE records each point itself, through G_PPOINT). It preserves X,
-\ Y and C (the caller sets A and the other flags straight after)
+\ H_PCURVE: PLS22 (through pl4pat) is about to compute an ellipse. In record
+\ mode that is only ever PL26's crater, which the renderer draws as caps
+\ (PF_HOOK, from H_CIRC): the ellipse is neither computed nor recorded, and
+\ H_PCURVE returns from PLS22 as its loop would: FLAG = 0, CNT = 64 + STP
+\ (the first multiple of STP above 64, the full ellipse's TGT) and CNT2 = 0.
+\ In direct mode it returns, preserving X, Y and C
 
 .H_PCURVE
  LDA QQ11
  ORA GFORCE
  BNE hpc9
- JMP G_PCURVE
+ PLA                    \ (return from PLS22: its return into pl4pat, then
+ PLA                    \ pl4pat's into PLS22)
+ PLA
+ PLA
+ STZ FLAG
+ STZ CNT2
+ LDA STP
+ CLC
+ ADC #64
+ STA CNT
+ RTS
 
 \ H_MERID: PL9 has a meridian planet (TYPE 128) of radius 6 or more that
 \ fits on the screen, and is about to draw its equator and meridian. In
 \ record mode the renderer colours the disc as a beach ball instead: the
-\ meridian window makes its circles (G_PFHOOK, PF_HOOK, from K, K3 and K4,
-\ before PLS1 overwrites K), and H_MERID returns from PL9 (Elite's half
-\ ellipses are neither computed nor recorded) with TGT and K2 as PL9 would
-\ have left them: the game reads both later. In direct mode it returns, and
-\ PL9 draws the lines
+\ meridian window has made its circles (G_PFHOOK, from H_CIRC), and H_MERID
+\ returns from PL9 (Elite's half ellipses are neither computed nor recorded)
+\ with TGT and K2 as PL9 would have left them: the game reads both later. In
+\ direct mode it returns, and PL9 draws the lines
 
 .H_MERID
  LDA QQ11
  ORA GFORCE
  BNE hpc9
- JSR G_PFHOOK           \ the planet's surface detail (gfx-planet7.asm)
  LDX #9                 \ K2 = nosev_x / z, as PL25 leaves it: MV40 adds
  JSR PLS1               \ K2 into the next object's y without setting it
  STA K2                 \ first (the sun's, when it follows the planet)

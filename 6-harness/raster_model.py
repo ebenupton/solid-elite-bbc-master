@@ -744,7 +744,8 @@ class Tester:
         dce, dco = rnd.randrange(256), rnd.randrange(256)
         dbe, dbo = rnd.randrange(256), rnd.randrange(256)
         bands = sc in ('bands', 'bandmix', 'bandjump')
-        beach = sc == 'beachball'       # (the adapter's beach_rows: a rotating meridian planet)
+        beach = sc in ('beachball', 'capball')  # (the adapter's beach_rows or cap_rows: a rotating
+                                                # meridian or crater planet)
         if beach:
             cx, cy, rad = rnd.uniform(20, 236), rnd.uniform(10, 180), rnd.uniform(6, 140)
             vx, vy, vr = rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), rnd.uniform(-0.6, 0.6)
@@ -808,7 +809,7 @@ class Tester:
             if beach:
                 if rnd.random() < 0.1:
                     dce, dco, dbe, dbo = (rnd.randrange(256) for _ in range(4))
-                bnd, ndf = self.beach_rows(f, spans, cx, cy, rad)
+                bnd, ndf = (self.cap_rows if sc == 'capball' else self.beach_rows)(f, spans, cx, cy, rad)
             if bands:
                 for c in curves:                    # drift, sometimes jump
                     c[0] += rnd.uniform(-2.5, 2.5)

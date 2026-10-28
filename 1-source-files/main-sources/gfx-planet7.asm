@@ -4,7 +4,7 @@
 \ window after gfx-merid.asm and gfx-kept7.asm, paged as ROMSEL MERIDBANK;
 \ docs/memory-map.md)
 \
-\ PF_HOOK, in game context (G_PFHOOK, from H_MERID): the planet's class
+\ PF_HOOK, in game context (G_PFHOOK, from H_CIRC): the planet's class
 \ (PF_CLS) and its style as a few circles on its sphere, each a record made
 \ by gfx-merid.asm's pc_circ (which describes the method), and a base colour
 \ (pc_inv):
@@ -12,7 +12,10 @@
 \   * class 0, a meridian planet (TYPE 128): the beach ball, the great
 \     circles normal to roofv and sidev, base 1 (colour B where the surface
 \     is on the same side of both planes, as Elite's equator and meridian
-\     divide it).
+\     divide it);
+\
+\   * class 1, a crater planet (TYPE 130): one to three craters, small caps
+\     from the system's seed (pf_craters), base 0.
 \
 \ Elite's state is not touched: Elite's zero page &10-&28 (the engine's
 \ workspace) is saved and restored, and A, X, Y and the flags are preserved.
@@ -53,9 +56,12 @@
  STA pcby+1
  STZ pc_inv
  LDA PF_CLS
- BNE pfh3               \ (H_MERID: a meridian planet only)
+ BNE pfh2
  INC pc_inv             \ (the beach ball: base 1)
  JSR pf_beach
+ BRA pfh3
+.pfh2
+ JSR pf_craters
 .pfh3
  LDA PC_N               \ (records, or a base colour)
  ORA pc_inv
@@ -94,6 +100,56 @@
  STA pcc
  STZ pcneg
  JMP pc_circ
+
+\ pf_craters: a crater planet's caps, from the system's seed (QQ2): the
+\ first on roofv, 30 degrees across (Elite's crater: at 222/256 of the radius
+\ from the centre, half the radius across); then, as the seed has it, one on
+\ nosev (either way) tilted towards sidev, and one on sidev tilted towards
+\ roofv, each 15 to 30 degrees. No two axes are closer than 63 degrees, so
+\ the craters never overlap.
+
+.pf_craters
+ LDX #15                \ roofv
+ LDA #222
+ JSR pf_one
+ LDA QQ2+4              \ s2_lo bits 0-1: more caps (0, 1, 2, 1)
+ AND #3
+ BEQ pfc9
+ PHA
+ LDA QQ2+4              \ bits 2-4: the second's signs and tilt
+ LSR A
+ LSR A
+ AND #7
+ LDX #9                 \ nosev, tilted towards sidev
+ LDY #21
+ JSR pf_tilt
+ LDA QQ2+5              \ s2_hi bits 0-1: its size
+ JSR pf_size
+ PLA
+ CMP #2
+ BNE pfc9
+ LDA QQ2+4              \ bits 5-7: the third's
+ LSR A
+ LSR A
+ LSR A
+ LSR A
+ LSR A
+ LDX #21                \ sidev, tilted towards roofv
+ LDY #15
+ JSR pf_tilt
+ LDA QQ2+5              \ s2_hi bits 2-3
+ LSR A
+ LSR A
+.pf_size                \ a crater of A bits 0-1's size (15, 20, 25 or 30
+ AND #3                 \ degrees) on pcv
+ TAX
+ LDA pfs_c,X
+ STA pcc
+ STZ pcneg
+ JMP pc_circ
+.pfc9
+ RTS
+.pfs_c EQUB 247, 241, 232, 222
 
 \ pf_tilt: pcv = (+/- vector X) / 2 + (+/- vector Y) / 2^(k+1), as
 \ sign-magnitude words (X, Y = 9 nosev, 15 roofv, 21 sidev; Y = 0: none), A

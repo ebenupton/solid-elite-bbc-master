@@ -702,6 +702,41 @@ def beach_rows(self, f, spans, cx, cy, rad):
     return rows, 1
 
 
+def test_pfhook(self, n):
+    """PF_HOOK on random crater and meridian planets: the class, and the rows
+    (PC_ROWS) against the model of its style's circles"""
+    rnd, m, mem = self.rnd, self.m, self.m.mem
+    self.set_clip((1, 254, 1, 191))
+    for i in range(n):
+        vecs = _rand_frame(rnd)
+        typ = rnd.choice((128, 130, 130))
+        r = rnd.choice((rnd.randrange(1, 40), rnd.randrange(6, 251), 300))
+        cx = rnd.randrange(-60, 316)
+        cy = rnd.randrange(-60, 252)
+        qq2 = [rnd.randrange(256) for _ in range(6)]
+        inwk, base, recs, on, c1 = self._pfhook(vecs, typ, r, cx, cy, qq2)
+        if on:
+            self._pfrows(base, recs, cx, cy, r, 'PF_HOOK (type %d centre %d,%d r %d)' % (typ, cx, cy, r))
+    return '%d planets' % n
+
+
+def cap_rows(self, f, spans, cx, cy, rad):
+    """test_frames' 'capball' scenario: this frame's boundaries from the caps of a
+    planet spinning about a random axis, written to the disc layer's arrays"""
+    st = getattr(self, '_capst', None)
+    if st is None or f == 0:
+        st = self._capst = dict(vecs=_rand_frame(self.rnd)[:], ax=self.rnd.randrange(3),
+                                w=self.rnd.choice((-1, 1)) * self.rnd.uniform(0.01, 0.12),
+                                cs=[(self.rnd.randrange(3), self.rnd.randrange(150, 256), self.rnd.random() < 0.2)
+                                    for _ in range(self.rnd.randrange(1, 4))])
+    st['vecs'] = _rotate(st['vecs'], st['ax'], st['w'])
+    r = max(6, min(250, int(rad)))
+    caps = [([tuple(_smag(x // 2)) for x in st['vecs'][k]], c8, cn, 10923) for k, c8, cn in st['cs']]
+    rows, c1, c2 = self.circ_rows(caps, spans, (int(cx), int(cy), r))
+    self.m.wr('R_NDF', 1)
+    return rows, 1
+
+
 def test_kept(self, nframes, scenario='station'):
     """K mode (the kept solid rows: gfx-raster_kept.asm, gfx-kept7.asm) over
     multi-frame sequences on two buffers, as the frame layer drives it: each
@@ -860,6 +895,8 @@ tr.Tester._pfrows = _pfrows
 tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
 tr.Tester.test_caps = test_caps
+tr.Tester.test_pfhook = test_pfhook
+tr.Tester.cap_rows = cap_rows
 if os.path.exists(MERID):
     tr.EXTRA += [('merid', 'test_merid', 400, ()), ('beachball', 'test_frames', 44, ('beachball',)),
                  ('beachball', 'test_frames', 44, ('beachball',))]
@@ -868,7 +905,8 @@ if KEPT:     # (after the meridian tests, which keep the random numbers they had
     tr.EXTRA += [('kept', 'test_kept', 120, ('station',)), ('kept', 'test_kept', 120, ('sun',))] * 3
 
 if CAPS:     # (after the rest, which keep the random numbers they had)
-    tr.EXTRA += [('caps', 'test_caps', 400, ())]
+    tr.EXTRA += [('caps', 'test_caps', 400, ()), ('pfhook', 'test_pfhook', 200, ()),
+                 ('capball', 'test_frames', 44, ('capball',)), ('capball', 'test_frames', 44, ('capball',))]
 
 tr.assemble = assemble
 tr.Tester.test_lines = test_lines

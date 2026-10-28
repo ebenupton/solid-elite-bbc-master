@@ -6,8 +6,10 @@
 // node 6-harness/mcompare.mjs [--iters 5000] [--ref disc] [--rsyms file]
 //                           [--cand disc] [--csyms file] [--seed boot|rand|none]
 //                           [--loose] [--window 200] [--out dir] [--shots N]
-//                           [--maxsecs S] [--nopatch] [--norefcache] [--views]
+//                           [--maxsecs S] [--nopatch] [--norefcache] [--views] [--crater]
 //                           [--trace FROM,TO,LABEL+LABEL,VAR+VAR~OFFSET]
+//   --crater: the commander patch also sets the tech level's bit 1, so the first
+//   system's planet is a crater planet (TYPE 130), in both runs
 //
 // Defaults: reference = 4-reference-binaries/sng47/elite-master-sng47.ssd (the
 // released SNG47 disc) with 4-reference-binaries/sng47/symbols.txt (the symbols
@@ -51,7 +53,7 @@ import { makeTracer } from "./mtrace.mjs";
 import { parseArgs } from "./args.mjs";
 
 const args = parseArgs({ iters: "value", ref: "value", rsyms: "value", cand: "value", csyms: "value", seed: "value", loose: "flag", window: "value",
-    out: "value", shots: "value", maxsecs: "value", nopatch: "flag", norefcache: "flag", views: "flag", trace: "value", screen: "flag" });
+    out: "value", shots: "value", maxsecs: "value", nopatch: "flag", norefcache: "flag", views: "flag", trace: "value", screen: "flag", crater: "flag" });
 for (const [d, s] of [["ref", "rsyms"], ["cand", "csyms"]])       // (a disc with another build's symbols hooks the wrong addresses)
     if (!args[d] !== !args[s]) { console.error(`--${d} and --${s} go together`); process.exit(2); }
 const ITERS = +(args.iters || 5000);
@@ -76,7 +78,7 @@ async function run(label, disc, sy, seed, seedBoot) {
     const t0 = Date.now();
     const r = await runElite({
         disc, syms: sy, pilot, iters: ITERS, maxSecs: +(args.maxsecs || 4 * ITERS),
-        patch: args.nopatch ? null : patchCommander, seed, seedBoot, screen: !!args.screen,
+        patch: args.nopatch ? null : args.crater ? (o => { patchCommander(o); o.wr(o.sy.tek, [o.rb(o.sy.tek) | 2]); }) : patchCommander, seed, seedBoot, screen: !!args.screen,
         onIter: (i, s, res) => { phases.push(pilot.P.phase); if (tracer) tracer(i, s, res); },
         shots: SHOTS, onShot: async (s, i) => writeFileSync(`${OUT}/${label}-${String(i).padStart(6, "0")}.png`, await s.screenshotActive({ scale: 1 })),
     });
@@ -96,7 +98,7 @@ async function cachedRef() {
     const { gzipSync, gunzipSync } = await import("zlib");
     const h = createHash("sha1");
     for (const f of [REF, RSYMS, new URL("mlib.mjs", import.meta.url), new URL("mpilot.mjs", import.meta.url)]) h.update(readFileSync(f));
-    h.update(JSON.stringify([ITERS, args.maxsecs || 0, !!args.nopatch, !!args.views, !!args.screen]));
+    h.update(JSON.stringify([ITERS, args.maxsecs || 0, !!args.nopatch, !!args.views, !!args.screen].concat(args.crater ? ['crater'] : [])));
     const dir = `${WORK}refcache`, file = `${dir}/${h.digest("hex")}.json.gz`;
     if (!args.norefcache && !args.trace && existsSync(file)) {
         const o = JSON.parse(gunzipSync(readFileSync(file)).toString());

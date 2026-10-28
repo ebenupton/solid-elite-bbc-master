@@ -116,7 +116,7 @@ The port puts Elite's workspace `WP` at `&0841-&0CA9`, the original's
 `&0E41-&12A9` moved down by `&600` so that each byte keeps its place in its
 page. The CMYK dashboard's variables follow it to `&0CCE`, then `VEC`, the
 original IRQ1 vector, at `&0CCF`. From `&0E00` (OSHWM) up to the main code
-(`&1E01`) is the renderer's shared workspace; the loader runs there first,
+(`&1E0E`) is the renderer's shared workspace; the loader runs there first,
 and its last part from `&0400`. The commander file buffer (`commbuf`, which shares its place with
 `LSX2`) is at `&087E`. `*SAVE` gives commander files load and execution
 addresses of 0, so their catalogue entries do not depend on the buffer. A

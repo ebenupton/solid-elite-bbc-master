@@ -120,25 +120,12 @@
  JSR F_BOMB
  JMP gback
 
-.G_PCURVE               \ (F_PCURVE and F_PPOINT do not read A, and both
- LDA #GFXBANK           \ callers, H_PCURVE and BLINE, enter with A = 0 and
- STA &F4                \ reload A afterwards, so A need not be kept in gA)
- STA &FE30
- JSR F_PCURVE
- JMP gback
-
 .G_PFHOOK               \ (the planet's detail, gfx-planet7.asm: it keeps A,
  LDA #MERIDBANK         \ X, Y and the flags)
  STA &F4
  STA &FE30
  JSR PF_HOOK
  JMP gback
-
-.G_PPOINT
- LDA #GFXBANK
- STA &F4
- STA &FE30
- JMP F_PPOINT           \ (it returns through gback)
 
 
 .G_DSTAR                \ (C preserved both ways)
