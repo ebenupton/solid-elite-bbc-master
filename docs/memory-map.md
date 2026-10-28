@@ -285,8 +285,8 @@ line.
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
 | `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set, and `VEC` (`&0CCF`), the configuration's last block |
 | The shared workspace | main `&0E00-&1DD4` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
-| The glue area | main from `CODE%` (`&1E16`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
-| The low pass | main `&2869-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
+| The glue area | main from `CODE%` (`&1E16`) to `&2860` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
+| The low pass | main `&2861-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`, after 8 bytes of padding), `UP`, `stackpt`, `NEWBRK` |
 | The hot pass, in main RAM | main `&2E49-&3F92` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
@@ -294,7 +294,7 @@ line.
 | Bank 7, the cold pass | `&8000-&A660` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens |
 | Bank 7, the meridian window | `&A661-&B577` (its own image, `MERID`) | the beach ball planet's boundaries (`gfx-merid.asm`: `PM_HOOK`, `PM_MERID` and their workspace), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FDA` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
-| Bank 5, the rasteriser | `&8000-&8F2F` (ROMSEL 5), `&9000-&BF94` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; `gfx-flare.asm`; `gfx-raster_lcold.asm`; then the rasteriser's private state, `R_PRBUF` to `R_PRCWB`) |
+| Bank 5, the rasteriser | `&8000-&8F2F` (ROMSEL 5), `&9000-&BF90` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; `gfx-flare.asm`); in the room below the per-x tables, `&98D8-&9993`, R_LINE's cold part (`gfx-raster_lcold.asm`) and then the rasteriser's private state, `R_PRBUF` to `R_PRCWB` |
 | Bank 6, the frame layer | `&8000-&BFF9` | `gfx-frame.asm`, `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm`, `gfx-frame_cold.asm`, `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the half-widths, the display list (with `F_INIT`, `gfx-finit.asm`), the text map, the cells' shown states and the directly drawn stars; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
 | HAZEL | `&C000-&D780` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints (without their edge lists), `QQ18`, `SNE`, `ACT`. `&DF00-&DFFF` is the MOS's |
 | Shadow `&3000-&3FFF` | `&3090-&30FF` | the zero-page save (`setzp`, `getzp`), as in the original; nothing else |
@@ -307,9 +307,9 @@ parts branch into one another and so move as a whole, leads the second.
 
 Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 1,850 at the end of bank 4,
-2,696 at the end of bank 7, 1,919 in HAZEL, 208 and 107 in bank 5 (and 808
-below the per-x tables, freed when the disc layer went to two boundaries a
-row, and 256 in the row runs' tails), 37 in ANDY, 6 in bank 6 (12 before the depth
+2,696 at the end of bank 7, 1,919 in HAZEL, 208 and 111 in bank 5 (and 620
+below the per-x tables, of the 808 freed when the disc layer went to two
+boundaries a row, and 256 in the row runs' tails), 37 in ANDY, 6 in bank 6 (12 before the depth
 test's fix to the planet's z), and 48 and 105 in `WP`'s
 pages and the shared workspace, with 65 more between it and the main code
 (79 before the 25 fps cap's 14 bytes in the glue area: `CODE%` moved down

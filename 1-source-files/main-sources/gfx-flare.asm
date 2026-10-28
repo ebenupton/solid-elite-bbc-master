@@ -15,6 +15,18 @@
 \ palette. Three levels by |dx| + |dy| step every density down the ladder 0,
 \ 1, 2, 4, 6, 8 / 16.
 \
+\ Occlusion: before any ghost, R_FLARE probes the back buffer at nine
+\ points of the sun's disc (its centre, and eight round it at about 0.62 R:
+\ left, right, up, down and the diagonals), as drawn so far (the planet,
+\ ships, dots and lasers are on it; the text, sights and stars come after
+\ the flare). A probe outside the clip window (x 2..253, y 1..191) is out of
+\ sight; one inside is in sight if its pixel is still the sun's colour for
+\ its row (FC_SUNE on even rows, FC_SUNO on odd: the dithered rows compare
+\ with their own pair). None in sight: no flare (and nothing marked dirty).
+\ Otherwise every ghost's density steps down 0 (all 9), 1 (7 or 8), 2 (4 to
+\ 6) or 3 (1 to 3) more rungs of the ladder (fl_vred), on top of the level.
+\ About 1,250 cycles a flared frame.
+\
 \ Every span extends this buffer's dirty extent for its row, and the rows'
 \ range goes to R_MARKDIRTY, so the next frame on this buffer repairs it as
 \ after any shape (the disc rows repainted, the rest blacked, the text and
@@ -56,6 +68,12 @@ fl_sp   = &21           \ screen pointer (fl_or)
 fl_n    = &23           \ 8 * (bytes - 1) (fl_or)
 fl_ch   = &24           \ &40 + (a span's first byte's column >= 32)
 fl_cl   = &27           \ 8 x a span's first byte's column, low byte
+fl_vo   = &12           \ the probes (before the ghosts): offsets 0, a, b,
+                        \ -b, -a (&12-&16)
+fl_vn   = &17           \ the probes in sight
+fl_vx   = &18           \ a probe's x
+fl_vy   = &19           \ (scratch)
+fl_vh   = &1B           \ R / 2
 
 FLNG = 8                \ ghosts
 FLHMAX = 26             \ the ring round the sun only for a sun this small
@@ -71,15 +89,112 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  STX fl_dl2+2
  STY fl_dr1+2
  STY fl_dr2+2
-.flm1
- LDA fl_dx              \ level 3 if |dx| + |dy| < 96, 2 if < 192, else 1
- JSR fl_abs
+                        \ how much of the sun is in sight: nine probes of
+                        \ the back buffer as drawn so far (the ships, the
+                        \ planet, the dots and the lasers on it; not the
+                        \ text, sights and stars, drawn after the flare),
+                        \ the centre and eight round it at about 0.62 R (R
+                        \ capped at 127): offsets 0, a, b, -b, -a with a =
+                        \ R/2 + R/8, b = R/2 - R/16 (the diagonals' b, b
+                        \ about a / sqrt 2)
+ LDA GSUNR
+ BPL P%+4
+ LDA #127
+ LSR A
+ STA fl_vh              \ R/2
+ LSR A
+ LSR A
+ STA fl_vx              \ R/8
+ LSR A
+ STA fl_vy              \ R/16
+ LDA fl_vh
+ CLC
+ ADC fl_vx
+ STA fl_vo+1            \ a
+ EOR #&FF
+ INC A
+ STA fl_vo+4            \ -a
+ LDA fl_vh
+ SEC
+ SBC fl_vy
+ STA fl_vo+2            \ b
+ EOR #&FF
+ INC A
+ STA fl_vo+3            \ -b
+ STZ fl_vo
+ STZ fl_vn
+ LDX #8                 \ probe X: (sx, sy) + (fl_vo[fl_pxi], fl_vo[fl_pyi])
+.flv1
+ LDY fl_pxi,X           \ x: (sx - 128) + offset, signed, in -126..125 (x
+ LDA fl_dx              \ 2..253, the clip window), else out of sight
+ CLC
+ ADC fl_vo,Y
+ BVS flv8
+ EOR #&80
+ CMP #2
+ BCC flv8
+ CMP #254
+ BCS flv8
+ STA fl_vx
+ LDY fl_pyi,X           \ y: (sy - 96) + offset in -95..95 (y 1..191)
+ LDA fl_dy
+ CLC
+ ADC fl_vo,Y
+ BVS flv8
+ CLC
+ ADC #95                \ y - 1
+ CMP #191
+ BCS flv8
+ INC A
+ TAY                    \ the byte: &4000 + (y DIV 8) * &200 + 8 * (x DIV
+ LSR A                  \ 4) + y MOD 8
+ LSR A
+ AND #&FE
+ ORA #&40
+ STA fl_sp+1
+ LDA fl_vx
+ AND #&FC
+ ASL A
+ STA fl_sp
+ BCC P%+4
+ INC fl_sp+1
+ TYA
+ LSR A                  \ C: y odd (the sun's odd rows' colour)
+ TYA
+ AND #7
+ TAY
+ LDA (fl_sp),Y          \ the probe's pixel still the sun's colour for the
+ EOR #FC_SUNE           \ row (a dithered row compares with its own byte)?
+ BCC P%+4
+ EOR #FC_SUNE EOR FC_SUNO
+ STA fl_vy
+ LDA fl_vx
+ AND #3
+ TAY
+ LDA fl_pxm,Y
+ AND fl_vy
+ BNE flv8
+ INC fl_vn
+.flv8
+ DEX
+ BPL flv1
+.fl_seen
+ LDY fl_vn              \ none in sight: no flare
+ BNE P%+3
+ RTS
+ BIT KMODE              \ (K mode: the flare's rows are not kept)
+ BPL P%+5
+ JSR k_clear            \ bankcheck: ok (T_FLARE pages bank 5: the disc window)
+ LDY fl_vn
+ LDX fl_vred,Y          \ the flare turned down by the probes in sight: 0
+.flm1                   \ for all 9, else -1, -2 or -3
+ LDA fl_dx              \ level 3 if |dx| + |dy| < 96, 2 if < 192, else 1:
+ JSR fl_abs             \ fl_lev = level - 3 + that
  STA fl_t
  LDA fl_dy
  JSR fl_abs
  CLC
  ADC fl_t
- LDX #3
  CMP #96
  BCC flm2
  DEX
@@ -160,11 +275,10 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  CMP #FLHMAX+1
  BCS flm3
 .flm4
- LDA fl_ni,X            \ density index + level - 3 (none if 0 or less)
+ LDA fl_ni,X            \ density index + fl_lev (none if 0 or less)
  AND #&7F
  CLC
  ADC fl_lev
- SBC #2                 \ (C = 0: - 3)
  BEQ flm3
  BMI flm3
  STA fl_m
@@ -525,5 +639,10 @@ fl_mt = P% - 4          \ row masks of densities 1, 2, 4, 6, 8 / 16 (4x4
 .fl_lmt EQUB &FF, &77, &33, &11     \ pixels x AND 3..3 of a byte
 .fl_rmt EQUB &88, &CC, &EE, &FF     \ pixels 0..x AND 3
 .fl_pxm EQUB &88, &44, &22, &11     \ pixel x AND 3
+.fl_pxi EQUB 0, 1, 4, 0, 0, 2, 2, 3, 3 \ the probes' offsets (fl_vo): the
+.fl_pyi EQUB 0, 0, 0, 1, 4, 2, 3, 2, 3 \ centre, right, left, down, up and
+                                       \ the four diagonals
+.fl_vred EQUB 0, -3, -3, -3, -2, -2, -2, -1, -1, 0 \ by the probes in sight
+                                    \ (0: no flare)
 .fl_ring                \ (dx, dy) of 9 points of a quarter circle of radius 15
  EQUB 15, 0, 15, 3, 14, 6, 12, 8, 11, 11, 8, 12, 6, 14, 3, 15, 0, 15

@@ -71,10 +71,7 @@
  LDA #RASTBANK
  STA &F4
  STA &FE30
- BIT KMODE              \ (K mode: the flare's rows are not kept)
- BPL P%+5
- JSR k_clear
- JSR R_FLARE
+ JSR R_FLARE            \ (K mode: R_FLARE forgets the kept rows)
  JMP tback
 
 .T_MARKDIRTY

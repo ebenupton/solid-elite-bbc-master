@@ -250,6 +250,33 @@ sun is from the centre. The flare extends each row's dirty extent, so the
 next frame on the buffer repairs it like any other shape. It never touches
 game state. `f_flt` (bank 6) makes the tests and `R_FLARE` (bank 5) draws.
 
+The flare is turned down, or off, as the sun is hidden. Before drawing any
+ghost, `R_FLARE` probes the back buffer as drawn so far (the planet, ships,
+dots and lasers; the text, sights and stars come after the flare) at nine
+points of the sun's disc: the centre, and eight round it at about 0.62 R
+(left, right, up, down and the diagonals; offsets R/2 + R/8 and R/2 - R/16,
+with R capped at 127).
+
+* A probe outside the clip window (x 2 to 253, y 1 to 191) is out of sight.
+* A probe inside is in sight if its pixel is still the sun's colour for its
+  row: `FC_SUNE` on even rows and `FC_SUNO` on odd ones, so a dithered row is
+  compared pixel by pixel with its own colour byte (`fl_pxm`). ACCCON X is
+  the frame layer's, so the reads see this buffer.
+* With no probe in sight there is no flare, and nothing is marked dirty. In
+  K mode the kept rows are forgotten only when the flare draws (`k_clear`,
+  after the probes).
+* Otherwise every ghost's density steps down 0 (all nine in sight), 1 (seven
+  or eight), 2 (four to six) or 3 (one to three) more rungs of its ladder
+  (`fl_vred`).
+
+`f_flt`'s tests are still made first: the front view, the sun's centre on
+the screen, and the centre not inside the planet's disc. The probes take
+1,200-1,280 cycles a flared frame, so a hidden sun's flare costs about 1,440
+cycles where a drawn flare costs 14,000-28,000. `6-harness/mflarevis.mjs`
+puts the sun, and optionally a ship, on paths in front of the gate's pilot
+and dumps each frame's back buffer with the probes' count and cycles;
+`2-build-files/flarevis.py` renders the dumps.
+
 ## Beach ball planets
 
 A meridian planet (type 128, Lave's among them) is drawn as the

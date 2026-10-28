@@ -1056,7 +1056,7 @@ R_ENDPAGE 19
 .fl_mh  SKIP 2          \ and high bytes
 .fl_sl  SKIP 2          \ the centres' sums S (x, y)
 .fl_sh  SKIP 2
-.fl_lev SKIP 1          \ the level, 1..3
+.fl_lev SKIP 1          \ the level less 3, turned down by the probes (-5..0)
 R_ENDPAGE 20
 .r_run21 R_RUN 21
 .r_dp1
