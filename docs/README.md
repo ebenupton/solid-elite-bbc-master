@@ -56,7 +56,9 @@ deterministic pilot, and requires the game state to be byte for byte the
 original's at every one of 10,000 main-loop iterations. While the port
 still draws as the original does, it also requires the screen to match at
 every iteration. The memory map's hardware findings are in
-[master-memory.md](master-memory.md).
+[master-memory.md](master-memory.md). [source-diff.md](source-diff.md)
+measures how far `elite-source.asm` is from the original's source, line by
+line, and sets out a plan to bring it back.
 
 ## Building
 
