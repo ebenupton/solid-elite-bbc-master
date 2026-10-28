@@ -26,7 +26,8 @@ the original source's build) against the new disc
 (`5-compiled-game-discs/elite-master-sng47.ssd`, with its own symbols) for
 10,000 main-loop iterations. Then it runs the regression checks: dock,
 launch and dock again; save, load, fail to load and catalogue through the
-game's disc menu; and change view in flight. It prints `VERIFY PASS` with
+game's disc menu; change view in flight; and pose the ships the ship audit
+flagged in flight (`mshippose.mjs`). It prints `VERIFY PASS` with
 the speed of both builds in flight-loop iterations per emulated second,
 their ratio, and the new build's cycles per flight iteration. A run takes
 about 10 minutes, or 5 once the reference run is cached in `work/`.
@@ -85,6 +86,7 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mredock.mjs` | The regression check for docking, launching and docking again, with real key presses. |
 | `msavetest.mjs` | Exercises the disc menu: save, load, a failed load, a catalogue and a launch. It junks the parts of HAZEL that DFS and the MOS may write at each disc command, then checks that the game data and the NMI handler survive. |
 | `mstation.mjs` | The regression check for the depth test: puts a docking scene (the planet at z = &10636, just over 65536, the station dead ahead in front of it) into a freshly launched game and checks that every frame recording the station draws it. F_PLANET once kept 16 bits of the planet's z, so the station was hidden behind the planet. |
+| `mshippose.mjs` | The regression check for the ships the ship audit flagged: poses the Missile and the Splinter in a flight slot at the audit's orientations, in both of the game's handednesses (as `ZINF` spawns a ship and as `TIDY` leaves it), with `LL9`'s `XX3` poisoned, and checks each screen: nothing lit outside the ship's projected hull, its body covered, and exactly its front faces filled. |
 | `mboot.mjs` | Boots a build to the title screen and checks every image that the loader installs. |
 | `mtrace.mjs` | Traces chosen routines and variables over chosen iterations (`mcompare.mjs --trace`). |
 | `profile.mjs` | Profiles cycles by PC over exactly the gate's run, with `--pagex` for page-crossing cycles. |

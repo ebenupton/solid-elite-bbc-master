@@ -20,7 +20,8 @@
 #     glue); once the build has the filled renderer, the station drawn in
 #     front of a planet just over 65536 away (mstation.mjs); and changes of
 #     view in flight against the reference over 1500 iterations
-#     (mcompare.mjs --views).
+#     (mcompare.mjs --views); once the build culls by the ship's handedness,
+#     the ships the ship audit flagged, posed in flight (mshippose.mjs).
 #  4. speed: flight-loop iterations per emulated second over the whole run,
 #     reference and candidate, their ratio, and the candidate's cycles per
 #     flight iteration (reported, not gated; the per-window table is in the
@@ -107,7 +108,16 @@ fi
 node 6-harness/mcompare.mjs --iters 1500 $OPTS --views --maxsecs 400 --cand "$CAND" --csyms "$CSYMS" \
     --out "$LOG/views" > "$LOG/views.log" 2>&1
 grep -q "^MCOMPARE PASS" "$LOG/views.log" || { grep -A8 "FIRST DIVERGENCE" "$LOG/views.log" | head -10; grep SCREEN "$LOG/views.log"; echo "views: FAIL"; fail views; }
-echo "regressions: PASS (redock, $SAVE, views)"
+SAVE="$SAVE, views"
+if grep -q "'GHAND'" "$CSYMS"; then
+    # the ship audit's flagged poses (the missile's fins, the splinter's
+    # faces), in flight, in both handednesses: nothing drawn outside the
+    # ship, its body covered, its front faces and no others filled
+    node 6-harness/mshippose.mjs --disc "$CAND" --syms "$CSYMS" --out "$LOG/shippose" > "$LOG/shippose.log" 2>&1
+    grep -q "^SHIPPOSE PASS" "$LOG/shippose.log" || { grep "BAD" "$LOG/shippose.log" | head -10; echo "shippose: FAIL"; fail shippose; }
+    SAVE="$SAVE, shippose"
+fi
+echo "regressions: PASS (redock, $SAVE)"
 
 # ---- 4. speed
 ALL=$(grep -E "^ +all " "$LOG/compare.log")
