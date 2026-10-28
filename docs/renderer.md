@@ -78,9 +78,14 @@ would have drawn, then returns from the routine itself:
 * `CIRCLE` records the planet's disc, and `H_CIRC` hands the planet's
   orientation to the meridian window, which makes its surface detail (see
   "Planet surfaces"). A meridian planet's equator and meridian and a crater
-  planet's crater are not worked out at all: `H_MERID` returns from `PL9`,
-  and `H_PCURVE` from `PLS22`, leaving the game's variables as the
-  original's loops leave them; `BLINE` records nothing. `SUN` records the sun's half-widths.
+  planet's crater are not worked out at all: in record mode `H_CIRC`
+  returns from `PL9` itself, leaving what the game reads of that path as
+  the original leaves it (`K2`, which `MV40` adds into the next object's
+  y; `TGT`; `FLAG`). That path (`PL9` parts 2 and 3, `PLS2`, `PLS22` and its
+  curve loop, `PLS3`, `PLS4`, `PLS5`) is `Area: none` in the source
+  ([memory-map.md](memory-map.md)): planets are never drawn outside record
+  mode, as `GFORCE` is set only for the hyperspace rings, which use
+  `CIRCLE2`. `SUN` records the sun's half-widths.
 * `PIXEL2` records a star and `PIXEL` an explosion particle. `PIX1` no longer
   erases a star's old position, a choice that `pxpat` patches once per star
   pass.
@@ -336,8 +341,7 @@ in the glue area:
   m.p - d is concave on the visible hemisphere, so whether each of a row's
   two crossings is a boundary, and the colour the row starts in, are
   comparisons of the row with the two thresholds. A circle wholly hidden
-  keeps no record. `H_MERID` leaves `TGT` and `K2` as `PL25` did, as `MV40`
-  reads `K2` later.
+  keeps no record.
 * `PC_ROWS` runs during the frame. `f_bounds` calls it through `T_CAPS`
   before the disc rows, when `PF_HOOK` made the detail this frame. It fills
   the rows with the base colour EOR the left limb's toggles, then for each

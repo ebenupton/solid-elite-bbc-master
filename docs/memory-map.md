@@ -139,6 +139,13 @@ header names its pass:
   screens, the extended tokens, the charts, the market, equipment, the title
   and start-up, save and load, launch, docking and hyperspace, the missions.
   161 blocks.
+* **`Area: none`** is code the port no longer runs, kept in the source as
+  the original's text: each copy has only its labels and one `RTS`, at its
+  place, so a reference still assembles and returns at once. It is the
+  planet's surface maths that the renderer's circle engine replaces: `PL9`
+  parts 2 and 3, `PLS2`, `PLS22`, `PLL4F`, `pl4pat`, `PLS3`, `PLS4` and
+  `PLS5` (`H_CIRC` returns from `PL9` in record mode, leaving `K2`, `TGT`
+  and `FLAG` as they would be): 9 blocks.
 * **`, runs on`** after any of these marks a table that code reads past its
   end, so that the next block must follow it, as a fall-through would.
   `TKN2` is `Area: hot, runs on`: `DETOK2` reads the pairs of tokens
@@ -298,12 +305,12 @@ line.
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
 | `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set, and `VEC` (`&0CCF`), the configuration's last block |
 | The shared workspace | main `&0E00-&1DDE` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
-| The glue area | main from `CODE%` (`&1E0E`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
+| The glue area | main from `CODE%` (`&1E10`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
 | The low pass | main `&2869-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
 | The hot pass, in main RAM | main `&2E49-&3F92` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
-| Bank 4 | `&8000-&BC12` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B98E`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routine that runs in game context, `L_SUN` (`gfx-light.asm`'s first pass, `&B98E-&BC12`) |
+| Bank 4 | `&8000-&B968` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B6E4`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routine that runs in game context, `L_SUN` (`gfx-light.asm`'s first pass, `&B6E4-&B968`) |
 | Bank 7, the cold pass | `&8000-&A3A8` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens, `TKN1` |
 | Bank 7, the meridian window | `&A3A9-&B795` (its own image, `MERID`) | the planet's surface detail (`gfx-merid.asm`, the circle engine: `pc_circ`, `PC_ROWS` and their workspace; `gfx-planet7.asm`, the styles: `PF_HOOK`), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`), then the lens flare (`gfx-flare.asm`: `R_FLARE`, its tables, its half-width table `fl_htab` and its variables) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FDA` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
@@ -319,18 +326,18 @@ parts branch into one another and so move as a whole, leads the second.
 `3-assembled-output/flow.txt` lists every unit.
 
 Free space: 109 bytes below `&4000` and 194 below `&8000` (each the end of
-one of the hot pass's containers in main RAM), 1,005 at the end of bank 4,
+one of the hot pass's containers in main RAM), 1,687 at the end of bank 4,
 2,154 at the end of bank 7, 1,223 in HAZEL, 208 and 1,081 in bank 5 (and 620
 below the per-x tables, of the 808 freed when the disc layer went to two
 boundaries a row, and 256 in the row runs' tails), 37 in ANDY, 1,813 in bank 6, and 48 and 105 in `WP`'s
-pages and the shared workspace, with 47 more between it and the main code.
+pages and the shared workspace, with 49 more between it and the main code.
 `CODE%` moves down as the glue area grows, to keep the font page aligned,
 so nothing after the glue area moves: from `&1E24` to `&1E16` for the 25
 fps cap's 14 bytes, to `&1DF8` for the lens flare's 38 in `T_FLARE`, and
 to `&1DE7` for `L_SUN`'s call and its result, `LLT`, in the glue area;
 it moves up as the glue area shrinks (to `&1E01` when the circle engine's
-stubs replaced the beach ball's, and to `&1E0E` when the crater's curve
-and point stubs went).
+stubs replaced the beach ball's, to `&1E0E` when the crater's curve and
+point stubs went, and to `&1E10` when `H_MERID` and `H_PCURVE` did).
 
 The three passes cost 373 free bytes outside shadow RAM. The stubs between
 the passes are 884 bytes, against the far calls' 184, all in the glue area
@@ -372,7 +379,7 @@ place, using its table `FTAB`:
 * HICODE goes to main `&7000-&7FFF`.
 
 Then it loads BCODE (the glue area, the low pass and the hot pass's first
-container) to its address (`&1E0E`) and changes directory to E. The
+container) to its address (`&1E10`) and changes directory to E. The
 loader is in the shared workspace's place, so its last part runs from `K%`
 (`&0400`), where it is copied first. That part takes DFS's and the MOS's
 lasting bytes into `DFSST` and `DFSST2`, copies HAZEL into place, quietens the 1770 and

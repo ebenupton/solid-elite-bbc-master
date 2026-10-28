@@ -38,12 +38,16 @@
  PLP
  RTS
 
-\ H_CIRC: CIRCLE in record mode records the planet disc instead (PL9 is about
-\ to draw the planet's circle) and its surface detail (G_PFHOOK), and
-\ returns from CIRCLE as CIRCLE2 would:
-\ C clear, LSX2 = 0 (the ball line heap in use), FLAG = 0, STP = 8, 4 or 2
-\ by the radius and CNT = the first multiple of STP above 64. If the circle
-\ isn't on screen (CHKON), C set as CIRCLE returns
+\ H_CIRC: CIRCLE in record mode records the planet's disc instead (PL9 is
+\ about to draw the planet's circle) and its surface detail (G_PFHOOK), and
+\ returns from PL9 itself, whose meridians and crater the renderer draws
+\ (their maths, PL9 parts 2 and 3, PLS2, PLS22 ..., are "Area: none"),
+\ leaving what the game reads of them: K2 (MV40 adds it into the next
+\ object's y without setting it first) as PLS1 leaves it for nosev_x (a
+\ meridian planet of radius 6 or more; halved, a crater planet whose crater
+\ faces us), TGT (31 or 64) and FLAG (0); and LSX2 = 0, STP and CNT as
+\ CIRCLE2 would. If the circle isn't on screen (CHKON), it returns from
+\ CIRCLE with C set, as CIRCLE does
 
 .H_CIRC
  LDA QQ11
@@ -74,7 +78,32 @@
 .hci1
  STA STP
  STY CNT
- CLC
+ PLA                    \ (return from PL9: CIRCLE's return into it)
+ PLA
+ LDA K+1                \ (PL9: only below a radius of 256)
+ BNE hci9
+ LDA TYPE
+ CMP #128
+ BNE hci2
+ LDA K                  \ a meridian planet (part 2): radius 6 up
+ CMP #6
+ BCC hci9
+ LDA #31
+ BNE hci3
+.hci2
+ LDA INWK+20            \ a crater planet (part 3): its crater facing us
+ BMI hci9
+ LDA #64
+.hci3
+ STA TGT
+ LDX #9
+ JSR PLS1
+ LDY TYPE               \ (halved for a crater planet)
+ CPY #128
+ BEQ P%+3
+ LSR A
+ STA K2
+.hci9
  RTS
 
 \ H_WPLS2: in record mode the planet's lines are not on screen: just reset the
@@ -89,52 +118,6 @@
  PLA
  JMP WP1
 
-\ H_PCURVE: PLS22 (through pl4pat) is about to compute an ellipse. In record
-\ mode that is only ever PL26's crater, which the renderer draws as caps
-\ (PF_HOOK, from H_CIRC): the ellipse is neither computed nor recorded, and
-\ H_PCURVE returns from PLS22 as its loop would: FLAG = 0, CNT = 64 + STP
-\ (the first multiple of STP above 64, the full ellipse's TGT) and CNT2 = 0.
-\ In direct mode it returns, preserving X, Y and C
-
-.H_PCURVE
- LDA QQ11
- ORA GFORCE
- BNE hpc9
- PLA                    \ (return from PLS22: its return into pl4pat, then
- PLA                    \ pl4pat's into PLS22)
- PLA
- PLA
- STZ FLAG
- STZ CNT2
- LDA STP
- CLC
- ADC #64
- STA CNT
- RTS
-
-\ H_MERID: PL9 has a meridian planet (TYPE 128) of radius 6 or more that
-\ fits on the screen, and is about to draw its equator and meridian. In
-\ record mode the renderer colours the disc as a beach ball instead: the
-\ meridian window has made its circles (G_PFHOOK, from H_CIRC), and H_MERID
-\ returns from PL9 (Elite's half ellipses are neither computed nor recorded)
-\ with TGT and K2 as PL9 would have left them: the game reads both later. In
-\ direct mode it returns, and PL9 draws the lines
-
-.H_MERID
- LDA QQ11
- ORA GFORCE
- BNE hpc9
- LDX #9                 \ K2 = nosev_x / z, as PL25 leaves it: MV40 adds
- JSR PLS1               \ K2 into the next object's y without setting it
- STA K2                 \ first (the sun's, when it follows the planet)
- LDA #31
- STA TGT
- PLA                    \ (return from PL9)
- PLA
- RTS
-
-.hpc9
- RTS
 
 \ H_STAR: PIXEL2 has star Y's screen position in X = x, A = y and is about to
 \ fall into PIXEL (it JMPs here); in record mode it is recorded straight into the

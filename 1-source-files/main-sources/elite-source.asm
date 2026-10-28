@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1E0E          \ The address where the code will be run (Port: the
+ CODE% = &1E10          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low
@@ -32836,6 +32836,7 @@ ENDIF
 \   Category: Drawing planets
 \    Summary: Draw the planet's equator and meridian
 \  Deep dive: Drawing meridians and equators
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -32934,6 +32935,7 @@ ENDIF
 \   Category: Drawing planets
 \    Summary: Draw the planet's crater
 \  Deep dive: Drawing craters
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -33148,6 +33150,7 @@ ENDIF
 \    Summary: Draw a half-ellipse
 \  Deep dive: Drawing ellipses
 \             Drawing meridians and equators
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -33171,6 +33174,7 @@ ENDIF
 \  Deep dive: Drawing ellipses
 \             Drawing meridians and equators
 \             Drawing craters
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -33524,6 +33528,7 @@ ENDIF
 \   Category: Drawing planets
 \    Summary: Port: PLL4 with the curve's four FMLTU multipliers patched in once
 \             per curve
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -33638,6 +33643,7 @@ ENDIF
 \    Summary: Pick PLL4 or PLL4F for a new curve, patching PLL4F's multipliers
 \             (Port: the demo port's per-curve PLL4 operand patching, 5518429
 \             and demo-final's pl4k/pl4p operands, with Master's log tables)
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34929,6 +34935,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing planets
 \    Summary: Calculate (Y A P) = 222 * roofv_x / z
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -35012,6 +35019,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing planets
 \    Summary: Calculate CNT2 = arctan(P / A) / 4
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -35080,6 +35088,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing planets
 \    Summary: Calculate roofv_x / z and roofv_y / z
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \

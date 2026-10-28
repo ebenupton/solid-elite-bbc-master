@@ -32,6 +32,10 @@
 #     &3000-&7FFF: the flow puts it in bank 4 (in the source's order, before
 #     the hot code that follows it in the source).
 #   * "Area: cold": the cold pass, sideways RAM bank 7 from &8000.
+#   * "Area: none": code the port no longer runs (the original's planet
+#     detail maths, which the renderer's circle engine replaces): its text
+#     stays, but each copy has only its labels and an RTS, at its place (so a
+#     reference to it still assembles, and returns at once).
 #   * ", runs on" after any of these ("Area: hot, runs on"): a table that code
 #     reads past its end into the next block (DETOK2 reads TKN2 on into QQ16),
 #     so the next block must follow it, in the same pass and unit, as if it
@@ -133,11 +137,12 @@ FLOWTXT = "3-assembled-output/flow.txt"
 DTAGS = {"cold": "cold", "BDATA": "bdata"}
 STAR = re.compile(r"^\\ \*{70,}\s*$")
 AREA = re.compile(r"^\\       Area: (.*)$")
-TAGS = {"cold": "cold", "low": "low", "hot": "run", "hot, ACCCON X": "hotx"}
+TAGS = {"cold": "cold", "low": "low", "hot": "run", "hot, ACCCON X": "hotx", "none": "none"}
 # the blocks (by their first line) whose header says ", runs on": a table that
 # code reads past its end into the next block (TKN2 into QQ16), which must
 # therefore follow it as a fall-through does
 RUNSON = set()
+NONE = set()                               # (the "Area: none" blocks, by their first line)
 NOFALL = set("RTS RTI JMP BRA BRK".split())
 BRANCH = set("BCC BCS BEQ BMI BNE BPL BRA BVC BVS".split())
 
@@ -194,6 +199,9 @@ def blocks(lines, tags=TAGS):
                     sys.exit("%d: unknown area %r" % (i + 1, t))
                 out[-1][3] = tags[t]
     for k, b in enumerate(out):
+        if b[3] == "none":
+            b[3] = "run"
+            NONE.add(b[0])
         b[1] = out[k + 1][0] if k + 1 < len(out) else len(lines)
     return [tuple(b) for b in out]
 
@@ -804,12 +812,30 @@ def data(errors, phase, sy=None):
 ASM = []
 
 
+def stub_none(lines, bl):
+    """each "Area: none" block's code: only its labels, then an RTS on its
+    last code line (the lines between blanked, so line numbers stay)"""
+    for s, e, name, area in bl:
+        if s not in NONE:
+            continue
+        last = None
+        for i in range(s, e):
+            if code_part(lines[i]).strip():
+                m = re.match(r"^(\.[A-Za-z_]\w*)", lines[i])
+                lines[i] = m.group(1) if m else ""
+                last = i
+        if last is None:
+            sys.exit("%s:%d: %s: Area: none, and no code" % (SRC, s + 1, name))
+        lines[last] = (lines[last] + " : RTS") if lines[last] else " RTS"
+
+
 def main():
     phase = sys.argv[1] if len(sys.argv) > 1 else "place"
     if phase not in ("measure", "place"):
         sys.exit("usage: streams.py measure|place")
     lines = open(SRC, encoding="latin-1").read().split("\n")
     bl = blocks(lines)
+    stub_none(lines, bl)
     ACTIVE[:] = active_lines(lines)
     macros = set(m.group(1) for m in (re.match(r"^\s*MACRO\s+(\w+)", l) for l in lines) if m)
     errors = []
