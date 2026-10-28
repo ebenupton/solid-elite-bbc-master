@@ -115,9 +115,16 @@ MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 BANDS = os.environ.get('BANDS', 'on') == 'on'
 MERID_GAME += '_PLANET_BANDS = %s\n' % ('TRUE' if BANDS else 'FALSE')
 # the planet's styles (gfx-planet7.asm in the meridian window after
-# gfx-kept7.asm)
+# gfx-kept7.asm) and the variables the frame reads (gfx-planetv.asm: in the
+# shared workspace, ws_block, where elite-gfx.asm includes it; else here at
+# ZTEST)
 CAPS7 = os.path.join(MS, 'gfx-planet7.asm')
+CAPSV = os.path.join(MS, 'gfx-planetv.asm')
 CAPS = os.path.exists(CAPS7)
+CAPSV_WS = 'gfx-planetv.asm' in open(GFX).read()   # (elite-gfx.asm includes it:
+                                                    # the shared workspace, ws_block)
+ZTEST = 0xC000
+DATAZ = b''
 # the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
 # bank 7 after the meridian window): their variables (in the glue area in the
 # game; KF is in the shared workspace, as in the game) and the glue area's
@@ -216,6 +223,9 @@ def assemble(org):
             f.write('SAVE "ra.bin", &8000, P%\n')
             if os.path.exists(MERID):       # the meridian window (bank 7), with the game's
                 f.write(MERID_GAME)
+                if CAPS and not CAPSV_WS:   # (the variables at ZTEST first, if not in
+                    f.write('CLEAR &%X, &DF00\nORG &%X\nINCLUDE "%s"\nSAVE "z.bin", &%X, P%%\n'
+                            % (ZTEST, ZTEST, CAPSV, ZTEST))   # the shared workspace)
                 f.write('CLEAR &8000, &C000\nORG &%X\nINCLUDE "%s"\n' % (MTEST, MERID)
                         + ('INCLUDE "%s"\n' % KEPT7 if KEPT else '')
                         + ('INCLUDE "%s"\n' % CAPS7 if CAPS else '') + 'SAVE "m.bin", &%X, P%%\n' % MTEST)
@@ -237,8 +247,9 @@ def assemble(org):
     dataa = open(os.path.join(d, 'ra.bin'), 'rb').read() if WINDOWS else b''
     data7 = open(os.path.join(d, 'r7.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'r7.bin')) else b''
     datah = open(os.path.join(d, 'h.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'h.bin')) else b''
-    global DATAM
+    global DATAM, DATAZ
     DATAM = open(os.path.join(d, 'm.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'm.bin')) else b''
+    DATAZ = open(os.path.join(d, 'z.bin'), 'rb').read() if os.path.exists(os.path.join(d, 'z.bin')) else b''
     msg = [l for l in r.stdout.splitlines() if l.startswith('raster')]
     shutil.rmtree(d, ignore_errors=True)
     return syms, (data, dataa, data7, datah), ('; '.join(msg))
@@ -267,6 +278,7 @@ class Machine(tr.Machine):
         r7 = self.syms.get('r7_start', 0x8000) - 0x8000
         b7[r7:r7 + len(data7)] = list(data7)
         b7[MTEST - 0x8000:MTEST - 0x8000 + len(DATAM)] = list(DATAM)
+        self.mem[ZTEST:ZTEST + len(DATAZ)] = list(DATAZ)
         for n in range(512):
             self.mem[MG['QSL'] + n] = (n * n // 4) & 255
             self.mem[MG['QSH'] + n] = (n * n // 4) >> 8
@@ -719,8 +731,8 @@ def beach_rows(self, f, spans, cx, cy, rad):
 
 
 def test_pfhook(self, n):
-    """PF_HOOK on random crater and meridian planets: the class, and the rows
-    (PC_ROWS) against the model of its style's circles"""
+    """PF_HOOK on random crater and meridian planets: the class, the moon, and
+    the rows (PC_ROWS) against the model of its style's circles"""
     rnd, m, mem = self.rnd, self.m, self.m.mem
     self.set_clip((1, 254, 1, 191))
     for i in range(n):
@@ -730,10 +742,64 @@ def test_pfhook(self, n):
         cx = rnd.randrange(-60, 316)
         cy = rnd.randrange(-60, 252)
         qq2 = [rnd.randrange(256) for _ in range(6)]
-        inwk, base, recs, on, c1 = self._pfhook(vecs, typ, r, cx, cy, qq2)
+        if rnd.random() < 0.5:          # (a moon: h bits 0-1 = 1)
+            qq2[5] = (qq2[5] & 0xFC) | ((1 ^ qq2[1] ^ qq2[3]) & 3)
+        pz = rnd.randrange(24576 * 256 // max(r, 1) // 2, 24576 * 256 // max(r, 1) * 2 + 1)
+        pz = min(pz, (1 << 23) - 1)
+        pos = [max(-(1 << 23) + 1, min((1 << 23) - 1, c)) for c in
+               ((cx - 128) * pz // 256 + rnd.randrange(-300, 301), (96 - cy) * pz // 256 + rnd.randrange(-300, 301), pz)]
+        mem[MG['FRIN'] + 1] = rnd.choice((129, 2))
+        k1 = MG['K%'] + 37
+        sz = rnd.randrange(1 << 23)
+        mem[k1 + 6], mem[k1 + 7], mem[k1 + 8] = sz & 255, (sz >> 8) & 255, (sz >> 16) | rnd.choice((0, 0, 0x80))
+        # the moon's place (MN_E, MN_TURN's: the coordinates, up to 5.25 radii
+        # out on each axis; or unknown, MN_OK clear) and the view
+        E = None if rnd.random() < 0.1 else [rnd.randrange(-129024, 129025) for _ in range(3)]
+        view = rnd.randrange(4)
+        mem[MG['VIEW']] = view
+        mem[self.m.syms['MN_OK']] = 0 if E is None else 0xFF
+        for j, v in enumerate(E or [0, 0, 0]):
+            v &= 0xFFFFFF
+            mem[self.m.syms['MN_E'] + 3 * j:self.m.syms['MN_E'] + 3 * j + 3] = [v & 255, (v >> 8) & 255, v >> 16]
+        inwk, base, recs, on, c1 = self._pfhook(vecs, typ, r, cx, cy, qq2, pos)
+        self._check_moon(inwk, qq2, typ, cx, cy, r, E, view)
         if on:
             self._pfrows(base, recs, cx, cy, r, 'PF_HOOK (type %d centre %d,%d r %d)' % (typ, cx, cy, r))
-    return '%d planets' % n
+    return '%d moons' % len(self.stats.get('moons', []))
+
+
+def _check_moon(self, inwk, qq2, typ, cx, cy, r, E=None, view=0):
+    """PF_HOOK's moon (MN_ON ...) against the model's, and its crater's rows
+    (PC_MROWS) on its disc"""
+    m, mem = self.m, self.m.mem
+    pz = mem[MG['INWK'] + 6] | (mem[MG['INWK'] + 7] << 8) | ((mem[MG['INWK'] + 8] & 0x7F) << 16)
+    sunz = None
+    if mem[MG['FRIN'] + 1] == 129 and not mem[MG['K%'] + 37 + 8] & 0x80:
+        k = MG['K%'] + 37
+        sunz = mem[k + 6] | (mem[k + 7] << 8) | (mem[k + 8] << 16)
+    want = PCM.pf_moon(inwk, qq2, cx, cy, r, pz, sunz, E, view) if 6 <= r < 256 else None
+    s = m.syms
+    on = mem[s['MN_ON']]
+    if want is None:
+        if on & 0x80:
+            raise AssertionError('PF_HOOK: a moon the model has not (r %d)' % r)
+        return
+    w16 = lambda a: (mem[a] | (mem[a + 1] << 8)) - (0x10000 if mem[a + 1] & 0x80 else 0)
+    got = dict(on=on, x=w16(s['MN_X']), y=w16(s['MN_Y']), r=mem[s['MN_R']], z16=mem[s['MN_Z']] | (mem[s['MN_Z'] + 1] << 8))
+    exp = dict(on=0x80 | (0x40 if want['behind'] else 0) | (0x20 if want['behindsun'] else 0), x=want['x'], y=want['y'], r=want['r'], z16=want['z16'])
+    if got != exp:
+        raise AssertionError('PF_HOOK moon: %s, the model %s' % (got, exp))
+    self.stat('moons', 1)
+    if want['cap'] is None:
+        return
+    mx, my, mr = want['x'], want['y'], want['r']
+    spans = _game_spans(mx, my, mr)
+    if not spans:
+        return
+    ndt, ndb, ndl, ndr = _spans_in(m, spans)
+    m.call(s['PC_MROWS'], bank=7)
+    base, recs = _body(mx, my, mr, 0, [want['cap']])
+    _check_rows(m, PCM.body_rows(base, recs, ndt, ndb, ndl, ndr), ndt, ndb, 'PC_MROWS')
 
 
 def cap_rows(self, f, spans, cx, cy, rad):
@@ -1177,6 +1243,7 @@ tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
 tr.Tester.test_caps = test_caps
 tr.Tester.test_pfhook = test_pfhook
+tr.Tester._check_moon = _check_moon
 tr.Tester.cap_rows = cap_rows
 if os.path.exists(MERID):
     tr.EXTRA += [('merid', 'test_merid', 400, ()), ('beachball', 'test_frames', 44, ('beachball',)),

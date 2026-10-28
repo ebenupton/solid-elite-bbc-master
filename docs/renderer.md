@@ -110,12 +110,13 @@ back buffer, two frames old:
    extent and the new span, write the disc's colour where it is not
    already right, and black where something old is no longer covered. Then
    the second disc, the smaller and further one, where the layer leaves
-   room (see "The sun near the planet").
+   room (see "The sun near the planet"), and the moon, if the system has
+   one (see "The moon").
 4. Fill the ships far to near, each face a dithered polygon in its lit
    colour, with their details and fins. Then draw the lines and the
    particles. All of these extend this buffer's dirty extent for each row.
-   A ship further away than the planet, with the first vertex of its first
-   visible face inside the planet's disc, is not drawn (`f_behind`).
+   A ship further away than the planet (or the moon), with the first vertex
+   of its first visible face inside its disc, is not drawn (`f_behind`).
    `F_PLANET` records the planet's z for this as 16 bits; a planet 65536 or
    more away (z's third byte non-zero) is recorded as `&FFxx`, further than
    any ship drawn with faces (always nearer than 4096). Before that fix,
@@ -156,7 +157,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| The shared workspace | main `&0E00-&1E15`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`, and what the frame reads of the moon (`gfx-planetv.asm`). Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
@@ -164,13 +165,13 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles and the moon, `PF_HOOK` and `pf_moon` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
 build. ANDY is paged in only by the trampolines: `T_POLY` and `T_LINE` page
 ROMSEL `&85`, and the rest page bank 5. The meridian window is paged in
-only by its stubs, `G_PFHOOK`, `T_CAPS`, `T_KPRE` and `T_FLARE`. `&F4` always matches
+only by its stubs, `G_PFHOOK`, `T_CAPS`, `T_MCAPS`, `T_KPRE` and `T_FLARE`. `&F4` always matches
 ROMSEL.
 
 ## The rasteriser
@@ -386,6 +387,59 @@ engine alone on random circles, and its `beachball` and `capball` frames
 feed a spinning planet's rows through `R_DISCROWS`. `6-harness/mplanet.mjs`
 poses planet scenes and dumps each frame with the planet routines' cycles,
 for `2-build-files/planetvis.py` to render.
+
+## The moon
+
+A quarter of the systems (by the seed: `h` = `s0_hi EOR s1_hi EOR s2_hi`,
+bits 0-1 = 1) have a moon. It is scenery only: no ship slot, no random
+number, no saved state. It is 0.19 to 0.28 of the planet's radius, drawn
+for planets of radius 16 or more, light grey (equal parts of the four
+inks) with a dark grey crater on `roofv`, 40 degrees across, from a moon
+radius of 10 (a circle record of the engine in slot `PCMAX`, its rows made
+by `PC_MROWS` through `T_MCAPS`).
+
+**Its place** is a point fixed in space, as `S_SUN` keeps the sun: `MN_TURN`
+(`gfx-ssun.asm`, bank 4, game context) keeps E = moon - planet (`MN_E`,
+24-bit two's complement, in the shared workspace beside `S_SUN`'s D) and
+turns it with our roll and pitch once an iteration by `MV40` itself
+(`ss_turnx`), at the first call with a new `MCNT`: `G_PFHOOK`, before the
+planet's detail, or `S_SUN` after the iteration. E is made in the first
+iteration after we arrive or launch, when the planet still has `ZINF`'s
+orientation: on its spin axis, (-1, 0, -1) / sqrt(2), on the side the seed
+gives, 3 to 5.25 radii out. The planet's own spin axis would not do, as
+`TIDY` renormalises its orientation every 16 iterations with one-byte
+precision, turning the axis by up to 3 degrees at a time. `MN_OK` is
+cleared in witchspace, with no planet, while docked and when `QQ2` changes.
+
+**Drawn.** `pf_moon` (`gfx-planet7.asm`, bank 7, from `PF_HOOK`) projects
+planet + E in the view's axes as `PLUT` has them; the moon is behind the
+planet if E's z is positive, and behind the sun if further than it. What
+the frame reads (`MN_ON`, `MN_X`, `MN_Y`, `MN_R`, `MN_Z` ...,
+`gfx-planetv.asm`) is in the shared workspace. The frame layer's `f_moon`
+draws it as a third disc after the sun and the planet, less their spans
+where they are in front, and `f_behind` hides a ship further than the moon
+whose first vertex is inside its disc. It is drawn incrementally: each
+buffer keeps the moon as it drew it (`MO_ON` ... `MO_CB`), and only the rows
+that changed since that buffer's last frame are drawn:
+
+* the same place, size and depth: a plain row only where this frame wrote
+  over it (the written extents), a crater row whole, as the crater turns
+  with the planet;
+* moved, resized, its depth changed, or gone: `f_moon0`, before the disc
+  layer, puts the old moon into the dirty extents, so the layer's repair
+  restores what was under it, and the moon is drawn whole.
+
+Its writes go through `T_WSPAN` (`R_WSPAN`, bank 5: a span noted in the
+written extents, as `R_DISC2`'s are, never in the dirty ones). A still
+moon costs 29% less than one drawn whole each frame.
+
+`test_raster.py`'s `pfhook` test checks the moon (`MN_ON`, `MN_X`, `MN_Y`,
+`MN_R`, `MN_Z` against `planet_caps.py`'s `pf_moon`, with random E, views
+and positions) and its crater's rows. `6-harness/mmoonpath.mjs` records a
+long turning flight in a moon system, and `2-build-files/moonpath.py`
+checks it: over 1,600 iterations |E| stays within 0.8%, its angle to the
+station less the planet within about 0.3 degrees, and the drawn centre
+within 1.4 pixels of planet + E projected.
 
 ## The sun near the planet
 

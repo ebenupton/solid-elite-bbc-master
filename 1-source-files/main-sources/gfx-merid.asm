@@ -47,10 +47,10 @@
 \     pc_inv. It uses Elite's zero page &10-&28, which PF_HOOK saves, and
 \     reads main RAM only for the quarter squares (QSL, QSH);
 \
-\   * PC_ROWS (the planet's records), in the frame (bank 6's f_bounds,
-\     through T_CAPS): the disc
+\   * PC_ROWS (the planet's records) and PC_MROWS (the moon's), in the frame
+\     (bank 6's f_bounds and f_moon, through T_CAPS and T_MCAPS): the disc
 \     layer's boundaries for rows R_NDT..R_NDB (spans R_NDISCL..R_NDISCR).
-\     It uses the rasteriser's scratch zero page &10-&27 (F_FRAME has saved
+\     They use the rasteriser's scratch zero page &10-&27 (F_FRAME has saved
 \     it).
 \
 \ ******************************************************************************
@@ -79,7 +79,7 @@ R_T2  = 21              \ are toggled, and from T2 those in M2 (0..192)
 R_M1  = 22
 R_M2  = 23              \ (M1 and M2 last: pr_c + RSZ follows them)
 RSZ   = 24
-PCMAX = 3               \ the planet's records (slots 0-2)
+PCMAX = 3               \ the planet's records (slots 0-2; the moon's in slot 3)
 
 \ ******************************************************************************
 \
@@ -94,7 +94,7 @@ PCMAX = 3               \ the planet's records (slots 0-2)
  RTS
 .pc_circ
  LDA PC_N
- CMP #PCMAX
+ CMP #PCMAX+1
  BCS pcc9
  STZ pc_t
  LDX #0                 \ the magnitudes >> 2 (pf_tilt's halved vectors: the
@@ -1091,13 +1091,13 @@ PCMAX = 3               \ the planet's records (slots 0-2)
  RTS
 \ ******************************************************************************
 \
-\ PC_ROWS (the planet: slots 0 .. PC_N - 1, base colour pc_inv): the disc
-\ layer's boundaries
+\ PC_ROWS (the planet: slots 0 .. PC_N - 1, base colour pc_inv), PC_MROWS
+\ (the moon: slots PCMAX .. MN_N - 1, MN_INV): the disc layer's boundaries
 \ for rows R_NDT..R_NDB (spans R_NDISCL..R_NDISCR). Every row starts with
 \ no boundary and the base colour; then each record in turn: its left limb's
 \ toggles flip the start colour of the rows from T1 or T2 down, and, unless
 \ every row is wholly outside its region, its rows from Yc out, down and up.
-\ Called by f_bounds (bank 6) through T_CAPS, during
+\ Called by f_bounds and f_moon (bank 6) through T_CAPS and T_MCAPS, during
 \ the frame, with this bank paged; it uses the rasteriser's scratch zero page
 \ &10-&27 (F_FRAME has saved it).
 \
@@ -1121,6 +1121,11 @@ ZC  = &24               \ the row's centre, ceil(C)
 ZS  = &26               \ s = round(sqrt(D(k)))
 ZSS = &27               \ the half-chord used: s, or 0 once past
 
+.PC_MROWS
+ LDX #PCMAX
+ LDY MN_N
+ LDA MN_INV
+ BRA pcr0
 .PC_ROWS
  LDX #0
  LDY PC_N
@@ -1754,7 +1759,7 @@ pr_ke  = pm_P + 17      \ the next k at which they change
 pr_lc  = pm_P + 18      \ the left limb's toggles (pr_nx): how many, their rows
 pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
 
-.pcb_o  EQUB 0, RSZ, 2*RSZ, 3*RSZ \ the slots' offsets in PCB (and the end)
+.pcb_o  EQUB 0, RSZ, 2*RSZ, 3*RSZ, 4*RSZ \ the slots' offsets in PCB (and the end)
 .PC_N   EQUB 0          \ the planet's records this frame
 .pc_inv EQUB 0          \ its base colour (the style's EOR its records')
 .pcbx   EQUW 0          \ the body: its centre and radius
@@ -1764,4 +1769,4 @@ pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
 .pcc    EQUB 0          \ the circle's cosine (0.8) and its sign (bit 7)
 .pcneg  EQUB 0
 .pcn    EQUW 0          \ 2^24 / the axis' nominal length (>> 3)
-.PCB    SKIP RSZ * PCMAX    \ the records: the planet's
+.PCB    SKIP RSZ * (PCMAX + 1)  \ the records: the planet's, and the moon's crater

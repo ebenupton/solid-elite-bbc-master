@@ -60,7 +60,7 @@ routine of the game stays at its place in the original's source.
    * The frame layer is bank 6.
    * The meridian window is bank 7 after the cold pass: the circle engine
      that makes the planet's surface detail and its styles (the beach
-     ball, the craters, the bands), the kept solid rows' polygon part and the lens
+     ball, the craters, the bands) and the moon, the kept solid rows' polygon part and the lens
      flare, which need about 5K that none of the others has. Only their
      stubs page it in.
    The renderer's routines that run in game context, `S_SUN` (the sun near
@@ -284,7 +284,7 @@ address range.
 | stubs out of the cold pass (`.x4_LL5`, `.j4_BEGIN`; `STUBS4`) | the glue area | 57 | bank 4 in, then bank 7 back |
 | `TTX66M` | the glue area (`elite-stubs.asm`) | 1 | bank 4 in, then the caller's bank back |
 | `G_` stubs | the glue area (`gfx-gstubs.asm`; `G_CHAR`, `G_DELCHAR` and `G_CLRTEXT` in `gfx-gluehooks.asm`) | 16 | bank 6 in (bank 7 for `G_PFHOOK`, the meridian window), then bank 4 back (or the caller's bank, for the text stubs) |
-| `T_` trampolines | the glue area (`gfx-tramp.asm`) | 13 | the rasteriser in (ROMSEL `&85` for `T_POLY` and `T_LINE`, bank 5 for most of the rest) or the meridian window (bank 7, for `T_CAPS`, `T_KPRE` and `T_FLARE`, which then makes its bank 5 calls), then bank 6 back |
+| `T_` trampolines | the glue area (`gfx-tramp.asm`) | 13 | the rasteriser in (ROMSEL `&85` for `T_POLY` and `T_LINE`, bank 5 for most of the rest) or the meridian window (bank 7, for `T_CAPS`, `T_MCAPS`, `T_KPRE` and `T_FLARE`, which then makes its bank 5 calls), then bank 6 back |
 
 **Which side a routine is on** is measured: for each cold block, the calls
 across the line that moving it hot would remove and the calls it would
@@ -313,18 +313,18 @@ line.
 |---|---|---|
 | Zero page, stack, `K%` | `&0000-&00E3`, `&0100-&01FF`, `&0400-&07FF` | as in the original |
 | `WP` | main `&0841-&0CCE` | Elite's workspace, the original's `&0E41-&12A9` moved down by `&600` (each byte keeps its place in its page), with the commander file buffer `commbuf` (`LSX2`) at `&087E`; then the CMYK dashboard's variables (`DASHV`), as the dashboard runs with ACCCON X set, and `VEC` (`&0CCF`), the configuration's last block |
-| The shared workspace | main `&0E00-&1DED` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
-| The glue area | main from `CODE%` (`&1E13`) to `&2868` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
-| The low pass | main `&2869-&2E48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
-| The hot pass, in main RAM | main `&2E49-&3F88` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
+| The shared workspace | main `&0E00-&1E15` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
+| The glue area | main from `CODE%` (`&1EE8`) to `&2968` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
+| The low pass | main `&2969-&2F48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
+| The hot pass, in main RAM | main `&2F49-&3FC5` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
-| Bank 4 | `&8000-&BDC6` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B6E4`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routines that run in game context, `S_SUN` (`gfx-ssun.asm`) and `L_SUN` (`gfx-light.asm`'s first pass, `&B6E4-&BDC6`) |
+| Bank 4 | `&8000-&BF0D` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B799`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routines that run in game context, `S_SUN` (`gfx-ssun.asm`) and `L_SUN` (`gfx-light.asm`'s first pass, `&B799-&BF0D`) |
 | Bank 7, the cold pass | `&8000-&A3A8` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens, `TKN1` |
-| Bank 7, the meridian window | `&A3A9-&B7BB` (its own image, `MERID`) | the planet's surface detail (`gfx-merid.asm`, the circle engine: `pc_circ`, `PC_ROWS` and their workspace; `gfx-planet7.asm`, the styles: `PF_HOOK`), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`), then the lens flare (`gfx-flare.asm`: `R_FLARE`, its tables, its half-width table `fl_htab` and its variables) |
+| Bank 7, the meridian window | `&A3A9-&BB3D` (its own image, `MERID`) | the planet's surface detail (`gfx-merid.asm`, the circle engine: `pc_circ`, `PC_ROWS` and their workspace; `gfx-planet7.asm`, the styles: `PF_HOOK`), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`), then the lens flare (`gfx-flare.asm`: `R_FLARE`, its tables, its half-width table `fl_htab` and its variables) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FDA` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
-| Bank 5, the rasteriser | `&8000-&8F3D` (ROMSEL 5), `&9000-&BF00` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`, then the second disc's right ends for buffer 0, `R_S2R0`, at `&8F40`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; then the second disc, `R_DISC2`, `gfx-raster_disc2.asm`, and its right ends for buffer 1, `R_S2R1`, at `&BF40`); its left ends, `R_S2L0` and `R_S2L1`, at `&9A00` and `&9B00`, and in the room below the per-x tables, `&98D8-&9993`, R_LINE's cold part (`gfx-raster_lcold.asm`) and then the rasteriser's private state, `R_PRBUF` to `R_PRCWB` |
-| Bank 6, the frame layer | `&8000-&B8E7` | `gfx-frame.asm`, `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm` (its second pass, `L_REC`), `gfx-frame_cold.asm`, `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the half-widths, the display list (with `F_INIT`, `gfx-finit.asm`), the text map, the cells' shown states and the directly drawn stars; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
+| Bank 5, the rasteriser | `&8000-&8F3D` (ROMSEL 5), `&9000-&BF38` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`, then the second disc's right ends for buffer 0, `R_S2R0`, at `&8F40`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; then the second disc, `R_DISC2`, `gfx-raster_disc2.asm`, and its right ends for buffer 1, `R_S2R1`, at `&BF40`); its left ends, `R_S2L0` and `R_S2L1`, at `&9A00` and `&9B00`, and in the room below the per-x tables, `&98D8-&9993`, R_LINE's cold part (`gfx-raster_lcold.asm`) and then the rasteriser's private state, `R_PRBUF` to `R_PRCWB` |
+| Bank 6, the frame layer | `&8000-&BE27` | `gfx-frame.asm`, `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm` (its second pass, `L_REC`), `gfx-frame_cold.asm`, `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the half-widths, the display list (with `F_INIT`, `gfx-finit.asm`), the text map, the cells' shown states and the directly drawn stars; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
 | HAZEL | `&C000-&DA38` | the hot data in the original's order: `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints (without their edge lists), `QQ18`, `SNE`, `ACT`, then `RUPLA`, `RUGAL` and `RUTOK`. `&DF00-&DFFF` is the MOS's |
 | Shadow `&3000-&3FFF` | `&3090-&30FF` | the zero-page save (`setzp`, `getzp`), as in the original; nothing else |
 | Buffer 1, the dashboard | shadow `&4000-&7DFF` | the screen |
@@ -334,15 +334,16 @@ that does not fit goes on to the next container. `TACTICS`, whose seven
 parts branch into one another and so move as a whole, leads the second.
 `3-assembled-output/flow.txt` lists every unit.
 
-Free space: 119 bytes below `&4000` and 194 below `&8000` (each the end of
-one of the hot pass's containers in main RAM), 569 at the end of bank 4,
-2,116 at the end of bank 7, 1,223 in HAZEL, 2 and 63 in bank 5 (before the
+Free space: 58 bytes below `&4000` and 194 below `&8000` (each the end of
+one of the hot pass's containers in main RAM), 242 at the end of bank 4,
+1,218 at the end of bank 7, 1,223 in HAZEL, 2 and 7 in bank 5 (before the
 second disc's `R_S2R0` and `R_S2R1`; and 42 below the per-x tables, 64
 after each of `R_S2L0` and `R_S2L1`, and 256 in the row runs' tails), 37
-in ANDY, 1,816 in bank 6, and 48 and 44 in `WP`'s pages and the shared
-workspace, with 37 more between it and the main code. `CODE%` (now
-`&1E13`) is chosen to keep the font page aligned as the glue area grows or
-shrinks, so nothing after the glue area moves.
+in ANDY, 472 in bank 6, and 48 and 44 in `WP`'s pages and the shared
+workspace, with 210 more between it and the main code. `CODE%` (now
+`&1EE8`) is chosen to keep the font page aligned with no padding as the
+glue area grows or shrinks (the moon's glue moved the font up a page, the
+hot pass's container in main RAM giving the room).
 
 The three passes cost 373 free bytes outside shadow RAM. The stubs between
 the passes are 884 bytes, against the far calls' 184, all in the glue area
@@ -384,7 +385,7 @@ place, using its table `FTAB`:
 * HICODE goes to main `&7000-&7FFF`.
 
 Then it loads BCODE (the glue area, the low pass and the hot pass's first
-container) to its address (`&1E13`) and changes directory to E. The
+container) to its address (`&1EE8`) and changes directory to E. The
 loader is in the shared workspace's place, so its last part runs from `K%`
 (`&0400`), where it is copied first. That part takes DFS's and the MOS's
 lasting bytes into `DFSST` and `DFSST2`, copies HAZEL into place, quietens the 1770 and

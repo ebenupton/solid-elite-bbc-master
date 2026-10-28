@@ -748,8 +748,11 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 .ffb0
 
  JSR T_STARERASE        \ undo last time's stars in this buffer
+ JSR f_moon0            \ the moon: what this buffer shows of it (before
+                        \ the layer's repair)
  JSR f_discs            \ the disc layer (sun or planet), incremental
  JSR f_disc2            \ the other disc, if both are on screen (incremental)
+ JSR f_moon             \ the moon, if any (incremental)
 .ff_lin                 \ (F_HANGAR points this call at f_hback for its frame)
  JSR f_lines            \ planet meridians, craters, enemy lasers
  JSR f_ships            \ filled ships, far to near
@@ -792,6 +795,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA F_NDOT
  STA F_PLON
  STA GSUNON
+ STA MN_ON
  LDA #LO(F_DL)
  STA F_DLP
  LDA #HI(F_DL)
@@ -886,6 +890,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  LDA #1                 \ buffer 1's state: empty (TTX66 blacked it)
  STA F_BACK
  STZ F_SGS+1
+ STZ MO_ON+1            \ (no moon in it)
  JSR T_SETBUF
  JSR T_RESETBUF
  LDA #&FF
@@ -2768,21 +2773,673 @@ FC_PLLE = &5F : FC_PLLO = &AF
  RTS
 
 \ ------------------------------------------------------------------------------
-\ f_behind: is ship f_si behind the planet, with the first vertex of its first
-\ visible face inside the planet's disc? C set if so (don't draw it)
+\ The moon (gfx-planet7.asm's pf_moon makes it in game context: MN_ON, MN_X,
+\ MN_Y, MN_R, MN_Z, its crater in the caps' slot PCMAX): a third disc after
+\ the sun and the planet (f_discs, f_disc2), light grey with a dark grey
+\ crater, its rows hidden where the planet or the sun is in front of it
+\ (MN_ON bits 6 and 5: the moon further than they). Ships further than the
+\ moon and inside its disc are hidden (f_behind).
+\
+\ It is drawn incrementally: each buffer keeps where it drew the moon (MO_ON
+\ ..., in the shared workspace: its centre, radius and depth bits, its rows
+\ and its crater's rows), and only the rows that have changed since that
+\ buffer's last frame are drawn again:
+\
+\   * the same place, size and depth (fm_md 1): a row with no crater, old or
+\     new, only where this frame wrote over it (R_WL..R_WR, read before the
+\     moon's own writes: the layer's repair of shapes drawn over the moon,
+\     the layer's and the second disc's own changes); the crater's rows, old
+\     or new, whole (the crater turns with the planet);
+\   * moved, resized, its depth changed or gone (every row changed): f_moon0,
+\     before the disc layer, puts the old moon's spans into DIRTY (its box's
+\     rows, if F_HW3 no longer has its radius's half-widths) for the layer's
+\     repair to restore in this frame, and the moon is drawn whole
+\     (fm_md 0, as with nothing of it in this buffer).
+\
+\ Its writes go through T_WSPAN, into R_WL/R_WR (for the text and the
+\ sights, and for the moon itself next time), never into DIRTY.
+\ ------------------------------------------------------------------------------
+
+.f_moon0
+ STZ fm_md
+ LDX F_BACK
+ BIT MO_ON,X
+ BPL fm09               \ (none in this buffer)
+ BIT MN_ON
+ BPL fm0d               \ gone
+ LDA MN_ON
+ EOR MO_ON,X
+ AND #&60
+ BNE fm0d               \ its depth changed
+ LDA MN_R
+ CMP MO_R,X
+ BNE fm0d               \ resized
+ LDY #0                 \ (MN_X, MN_Y against MO_XL ... MO_YH)
+.fm0c
+ LDA MN_X,Y
+ CMP MO_XL,X
+ BNE fm0n
+ INX
+ INX
+ INY
+ CPY #4
+ BNE fm0c
+ INC fm_md              \ the same (1)
+.fm09
+ RTS
+.fm0n
+ LDX F_BACK             \ (moved)
+.fm0d                   \ the old box, x +/- r on rows MO_T .. MO_B, into DIRTY
+ LDA MO_XL,X
+ SEC
+ SBC MO_R,X
+ STA fz_t
+ LDA MO_XH,X
+ SBC #0
+ JSR fm_clamp
+ STA fm_l
+ LDA MO_XL,X
+ CLC
+ ADC MO_R,X
+ STA fz_t
+ LDA MO_XH,X
+ ADC #0
+ JSR fm_clamp
+ STA fm_r
+ LDA MO_T,X
+ STA fm_y
+.fm0l
+ LDX F_BACK
+ LDY fm_y
+ TYA
+ CMP MO_B,X
+ BEQ fm0k
+ BCS fm0z
+.fm0k
+ LDA fm_l               \ the box's row, or the old span's when F_HW3 holds
+ STA R_XL               \ the old radius's half-widths
+ LDA fm_r
+ STA R_XR
+ LDA MO_R,X
+ CMP f_hw3r
+ BNE fm0w
+ TYA                    \ |y - old y|, and the half-width there (none: the row
+ SEC                    \ is skipped)
+ SBC MO_YL,X
+ STA fz_t
+ LDA #0
+ SBC MO_YH,X
+ JSR f_abs16
+ BCS fm0j
+ CMP MO_R,X
+ BEQ P%+4
+ BCS fm0j
+ TAY
+ LDA F_HW3,Y
+ STA fz_n
+ LDA MO_XL,X            \ x - n .. x + n, clamped
+ SEC
+ SBC fz_n
+ STA fz_t
+ LDA MO_XH,X
+ SBC #0
+ JSR fm_clamp
+ STA R_XL
+ LDA MO_XL,X
+ CLC
+ ADC fz_n
+ STA fz_t
+ LDA MO_XH,X
+ ADC #0
+ JSR fm_clamp
+ STA R_XR
+ LDY fm_y
+.fm0w
+ JSR T_MARKDIRTY
+.fm0j
+ INC fm_y
+ BNE fm0l
+.fm0z
+ LDX F_BACK             \ (and forget it)
+ STZ MO_ON,X
+ RTS
+
+\ fm_clamp: the 16-bit x (A high, fz_t low) clamped to R_CL .. R_CR
+
+.fm_clamp
+ TAY
+ BMI fmc_l
+ BNE fmc_r
+ LDA fz_t
+ CMP R_CL
+ BCC fmc_l
+ CMP R_CR
+ BCC fmc9
+.fmc_r
+ LDA R_CR
+ RTS
+.fmc_l
+ LDA R_CL
+.fmc9
+ RTS
+
+.f_moon
+ BIT MN_ON
+ BMI fmn0
+ LDX F_BACK             \ none (f_moon0 has put any old one into DIRTY)
+ STZ MO_ON,X
+ RTS
+.fmn0
+ LDA MN_X
+ STA f_cx
+ LDA MN_X+1
+ STA f_cxh
+ LDA MN_Y
+ STA f_cy
+ LDA MN_Y+1
+ STA f_cy+1
+ LDA MN_R
+ STA f_r
+ CMP f_hw3r
+ BEQ fmn1
+ STA f_hw3r
+ LDA #LO(F_HW3)
+ STA fhw_st+1
+ LDA #HI(F_HW3)
+ STA fhw_st+2
+ JSR f_hwbuild
+.fmn1
+ LDA #LO(F_HW3)
+ STA fpr_ld+1
+ STA fpr_ld2+1
+ LDA #HI(F_HW3)
+ STA fpr_ld+2
+ STA fpr_ld2+2
+ JSR f_discspans
+ LDA #255               \ its crater's rows: fm_ct .. fm_cb (none: 255, 0)
+ STA fm_ct
+ STZ fm_cb
+ LDY R_NDT
+ CPY R_NDB
+ BEQ fmn2
+ BCS fmn4               \ (no rows on the screen)
+.fmn2
+ JSR T_MCAPS            \ (its crater's boundaries, as the planet's)
+ LDY R_NDT
+.fmn3
+ LDA R_NDN,Y
+ BNE fmn3a
+ LDA R_NDP,Y
+ LSR A
+ BCC fmn3b
+.fmn3a
+ CPY fm_ct
+ BCS P%+5
+ STY fm_ct
+ STY fm_cb
+.fmn3b
+ CPY R_NDB
+ INY
+ BCC fmn3
+.fmn4
+ LDX F_BACK             \ the rows: the new ones, and the old ones when
+ LDA R_NDT              \ fm_md is 1 or 2
+ STA fm_y
+ LDA R_NDB
+ STA fm_hi
+ LDA fm_md
+ BEQ fmn5
+ LDA MO_T,X
+ CMP fm_y
+ BCS P%+5
+ STA fm_y
+ LDA MO_B,X
+ CMP fm_hi
+ BCC fmn5
+ STA fm_hi
+.fmn5
+ LDA fm_y
+ CMP fm_hi
+ BEQ fmn6
+ BCS fmn7
+.fmn6
+ JSR fm_row
+ INC fm_y
+ BNE fmn5
+.fmn7
+ LDX F_BACK             \ what this buffer now shows
+ LDA MN_ON
+ AND #&60
+ ORA #&80
+ STA MO_ON,X
+ LDY #0                 \ (MN_X, MN_Y, MN_R to MO_XL ... MO_R)
+.fmn8
+ LDA MN_X,Y
+ STA MO_XL,X
+ INX
+ INX
+ INY
+ CPY #5
+ BNE fmn8
+ LDX F_BACK
+ LDA R_NDT
+ STA MO_T,X
+ LDA R_NDB
+ STA MO_B,X
+ LDA fm_ct
+ STA MO_CT,X
+ LDA fm_cb
+ STA MO_CB,X
+ RTS
+
+\ fm_row: row fm_y. fm_sp: its old span a0, b0, its new one a1, b1, and the
+\ old one again (empty: 255, 0); fm_wl .. fm_wr: what this frame wrote over
+\ it before the moon (R_WR = 0: nothing)
+
+.fm_row
+ LDY fm_y
+ LDA R_WL,Y
+ STA fm_wl
+ LDA R_WR,Y
+ STA fm_wr
+ LDA #255
+ STA fm_sp
+ STA fm_sp+2
+ STZ fm_sp+1
+ STZ fm_sp+3
+ CPY R_NDT              \ the new span
+ BCC fr1
+ LDA R_NDB
+ CMP fm_y
+ BCC fr1
+ LDA R_NDISCL,Y
+ STA fm_sp+2
+ LDA R_NDISCR,Y
+ STA fm_sp+3
+.fr1
+ LDA fm_md              \ the old (0: none: the row whole)
+ BEQ frw
+ LDX F_BACK
+ TYA
+ CMP MO_T,X
+ BCC fr3
+ CMP MO_B,X
+ BEQ fr1a
+ BCS fr3
+.fr1a
+ LDA fm_sp+2            \ (the same)
+ STA fm_sp
+ LDA fm_sp+3
+ STA fm_sp+1
+.fr3
+ CPY fm_ct              \ a crater row, new or old: the row whole
+ BCC fr4
+ TYA
+ CMP fm_cb
+ BEQ frw
+ BCC frw
+.fr4
+ LDX F_BACK
+ TYA
+ CMP MO_CT,X
+ BCC fr5
+ CMP MO_CB,X
+ BEQ frw
+ BCC frw
+.fr5                    \ a plain row, the same: what was written over it,
+ LDA fm_wr              \ light grey
+ BEQ fr9
+ LDA fm_wl
+ CMP fm_sp+2
+ BCS P%+5
+ LDA fm_sp+2
+ PHA
+ LDA fm_wr
+ CMP fm_sp+3
+ BCC P%+5
+ LDA fm_sp+3
+ TAX
+ PLA
+ LDY #0
+ JMP fm_iv
+.fr9
+ RTS
+.frw                    \ the row whole: the new span's pieces in the moon's
+ LDA fm_sp+3            \ colours
+ CMP fm_sp+2
+ BCC fr9
+ STA fm_pb
+ LDA fm_sp+2
+ STA fm_pa
+ LDA #1
+ STA fm_n
+ JSR fm_occs
+ LDX #0
+.frw1
+ CPX fm_n
+ BCS fr9
+ STX fm_i
+ JSR fm_paint
+ LDX fm_i
+ INX
+ BRA frw1
+
+\ fm_iv: pixels A .. X of row fm_y in colour Y (0 light grey), less the
+\ discs in front
+
+.fm_iv
+ STY fm_c
+ STA fm_pa
+ STX fm_pb
+ CPX fm_pa
+ BCC fmd9
+ LDA #1
+ STA fm_n
+ JSR fm_occs
+ LDX #0
+.fmv1
+ CPX fm_n
+ BCS fmd9
+ STX fm_i
+ LDA fm_pa,X
+ STA fm_a
+ LDA fm_pb,X
+ STA R_XR
+ JSR fm_span
+ LDX fm_i
+ INX
+ BRA fmv1
+.fmd9
+ RTS
+
+\ fm_occs: the pieces (fm_pa, fm_pb, fm_n of them) less the planet's and the
+\ sun's discs where they are in front of the moon
+
+.fm_occs
+ BIT MN_ON
+ BVC fos1
+ LDA F_PLON
+ BEQ fos1
+ LDX #4
+.fos0
+ LDA F_PLX,X            \ (F_PLX, F_PLY, F_PLR to fm_ox, fm_oy, fm_or)
+ STA fm_ox,X
+ DEX
+ BPL fos0
+ LDA #HI(F_HW)
+ LDX #LO(F_HW)
+ JSR fm_occ
+.fos1
+ LDA MN_ON
+ AND #&20
+ BEQ fmd9
+ LDA GSUNON
+ BEQ fmd9
+ LDX #3
+.fos2
+ LDA F_SUX,X            \ (F_SUX, F_SUY)
+ STA fm_ox,X
+ DEX
+ BPL fos2
+ LDA GSUNR
+ STA fm_or
+ LDA #HI(F_HW2)
+ LDX #LO(F_HW2)
+ JMP fm_occ
+
+\ fm_occ: the pieces less the disc (fm_ox, fm_oy, fm_or) with half-width
+\ table (X, A) (low, high), on row fm_y
+
+.fmo0
+ RTS
+.fm_occ
+ STX fmo_ld+1
+ STA fmo_ld+2
+ LDA fm_y               \ dy = y - oy, |dy| <= r
+ SEC
+ SBC fm_oy
+ STA fz_t
+ LDA #0
+ SBC fm_oy+1
+ JSR f_abs16
+ BCS fmo0
+ CMP fm_or
+ BEQ fmo1
+ BCS fmo0
+.fmo1
+ TAX
+.fmo_ld
+ LDA F_HW,X             \ (patched: the half-width table)
+ STA fz_n
+ LDA fm_ox              \ ol = ox - n, or = ox + n (16-bit), to 0..255
+ SEC
+ SBC fz_n
+ STA fm_l
+ LDA fm_ox+1
+ SBC #0
+ BMI fmo2
+ BNE fmo0               \ (ol > 255: none)
+ BEQ fmo3
+.fmo2
+ STZ fm_l
+.fmo3
+ LDA fm_ox
+ CLC
+ ADC fz_n
+ STA fm_r
+ LDA fm_ox+1
+ ADC #0
+ BMI fmo0               \ (or < 0: none)
+ BEQ fmo4
+ LDA #255
+ STA fm_r
+.fmo4
+ LDX fm_n               \ each piece less [fm_l, fm_r]: from the last
+.fmo5
+ DEX
+ BMI fmo9
+ LDA fm_pb,X
+ CMP fm_l
+ BCC fmo5               \ (b < l: kept)
+ LDA fm_pa,X
+ CMP fm_r
+ BEQ fmo6
+ BCS fmo5               \ (a > r: kept)
+.fmo6
+ LDA fm_pa,X            \ [a, l - 1] in its place if a < l, and [r + 1, b]
+ CMP fm_l               \ at the end if r < b
+ BCS fmo7
+ LDA fm_pb,X
+ PHA
+ LDA fm_l
+ DEC A
+ STA fm_pb,X
+ PLA
+ CMP fm_r
+ BEQ fmo5
+ BCC fmo5
+ LDY fm_n
+ STA fm_pb,Y
+ LDA fm_r
+ INC A
+ STA fm_pa,Y
+ INC fm_n
+ BRA fmo5
+.fmo7
+ LDA fm_pb,X            \ (a >= l: only [r + 1, b], if any)
+ CMP fm_r
+ BEQ fmo8
+ BCC fmo8
+ LDA fm_r
+ INC A
+ STA fm_pa,X
+ BRA fmo5
+.fmo8
+ LDY fm_n               \ (wholly hidden: the last piece into its place)
+ DEY
+ STY fm_n
+ LDA fm_pa,Y
+ STA fm_pa,X
+ LDA fm_pb,Y
+ STA fm_pb,X
+ BRA fmo5
+.fmo9
+ RTS
+
+\ fm_paint: piece X on row fm_y in the moon's colours: light grey from the
+\ row's start colour, flipping to dark grey and back at its boundaries
+
+.fm_paint
+ LDA fm_pa,X
+ STA fm_a
+ LDA fm_pb,X
+ STA fm_b
+ LDY fm_y
+ LDA R_NDP,Y
+ AND #1
+ STA fm_c
+ LDA R_NDN,Y
+ STA fm_k
+ LDA R_NDX0,Y
+ STA fm_x
+ LDA R_NDX1,Y
+ STA fm_x+1
+ LDA R_NDX2,Y
+ STA fm_x+2
+ LDA R_NDX3,Y
+ STA fm_x+3
+ LDX #0
+.fmp1
+ CPX fm_k
+ BCS fmp4
+ LDA fm_x,X
+ CMP fm_a
+ BEQ fmp2
+ BCS fmp3
+.fmp2
+ LDA fm_c               \ (at or left of the piece's start: a flip)
+ EOR #1
+ STA fm_c
+ BRA fmp3a
+.fmp3
+ CMP fm_b               \ inside: paint up to it, then flip
+ BEQ fmp3b
+ BCS fmp4
+.fmp3b
+ DEC A
+ STA R_XR
+ PHX
+ JSR fm_span
+ PLX
+ LDA fm_x,X
+ STA fm_a
+ LDA fm_c
+ EOR #1
+ STA fm_c
+.fmp3a
+ INX
+ BRA fmp1
+.fmp4
+ LDA fm_b
+ STA R_XR
+.fm_span                \ R_XL = fm_a .. R_XR in colour fm_c, on row fm_y
+ LDA fm_a
+ STA R_XL
+ LDX fm_c
+ LDA mn_ce,X
+ STA R_COLE
+ LDA mn_co,X
+ STA R_COLO
+ LDY fm_y
+ JMP T_WSPAN            \ (into R_WL/R_WR, not DIRTY)
+
+\ The moon's colours: light grey (C, M, Y and black in equal measure) and dark
+\ grey (one of C, M, Y in four pixels): even rows, odd rows (MODE 1 bytes:
+\ pixel i in bits 7 - i and 3 - i)
+.mn_ce EQUB &6A, &28    \ light C M Y K, dark C K M K
+.mn_co EQUB &9A, &44    \ light Y K C M, dark K Y K K
+
+.f_hw3r EQUB 0          \ the radius F_HW3 was built for
+.fm_y  EQUB 0
+.fm_i  EQUB 0
+.fm_n  EQUB 0
+.fm_pa SKIP 3
+.fm_pb SKIP 3
+.fm_ox EQUW 0
+.fm_oy EQUW 0
+.fm_or EQUB 0
+.fm_l  EQUB 0
+.fm_r  EQUB 0
+.fm_a  EQUB 0
+.fm_b  EQUB 0
+.fm_c  EQUB 0
+.fm_k  EQUB 0
+.fm_x  SKIP 4
+.fm_md EQUB 0           \ f_moon0's case: 0 whole, 1 the same, 2 moved
+.fm_hi EQUB 0           \ the last row
+.fm_ct EQUB 0           \ the new crater rows
+.fm_cb EQUB 0
+.fm_wl EQUB 0           \ the row's R_WL, R_WR before the moon's writes
+.fm_wr EQUB 0
+.fm_sp SKIP 4           \ the row's old span, new span
+
+\ ------------------------------------------------------------------------------
+\ f_behind: is ship f_si behind the planet or the moon, with the first vertex
+\ of its first visible face inside its disc? C set if so (don't draw it)
 \ ------------------------------------------------------------------------------
 
 .f_behind
- LDA F_PLON
- CMP #1                 \ C clear (not behind) if there is no planet
- BCS P%+3
- RTS
- LDX f_si               \ further away than the planet?
- LDA F_PLZL
- CMP F_SZL,X
+ LDA F_PLON             \ the planet's disc, if any
+ BEQ fbh0
+ LDX #4
+.fbhp
+ LDA F_PLX,X            \ (F_PLX, F_PLY, F_PLR)
+ STA fb_x,X
+ DEX
+ BPL fbhp
  LDA F_PLZH
+ STA fb_zh
+ LDA F_PLZL
+ STA fb_zl
+ LDA #LO(F_HW)
+ LDX #HI(F_HW)
+ JSR f_bdisc
+ BCC fbh0
+ RTS
+.fbh0
+ BIT MN_ON              \ the moon's, if any
+ BMI fbh0a
+ CLC
+ RTS
+.fbh0a
+ LDX #3
+.fbhm
+ LDA MN_X,X             \ (MN_X, MN_Y, MN_R, MN_Z)
+ STA fb_x,X
+ DEX
+ BPL fbhm
+ LDA MN_R
+ STA fb_r
+ LDA MN_Z+1
+ STA fb_zh
+ LDA MN_Z
+ STA fb_zl
+ LDA #LO(F_HW3)
+ LDX #HI(F_HW3)
+
+\ f_bdisc: is ship f_si behind the disc fb_x, fb_y, fb_r (half-widths at
+\ (A, X)), z fb_zh/fb_zl, with the first vertex of its first visible face
+\ inside it? C set if so
+
+.f_bdisc
+ STA fbh_hw+1
+ STX fbh_hw+2
+ LDX f_si               \ further away than the disc?
+ LDA fb_zl
+ CMP F_SZL,X
+ LDA fb_zh
  SBC F_SZH,X
- BCS fbh8               \ planet z >= ship z: in front
+ BCS fbh8               \ disc z >= ship z: in front
  LDY #0                 \ first visible face: its first vertex
  STY f_f
  LDA fz_ft
@@ -2810,32 +3467,33 @@ FC_PLLE = &5F : FC_PLLO = &AF
  LDY #4                 \ XX3 offset of the vertex
  LDA (fz_p),Y
  TAY
- LDA (fz_v3),Y          \ dx = x - planet x (16-bit)
+ LDA (fz_v3),Y          \ dx = x - the disc's x (16-bit)
  SEC
- SBC F_PLX
+ SBC fb_x
  STA fz_t
  INY
  LDA (fz_v3),Y
- SBC F_PLX+1
+ SBC fb_x+1
  JSR f_abs16            \ -> A = |dx| if < 256, else C set
  BCS fbh8
  STA f_bdx
  INY
- LDA (fz_v3),Y          \ dy = y - planet y
+ LDA (fz_v3),Y          \ dy = y - the disc's y
  SEC
- SBC F_PLY
+ SBC fb_y
  STA fz_t
  INY
  LDA (fz_v3),Y
- SBC F_PLY+1
+ SBC fb_y+1
  JSR f_abs16
  BCS fbh8
- CMP F_PLR              \ |dy| <= r and |dx| <= half-width(|dy|)?
+ CMP fb_r               \ |dy| <= r and |dx| <= half-width(|dy|)?
  BEQ fbh3
  BCS fbh8
 .fbh3
  TAX
- LDA F_HW,X
+.fbh_hw
+ LDA F_HW,X             \ (patched: the half-width table)
  CMP f_bdx
  BCC fbh8
  SEC
@@ -2844,6 +3502,11 @@ FC_PLLE = &5F : FC_PLLO = &AF
  CLC
  RTS
 
+.fb_x  EQUW 0           \ the disc: centre, radius (as F_PLX, F_PLY, F_PLR)
+.fb_y  EQUW 0
+.fb_r  EQUB 0
+.fb_zh EQUB 0
+.fb_zl EQUB 0
 .f_bdx EQUB 0
 
 \ f_abs16: (A fz_t) 16-bit signed -> A = |value| and C clear if < 256, else

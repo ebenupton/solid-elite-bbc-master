@@ -48,8 +48,9 @@
 
 .F_DIRECT
  LDA QQ12               \ docked: S_SUN forgets where the sun is (after a
- BEQ P%+5               \ launch it takes it from the system's seeds)
- STZ SS_OK
+ BEQ P%+8               \ launch it takes it from the system's seeds), and
+ STZ SS_OK              \ MN_TURN the moon's place (MN_TURN makes it again)
+ STZ MN_OK
  ASL GWARP              \ LOOK1's TT66 for an in-system jump (WARP) in space
  BCC fdr1               \ mode: keep double buffering and the view on show (the
  BIT GMODE              \ blank screen was all a held J ever showed). As
@@ -217,6 +218,7 @@
  CPY #&70
  BNE fbn1
  STZ F_SGS              \ no sights drawn in it
+ STZ MO_ON              \ no moon
  LDA #&FF               \ no disc colour
  STA F_DCOL
  LDA #0                 \ its rasteriser state: empty

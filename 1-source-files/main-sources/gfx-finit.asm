@@ -42,6 +42,9 @@
  STA F_NLINE
  STA F_NDOT
  STA F_PLON
+ STA MN_ON              \ (no moon: gfx-planetv.asm is not loaded)
+ STA MO_ON              \ (and no moon drawn in either buffer)
+ STA MO_ON+1
  LDX #NDSTAR-1          \ no stars recorded, no direct-mode stars noted
 .fin1
  STA R_SS,X

@@ -68,6 +68,18 @@
  JSR R_SPAN
  JMP tback
 
+.T_WSPAN                \ (R_SPAN, noting the span as written: R_WL/R_WR)
+ STA tA
+ LDA #RASTBANK
+ STA &F4
+ STA &FE30
+ BIT KMODE
+ BPL P%+5
+ JSR tk_y
+ LDA tA
+ JSR R_WSPAN
+ JMP tback
+
 .T_FLARE                \ (the lens flare, gfx-flare.asm: bank 7; X and Y
  LDA #MERIDBANK         \ passed)
  STA &F4
@@ -110,6 +122,13 @@
  STA &F4
  STA &FE30
  JSR PC_ROWS
+ JMP tback
+
+.T_MCAPS                \ (the moon's crater's rows, gfx-merid.asm: bank 7)
+ LDA #MERIDBANK
+ STA &F4
+ STA &FE30
+ JSR PC_MROWS
  JMP tback
 
 .T_POLY                 \ (R_POLY is in the rasteriser's polygon window, ANDY)

@@ -120,6 +120,8 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
                             \ %01100000 as TIDY's (L_REC, f_winding)
 .GSPLV      SKIP 4          \ part 5's XX2 for the splinter's faces (SPLV)
 .GSHT       SKIP 4          \ SHAND's workspace
+INCLUDE "1-source-files/main-sources/gfx-planetv.asm"   \ the moon's and the ring's (bank 7 writes them in
+                            \ game context, the frame layer reads them)
 .F_SUX      SKIP 2          \ the sun's centre this frame (F_PLANET from SUN, or
 .F_SUY      SKIP 2          \ S_SUN: gfx-ssun.asm), with GSUNR and GSUNON
 .FL_BEH     SKIP 1          \ bit 7: the sun is behind the planet (f_flt, for
@@ -127,8 +129,13 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
 .SS_OK      SKIP 1          \ bit 7: S_SUN knows where the sun is from the planet
                             \ (F_DIRECT clears it while we are docked)
 .ss_d       SKIP 9          \ S_SUN's D = sun - planet (x, y, z: lo, hi, top, two's
-                            \ complement), as ss_turn (MV40) turns it
-.WS_GAP                     \ (free to the main code)
+                            \ complement), then, as ss_turn (MV40) turns both alike,
+.MN_E       SKIP 9          \ the moon's place, E = moon - planet, the same way, in
+                            \ the coordinates (MN_TURN, gfx-ssun.asm; pf_moon
+                            \ and MOONHIT read it)
+.MN_OK      SKIP 1          \ bit 7: MN_E is this system's (F_DIRECT clears it
+                            \ while we are docked)
+.WS_GAP                    \ (free to the main code)
 SKIP CODE% - P%
 .WS_END
 PRINT "Shared workspace: ", ~WS_START, "-", ~WS_GAP-1, " (free ", &1000-DFSIN-1, ", ", RVBASE-R_S2C-2, ", ", KF-WS_KGAP, " and ", CODE%-WS_GAP, " to the main code at ", ~CODE%, ")"
@@ -196,6 +203,7 @@ INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HAL
 .B6_CODE_END
 .F_HW   SKIP 256        \ planet half-widths
 .F_HW2  SKIP 256        \ sun half-widths
+.F_HW3  SKIP 64         \ moon half-widths (its radius is at most 63)
 .F_DL                   \ ship records: XX2 then XX3 copies (1536 bytes)
  SKIP &22
  INCLUDE "1-source-files/main-sources/gfx-finit.asm"   \ F_INIT, run once before the first frame

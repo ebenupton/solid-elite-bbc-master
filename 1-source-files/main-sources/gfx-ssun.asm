@@ -40,6 +40,7 @@
 \ ******************************************************************************
 
 .S_SUN
+ JSR MN_TURN            \ the moon's place, turned (once an iteration)
  LDA MJ                 \ witchspace: no planet, no sun
  BNE ss_off
  LDA FRIN               \ slot 0 the planet (128 or 130)
@@ -206,7 +207,8 @@ A_DORND = DORND         \ (the Trumbles' part, not run)
  RTS
 
 \ ss_turn: D turned by our roll (ALPHA) and pitch (BETA) by MV40 itself, as
-\ it turns the planet and the sun (ss_turnx: the vector at ss_d + X):
+\ it turns the planet and the sun (ss_turnx: the vector at ss_d + X, X = 0
+\ D, 9 the moon's MN_E):
 \   1. K2 = y - alpha * x / 256    2. z = z + beta * K2 / 256
 \   3. y = K2 - beta * z / 256     4. x = x + alpha * y / 256
 \ The vector goes into INWK's coordinates, sign-magnitude, and MV40 runs
@@ -585,9 +587,103 @@ SS_NZP = P% - ss_zpa
 .ssq9
  RTS
 
+\ ******************************************************************************
+\
+\ MN_TURN: the moon's place, E = moon - planet (MN_E), kept as S_SUN keeps
+\ D: a vector fixed in space, so turned by our roll and pitch as MV40 turns
+\ the planet's position (our own movement moves the planet and the moon
+\ alike), once an iteration (the first call with this MCNT: from G_PFHOOK
+\ before the planet's detail, from MOONHIT, or from S_SUN after the
+\ iteration). The planet's own orientation is not followed: Elite's TIDY
+\ renormalises it with one-byte precision every 16 iterations, which turns
+\ its spin axis (nosev - sidev) by up to 3 degrees at a time, so a moon 3
+\ to 5.25 radii out on that axis would jump with it.
+\
+\ In a system with a moon (h = s0_hi EOR s1_hi EOR s2_hi, bits 0-1 = 1), E
+\ is made in the first iteration after we arrive (SOLAR) or launch (SOS1),
+\ which make the planet with ZINF's orientation: on its spin axis then, w =
+\ (nosev - sidev) / sqrt(2) = (-1, 0, -1) / sqrt(2), on the side h bit 4
+\ gives (set: -w), D = 3, 3.75, 4.5 or 5.25 radii out (h bits 2-3): E =
+\ +/- (c, 0, c), c = D 24576 / sqrt(2) (the planet's radius is 24576 in the
+\ coordinates, which E is in, as D); then turned by that iteration's roll
+\ and pitch, as the planet's position was. It is forgotten (MN_OK clear) in
+\ witchspace, with no planet, while we are docked (also F_DIRECT) and when
+\ the system changes (QQ2). Only E, MN_OK and its own variables are
+\ written (A, X, Y and the flags are not kept).
+\
+\ ******************************************************************************
+
+.mt_off
+ STZ MN_OK
+.mnt9
+ RTS
+.MN_TURN
+ LDA MCNT               \ once an iteration
+ CMP mt_it
+ BEQ mnt9
+ STA mt_it
+ LDA MJ                 \ witchspace, docked, or no planet: none
+ ORA QQ12
+ BNE mt_off
+ LDA FRIN
+ BPL mt_off
+ LDX #5                 \ another system: forget it
+.mnt1
+ LDA QQ2,X
+ CMP mt_sys,X
+ BEQ mnt2
+ STA mt_sys,X
+ STZ MN_OK
+.mnt2
+ DEX
+ BPL mnt1
+ LDA QQ2+1              \ h: a moon?
+ EOR QQ2+3
+ EOR QQ2+5
+ TAY
+ AND #3
+ CMP #1
+ BNE mt_off
+ BIT MN_OK
+ BMI mnt4
+ TYA                    \ made: E = +/- (c, 0, c)
+ PHA
+ LSR A
+ LSR A
+ AND #3
+ TAY
+ LDA mt_cl,Y
+ STA ss_w
+ LDA mt_cm,Y
+ STA ss_w+1
+ LDA mt_ch,Y
+ STA ss_w+2
+ PLA
+ AND #16
+ BNE P%+5
+ JSR ss_neg             \ (h bit 4 clear: w, whose x and z are negative)
+ LDX #2
+.mnt3
+ LDA ss_w,X
+ STA MN_E,X
+ STA MN_E+6,X
+ STZ MN_E+3,X
+ DEX
+ BPL mnt3
+ DEC MN_OK              \ (&FF)
+.mnt4
+ LDX #9                 \ turned
+ JMP ss_turnx
+
+.mt_cl  EQUB 166, 143, 120, 98
+.mt_cm  EQUB 203, 254, 49, 100
+.mt_ch  EQUB 0, 0, 1, 1
+
 \ Its variables (bank 4)
 
 .ss_o   SKIP 1          \ ss_turnx's vector
+.mt_it  SKIP 1          \ MN_TURN: the MCNT of E's last turn
+.mt_sys SKIP 6          \ the system E is of (QQ2)
 .ss_s   SKIP 9          \ the sun: planet + D, in the view's axes
 ASSERT SS_NZP <= NI% AND NI% <= 37   \ (ss_zs, ss_pl and ss_su: the shared
                                      \ workspace, elite-gfx.asm)
