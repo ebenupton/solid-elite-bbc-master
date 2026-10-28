@@ -1,6 +1,8 @@
 // Regression test: ships posed in flight at the orientations the ship audit
 // flagged (2026-10-26: the Missile's poses o1-o4, the Splinter's o0, o5-o9 and
-// close), drawn by the renderer and checked.
+// close; 2026-10-27: the Cargo canister's o9 and close, the Boulder's o1, the
+// Cobra Mk III's o8, the Cougar's o0 and o4), drawn by the renderer and
+// checked.
 //
 // node 6-harness/mshippose.mjs [--disc d] [--syms s] [--out dir] [--only 1,8]
 //
@@ -17,7 +19,8 @@
 // (<out>/sNN_<pose><Z|T>.png) and checked:
 //   * outside: no blob of lit pixels outside the convex hull of the ship's
 //     projected vertices (grown by 4 pixels; the laser sights are left out)
-//     bigger than a speck of stardust. LL9's XX3 is poisoned as LL9 starts on
+//     bigger than a speck of stardust (or two side by side: over 6 pixels or
+//     5 across). LL9's XX3 is poisoned as LL9 starts on
 //     the posed ship (vertex i on an ellipse round the view's centre), so a
 //     vertex that is used but not projected draws far outside: the Missile's
 //     fins once did (in flight, XX3 holds whatever the ship drawn before left);
@@ -28,7 +31,16 @@
 //   * faces: the faces f_ship filled (fsh_draw) in the ship's last frame are
 //     its front faces, worked out from the pose (a face more than 5 degrees
 //     from edge-on to the line of sight must be drawn if it faces us and not
-//     drawn if it faces away).
+//     drawn if it faces away). A pose's "lax" faces are exempt, and so is
+//     their area from the cover test: faces LL9 hides although they face us,
+//     as the released game does (the Boulder's face 4: its blueprint normal,
+//     (-5, -4, -1), is too short for LL9's test, which uses the normal's tip);
+//   * wings: each of the pose's "wings" (the Cougar's: zero-thickness, on the
+//     body's edge, seen face on) is covered as the body is (2x2 cells inside
+//     it, shrunk by 1.5 pixels, lit);
+//   * empty: no lit pixel 1.5 pixels inside each of the pose's "empty"
+//     triangles (the Cougar's notches between its nose and a wing's leading
+//     edge, once filled as part of a face polygon taken round the wing).
 // The projection used for the hulls is LL9's arithmetic (within 3 pixels of
 // it); the largest difference from the vertices LL9 projected is printed.
 // Prints a line per pose and "SHIPPOSE PASS" or "SHIPPOSE FAIL"; exit status 0
@@ -50,6 +62,25 @@ const SHIPS = {
              [12, 12, -44], [12, -12, -44], [-12, -12, -44], [-12, 12, -44], [-8, 8, -12], [-8, -8, -12], [8, 8, -12], [8, -8, -12]] },
     8: { name: "Splinter", solid: [0, 1, 2, 3], f: [[3, 1, 2], [2, 0, 3], [3, 0, 1], [2, 1, 0]],
          v: [[-24, -25, 16], [0, 12, -10], [11, -6, 2], [12, 42, 7]] },
+    5: { name: "Cargo", solid: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+         f: [[0, 4, 3, 2, 1], [0, 1, 6, 5], [1, 2, 7, 6], [2, 3, 8, 7], [3, 4, 9, 8], [4, 0, 5, 9], [5, 6, 7, 8, 9]],
+         v: [[24, 16, 0], [24, 5, 15], [24, -13, 9], [24, -13, -9], [24, 5, -15], [-24, 16, 0], [-24, 5, 15], [-24, -13, 9],
+             [-24, -13, -9], [-24, 5, -15]] },
+    6: { name: "Boulder", solid: [0, 1, 2, 3, 4, 5, 6],
+         f: [[5, 4, 0], [1, 5, 0], [2, 5, 1], [2, 3, 5], [3, 4, 5], [1, 0, 6], [6, 2, 1], [6, 3, 2], [6, 4, 3], [0, 4, 6]],
+         v: [[-18, 37, -11], [30, 7, 12], [28, -7, -12], [2, 0, -39], [-28, 34, -30], [5, -10, 13], [20, 17, -30]] },
+    11: { name: "Cobra Mk3", solid: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+         f: [[0, 1, 2], [2, 1, 5], [0, 2, 6], [1, 3, 5], [4, 0, 6], [9, 2, 5], [6, 2, 9], [5, 3, 8], [7, 4, 6],
+             [11, 7, 6, 9, 5, 8, 10], [10, 8, 3, 1], [0, 11, 10, 1], [4, 7, 11, 0]],
+         v: [[32, 0, 76], [-32, 0, 76], [0, 26, 24], [-120, -3, -8], [120, -3, -8], [-88, 16, -40], [88, 16, -40],
+             [128, -8, -40], [-128, -8, -40], [0, 26, -40], [-32, -24, -40], [32, -24, -40], [-36, 8, -40], [-8, 12, -40],
+             [8, 12, -40], [36, 8, -40], [36, -12, -40], [8, -16, -40], [-8, -16, -40], [-36, -12, -40], [0, 0, 76],
+             [0, 0, 90], [-80, -6, -40], [-80, 6, -40], [-88, 0, -40], [80, 6, -40], [88, 0, -40], [80, -6, -40]] },
+    32: { name: "Cougar", solid: [0, 1, 2, 3, 4, 5, 6],
+         f: [[0, 1, 2, 3], [4, 2, 1], [5, 4, 1, 0], [6, 4, 5], [6, 5, 0, 3], [6, 3, 2, 4]],
+         v: [[0, 5, 67], [-20, 0, 40], [-40, 0, -40], [0, 14, -40], [0, -14, -40], [20, 0, 40], [40, 0, -40], [-36, 0, 56],
+             [-60, 0, -20], [36, 0, 56], [60, 0, -20], [0, 7, 35], [0, 8, 25], [-12, 2, 45], [12, 2, 45], [-10, 6, -40],
+             [-10, -6, -40], [10, -6, -40], [10, 6, -40]] },
 };
 // The audit's poses (nosev n, roofv r)
 const O6 = { n: [-0.5997301821134201, 0.34984260623282837, -0.7196762185361041], r: [0.22396377884822027, 0.9368084920965556, 0.2687565346178643] };
@@ -60,18 +91,20 @@ const POSES = {
     o3: { name: "right", n: [1, 0, 0], r: [0, 1, 0] },
     o4: { name: "top", n: [0, 1, 0], r: [0, 0, -1] },
     o5: { name: "bottom", n: [0, 1, 0], r: [0, 0, 1] },
-    o6: { name: "front-left-high", ...O6 },
-    o7: { name: "front-right-low", n: [0.5997301821134201, -0.34984260623282837, -0.7196762185361041], r: [0.22396377884822027, 0.9368084920965556, -0.2687565346178643] },
+    o6: { name: "front-left-low", ...O6 },
+    o7: { name: "front-right-high", n: [0.5997301821134201, -0.34984260623282837, -0.7196762185361041], r: [0.22396377884822027, 0.9368084920965556, -0.2687565346178643] },
     o8: { name: "rear-left-low", n: [-0.5997301821134201, -0.34984260623282837, 0.7196762185361041], r: [-0.22396377884822027, 0.9368084920965556, 0.2687565346178643] },
     o9: { name: "rear-right-high +25deg roll", n: [0.5997301821134201, 0.34984260623282837, 0.7196762185361041], r: [-0.527644458599955, 0.8490368313491703, 0.026977478038560345] },
-    close: { name: "close-up front-left-high", ...O6 },
+    close: { name: "close-up front-left-low", ...O6 },
 };
-// [type, pose, z, x, y], at the z the audit's capture drew them at. The
-// Missile's side and top views are off centre (as the title screen's ship
+// [type, pose, z, x, y, checks], at the z the audit's capture drew them at.
+// The Missile's side and top views are off centre (as the title screen's ship
 // is a little), so that the side faces seen edge-on are hidden, as there
 const CASES = [
     [1, "o1", 155], [1, "o2", 236, 0, 16], [1, "o3", 236, 0, -16], [1, "o4", 480, 24, 0],
     [8, "o0", 308], [8, "o5", 153], [8, "o6", 297], [8, "o7", 274], [8, "o8", 247], [8, "o9", 212], [8, "close", 186],
+    [5, "o9", 189], [5, "close", 80], [6, "o1", 288, 0, 0, { lax: [4] }], [11, "o8", 434],
+    [32, "o0", 215], [32, "o4", 481, 0, 0, { wings: [[1, 7, 8, 2], [5, 9, 10, 6]], empty: [[0, 1, 7], [0, 5, 9]] }],
 ].filter(([t]) => !a.only || a.only.split(",").map(Number).includes(t)).flatMap(c => [[...c.slice(0, 2), "Z", ...c.slice(2)], [...c.slice(0, 2), "T", ...c.slice(2)]]);
 
 const cross = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]];
@@ -190,7 +223,8 @@ const GROW = 4;
 const sight = (x, y) => (y >= 95 && y <= 97 && Math.abs(x - 128) < 26) || (x >= 127 && x <= 129 && Math.abs(y - 96) < 26);
 const XY = (b, i) => [(b[4 * i] | b[4 * i + 1] << 8) << 16 >> 16, (b[4 * i + 2] | b[4 * i + 3] << 8) << 16 >> 16];
 let bad = 0;
-for (const [t, pid, h, z, x = 0, y = 0] of CASES) {
+const fj = l => l.sort((p, q) => p - q).join(l.some(f => f > 9) ? "," : "");
+for (const [t, pid, h, z, x = 0, y = 0, chk = {}] of CASES) {
     cur = { t, p: POSES[pid], h, z, x, y }; xx3 = null; run = 0; drawn = null;
     const i0 = iters;
     for (let k = 0; k < 4000 && (iters < i0 + 6 || run < 3); k++) await s.runFor(20000);
@@ -232,23 +266,33 @@ for (const [t, pid, h, z, x = 0, y = 0] of CASES) {
                 seen.add(ny * 256 + nx); st.push([nx, ny]);
             }
         }
-        if ((n > 6 || Math.max(x1 - x0, y1 - y0) >= 3) && n > worst) { worst = n; wpos = [x0, y0, x1, y1]; }
+        if ((n > 6 || Math.max(x1 - x0, y1 - y0) >= 5) && n > worst) { worst = n; wpos = [x0, y0, x1, y1]; }
     }
-    // cover: 2x2 cells inside the shrunk solid hull with no lit pixel
+    // cover: 2x2 cells inside the shrunk solid hull (but not in a lax face)
+    // with no lit pixel, then in each wing
+    const lax = (chk.lax || []).map(f => hull(SHIPS[t].f[f].map(i => Q[i])));
     let cells = 0, holes = 0;
-    for (let py = 0; py < 190; py += 2) for (let px = 0; px < 256; px += 2) {
-        if (inside(hSolid, px + 1, py + 1) < SHRINK + 0.5) continue;
-        cells++;
-        if (!(lit(px, py) || lit(px + 1, py) || lit(px, py + 1) || lit(px + 1, py + 1))) holes++;
+    for (const [hh, sk] of [[hSolid, SHRINK], ...(chk.wings || []).map(w => [hull(w.map(i => Q[i])), 1.5])])
+        for (let py = 0; py < 190; py += 2) for (let px = 0; px < 256; px += 2) {
+            if (inside(hh, px + 1, py + 1) < sk + 0.5 || lax.some(lh => inside(lh, px + 1, py + 1) > -1.5)) continue;
+            cells++;
+            if (!(lit(px, py) || lit(px + 1, py) || lit(px, py + 1) || lit(px + 1, py + 1))) holes++;
+        }
+    // empty: lit pixels inside the empty triangles
+    let filled = 0;
+    for (const e of chk.empty || []) {
+        const eh = hull(e.map(i => Q[i]));
+        for (let py = 18; py < 190; py++) for (let px = 2; px < 254; px++)
+            if (inside(eh, px + 0.5, py + 0.5) > 1.5 && lit(px, py) && !sight(px, py)) filled++;
     }
-    // faces: the front faces drawn, no back face
-    const { front, back } = frontFaces(cur), d = drawn || new Set();
-    const missing = [...front].filter(f => !d.has(f)), extra = [...back].filter(f => d.has(f));
-    const ok = worst === 0 && holes === 0 && drawn && !missing.length && !extra.length;
+    // faces: the front faces drawn, no back face (lax faces either way)
+    const { front, back } = frontFaces(cur), d = drawn || new Set(), lx = new Set(chk.lax || []);
+    const missing = [...front].filter(f => !d.has(f) && !lx.has(f)), extra = [...back].filter(f => d.has(f) && !lx.has(f));
+    const ok = worst === 0 && holes === 0 && filled === 0 && drawn && !missing.length && !extra.length;
     if (!ok) bad++;
     console.log(`${SHIPS[t].name.padEnd(9)} ${(pid + h).padEnd(6)} z ${String(z).padStart(4)}: outside ${worst ? `${worst} px at ${wpos}` : "none"}, ` +
-        `cover ${cells - holes}/${cells}, faces ${drawn ? [...d].sort().join("") || "-" : "?"}` +
-        `${missing.length ? ` (front ${missing.join("")} not drawn)` : ""}${extra.length ? ` (back ${extra.join("")} drawn)` : ""}` +
+        `cover ${cells - holes}/${cells}${chk.empty ? `, empty ${filled ? `${filled} px lit` : "ok"}` : ""}, faces ${drawn ? fj([...d]) || "-" : "?"}` +
+        `${missing.length ? ` (front ${fj(missing)} not drawn)` : ""}${extra.length ? ` (back ${fj(extra)} drawn)` : ""}` +
         `, projection ${perr.toFixed(1)}  ${ok ? "ok" : "BAD"}`);
 }
 console.log(bad ? `SHIPPOSE FAIL (${bad} of ${CASES.length} poses)` : `SHIPPOSE PASS (${CASES.length} poses)`);
