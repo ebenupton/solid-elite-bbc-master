@@ -68,7 +68,8 @@ routine of the game stays at its place in the original's source.
    iteration's ships: `gfx-light.asm`'s first pass), are at bank 4's end,
    after the hot pass and the hot data (`streams.py` keeps their room), and
    `G_FRAME` calls them with bank 4 paged, before it pages bank 6 for
-   `F_FRAME`.
+   `F_FRAME`. The moon's collision test, `MOONHIT` (`elite-moon.asm`, called
+   from the main flight loop), follows them.
    Nothing calls between the two windows, and the shared region refers to
    neither. Each bank keeps its private tables. The state that more than one
    bank reads, or that the IRQ handler or code running with ACCCON X set
@@ -316,10 +317,10 @@ line.
 | The shared workspace | main `&0E00-&1E15` | the renderer's shared state, one block below the main code: the rasteriser's per-call inputs (the polygon edge tables share the disc spans' places), the stars, `DFSIN` and `DOSCLI`'s stash in two halves (`DFSST`, `DFSST2`), the dirty extents, the disc rows' boundaries, the kept solid rows' `KF` and the directly drawn stars' sizes `F_DSS` (`elite-gfx.asm`) |
 | The glue area | main from `CODE%` (`&1EE8`) to `&2968` | `elite-glue.asm`, the port's own code: `to7` and `to4`, `TTX66M` and the stubs between the passes (`elite-stubs.asm`: `STUBS7`, 38 into the cold pass, and `STUBS4`, 57 out of it), then the renderer's glue (`gfx-gvars.asm`, `gfx-tramp.asm`, `gfx-gluehooks.asm`, `gfx-gstubs.asm`, `gfx-hooks.asm`) |
 | The low pass | main `&2969-&2F48`, below `&3000` (`LOW_END%`) | Elite's code that must be below `&3000`, in the source's order: `WSCAN`, `DELAY`, the sound (`BOOP`, `BEEP`, `SOFH` ... `SOINT`, the sound variables and tables), `IRQ1`, `VSCAN`, `DOVDU19`, `cls`, `TT67K`, `CHPR`, `ZES1`, `ZES2`, the font (page aligned at `&2B00`: `CODE%` is chosen so that this pads nothing), `UP`, `stackpt`, `NEWBRK` |
-| The hot pass, in main RAM | main `&2F49-&3FC5` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
+| The hot pass, in main RAM | main `&2F49-&3FCA` (BCODE ends here) | the hot pass's first container: `T1SYNC`, `pxpatd`, `pxpat`, `HANGFLAG`, `G%`, the main flight loop, `MALW`, `MALC`, `MT14`, `MT15`, `TKN2` and `QQ16`, `NA%`, `UNIV`, `BLINE`, the stardust, `TENS`, `pr2`, `TT11`, `BPRNT`, `TT26`, `ESCAPE`, `HALL`, `HAS1` and more, in the source's order |
 | Buffer 0 | main `&4000-&6FFF` | the screen; during a disc command, HAZEL's stash and the command |
 | The quarter-square tables, then the hot pass | main `&7000-&7F3D` | `QSL` and `QSH` (`elite-qs.asm`, page aligned at `&7000`), then the hot pass's second container from `&7400`: `TACTICS`, `DOCKIT`, the tactics helpers, `HITCH`, `FRS1`, `FRMIS`, `ANGRY`, `FR1`, `SESCP`, `SFS1`, `SFS2`, `HFS2`, `STARS2`, and the maths from `MLS2` to `DVID3B2` |
-| Bank 4 | `&8000-&BF0D` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B799`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routines that run in game context, `S_SUN` (`gfx-ssun.asm`) and `L_SUN` (`gfx-light.asm`'s first pass, `&B799-&BF0D`) |
+| Bank 4 | `&8000-&BFF9` | the hot pass's third container. First the ACCCON X blocks (`&8000-&9089`): Master's drawing for the docked screens (`ylookup`, `LOIN`, `HLOIN`, `PIX1`, `PIXEL`, `TTX66`, `CLYNS` and their tables), the CMYK dashboard (`SCAN`, `DOT`, `ddot`, the bulbs, `MSBAR`, `DIALS` and its helpers, with the tables `dashboard.py` writes) and `ADDK`, then `log`, `logL` and `alogh`, page aligned at `&9100-&93FF`. Then the rest of the hot pass in the source's order, to `F%` (`&B799`): among it the text printers (`TT27` ... `ex`), the planet and the sun, the main game loop, `MESS`, the ships' drawing and moving. Then any hot data that HAZEL has no room for (none), and last the renderer's routines that run in game context, `S_SUN` (`gfx-ssun.asm`) and `L_SUN` (`gfx-light.asm`'s first pass), and the moon's `MOONHIT` (`elite-moon.asm`): `&B799-&BFF9` |
 | Bank 7, the cold pass | `&8000-&A3A8` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens, `TKN1` |
 | Bank 7, the meridian window | `&A3A9-&BB3D` (its own image, `MERID`) | the planet's surface detail (`gfx-merid.asm`, the circle engine: `pc_circ`, `PC_ROWS` and their workspace; `gfx-planet7.asm`, the styles: `PF_HOOK`), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`), then the lens flare (`gfx-flare.asm`: `R_FLARE`, its tables, its half-width table `fl_htab` and its variables) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FDA` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
@@ -334,8 +335,8 @@ that does not fit goes on to the next container. `TACTICS`, whose seven
 parts branch into one another and so move as a whole, leads the second.
 `3-assembled-output/flow.txt` lists every unit.
 
-Free space: 58 bytes below `&4000` and 194 below `&8000` (each the end of
-one of the hot pass's containers in main RAM), 242 at the end of bank 4,
+Free space: 53 bytes below `&4000` and 194 below `&8000` (each the end of
+one of the hot pass's containers in main RAM), 6 at the end of bank 4,
 1,218 at the end of bank 7, 1,223 in HAZEL, 2 and 7 in bank 5 (before the
 second disc's `R_S2R0` and `R_S2R1`; and 42 below the per-x tables, 64
 after each of `R_S2L0` and `R_S2L1`, and 256 in the row runs' tails), 37

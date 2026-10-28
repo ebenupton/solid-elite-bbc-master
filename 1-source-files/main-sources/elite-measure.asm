@@ -80,6 +80,7 @@
 .R4_START%
  INCLUDE "1-source-files/main-sources/gfx-ssun.asm"
  INCLUDE "3-assembled-output/gfx-light-4.asm"
+ INCLUDE "1-source-files/main-sources/elite-moon.asm"
 .R4_END%
 
  INCLUDE "1-source-files/main-sources/elite-gfx.asm"

@@ -158,7 +158,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | Part | Where | What |
 |---|---|---|
 | The shared workspace | main `&0E00-&1E15`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`, and what the frame reads of the moon (`gfx-planetv.asm`). Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
-| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
+| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass); then the moon's collision test, `MOONHIT` (`elite-moon.asm`), from the main flight loop |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
@@ -432,6 +432,22 @@ that changed since that buffer's last frame are drawn:
 Its writes go through `T_WSPAN` (`R_WSPAN`, bank 5: a span noted in the
 written extents, as `R_DISC2`'s are, never in the dirty ones). A still
 moon costs 29% less than one drawn whole each frame.
+
+**The moon is solid**: flying into it kills us, as the planet does. The
+main flight loop's part 15 (`MA22`) calls `MOONHIT` (`elite-moon.asm`, at
+bank 4's end) before the planet's altitude test, and on C set jumps to
+`MA28`, the planet's crash (`DEATH`: the same sound, the same death
+screen). `MOONHIT` tests on the planet's altitude iteration (`MCNT` mod 32 =
+10), in systems with a moon: with the moon's centre M = P + (E >> 8), we
+have crashed if |M|^2 < (rho 96)^2. It writes no zero page and nothing of
+the game's but by crashing, and in a system without a moon it returns at
+once. This is the port's one change to the game: SNG47 has no moons, so in
+a system with one a run that flies into the moon diverges from SNG47
+there. The gate's systems have none. For a lockstep comparison in a moon
+system, build with `make moon=scenery` (`_MOON_SOLID` FALSE: no call of
+`MOONHIT`). `6-harness/mmoonhit.mjs` puts the moon at a chosen distance
+dead ahead: inside its radius we crash, outside we do not, and a system
+without a moon never does.
 
 `test_raster.py`'s `pfhook` test checks the moon (`MN_ON`, `MN_X`, `MN_Y`,
 `MN_R`, `MN_Z` against `planet_caps.py`'s `pf_moon`, with random E, views

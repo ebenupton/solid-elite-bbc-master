@@ -11229,6 +11229,16 @@ ENDIF
  BNE MA23S              \ the following, as there are no planets or suns to
                         \ bump into in witchspace
 
+ IF _MOON_SOLID
+
+  JSR MOONHIT           \ Port: the moon (the planet's scenery, gfx-planet7.asm)
+  BCS MA28              \ is solid: if we have flown into it, jump to MA28 to
+                        \ crash as into the planet (elite-moon.asm: in the
+                        \ systems with a moon, on this iteration of 32; not in
+                        \ a moon=scenery build)
+
+ ENDIF
+
  LDA MCNT               \ Fetch the main loop counter and calculate MCNT mod 32,
  AND #31                \ which tells us the position of this loop in each block
                         \ of 32 iterations

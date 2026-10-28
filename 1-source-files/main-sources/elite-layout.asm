@@ -105,11 +105,13 @@
  INCLUDE "3-assembled-output/gfx-light-4.asm"        \ keeps its room), from G_FRAME: S_SUN,
                                         \ the sun near the planet, and L_SUN
                                         \ (gfx-light.asm's first pass), the
-                                        \ light for the next iteration's ships
+                                        \ light for the next iteration's ships;
+ INCLUDE "1-source-files/main-sources/elite-moon.asm"           \ and from MA22, MOONHIT: the moon is
+                                        \ solid
 .R4_END%
 .BANK4_END%
 
- PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~R4_START%-1, ", S_SUN and L_SUN ", ~R4_START%, "-", ~R4_END%-1, " free ", &C000-BANK4_END%
+ PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~R4_START%-1, ", S_SUN, L_SUN and MOONHIT ", ~R4_START%, "-", ~R4_END%-1, " free ", &C000-BANK4_END%
  ASSERT BANK4_END% <= &C000
  SAVE "3-assembled-output/BANK4.bin", &8000, &C000, &8000
 

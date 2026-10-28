@@ -14,7 +14,8 @@
 #     area; with the filled renderer, 5: the rasteriser, 85: its polygon
 #     window in ANDY, 6: the frame layer, 7 again: the meridian window after
 #     the cold area, with the lens flare; 4 again for the sun near the
-#     planet, S_SUN, at bank 4's end), for the harness
+#     planet, S_SUN, and the moon's MOONHIT, at bank 4's end), for the
+#     harness
 #     (6-harness/mlib.mjs) and bankcheck.py
 #
 #   * 3-assembled-output/game-addresses.asm: the addresses and lengths that
@@ -58,7 +59,7 @@ BANKED = [(OUT + "elite-source-hot3.asm", "4"), (OUT + "elite-data-hot4.asm", "4
           (SRC + "gfx-frame.asm", "6"), (SRC + "gfx-flare6.asm", "6"),
           (SRC + "gfx-hangar.asm", "6"), (SRC + "gfx-faces.asm", "6"), (SRC + "gfx-frame_cold.asm", "6"),
           (SRC + "gfx-merid.asm", "7"), (SRC + "gfx-kept7.asm", "7"), (SRC + "gfx-planet7.asm", "7"),
-          (SRC + "gfx-flare.asm", "7"), (SRC + "gfx-ssun.asm", "4")]
+          (SRC + "gfx-flare.asm", "7"), (SRC + "gfx-ssun.asm", "4"), (SRC + "elite-moon.asm", "4")]
 
 # Each name is written once, from the first file that defines it: the game's
 # copies come first, and a name they share with a scoped local label of the
