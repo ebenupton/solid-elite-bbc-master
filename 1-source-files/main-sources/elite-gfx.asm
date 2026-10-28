@@ -163,7 +163,8 @@ ORG &8000
 INCLUDE "1-source-files/main-sources/gfx-frame.asm"
 INCLUDE "1-source-files/main-sources/gfx-faces.asm"
 INCLUDE "1-source-files/main-sources/gfx-light6.asm"   \ the lighting tables (and the first ramps)
-INCLUDE "1-source-files/main-sources/gfx-light.asm"    \ the lighting's L_SUN and L_REC
+INCLUDE "3-assembled-output/gfx-light-6.asm"   \ the lighting's L_REC (gfx-light.asm's second
+                               \ pass; L_SUN, its first, is at bank 4's end)
 INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
 INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 7)
 INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are at bank 6's end)

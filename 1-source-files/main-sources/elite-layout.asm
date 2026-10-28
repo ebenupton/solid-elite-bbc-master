@@ -30,7 +30,9 @@
 \
 \   * bank 4 from &8000: the hot pass's third container (the code that runs
 \     with ACCCON X set first, as it comes first in the source), then the hot
-\     data that HAZEL has no room for (saved as BANK4);
+\     data that HAZEL has no room for, then the renderer's routine that runs
+\     in game context from G_FRAME, L_SUN (gfx-light.asm's first pass; saved
+\     as BANK4);
 \
 \   * the cold pass, sideways RAM bank 7: elite-source.asm's cold blocks,
 \     then elite-data.asm's (3-assembled-output/elite-data-cold.asm, which
@@ -98,9 +100,15 @@
 
  INCLUDE "3-assembled-output/elite-data-hot4.asm"    \ the hot data that HAZEL has no room for
 
+.R4_START%                              \ the renderer's code that runs in game
+ INCLUDE "3-assembled-output/gfx-light-4.asm"        \ context, at bank 4's end (streams.py
+                                        \ keeps its room), from G_FRAME: L_SUN
+                                        \ (gfx-light.asm's first pass), the
+                                        \ light for the next iteration's ships
+.R4_END%
 .BANK4_END%
 
- PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~BANK4_END%-1, " free ", &C000-BANK4_END%
+ PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~R4_START%-1, ", L_SUN ", ~R4_START%, "-", ~R4_END%-1, " free ", &C000-BANK4_END%
  ASSERT BANK4_END% <= &C000
  SAVE "3-assembled-output/BANK4.bin", &8000, &C000, &8000
 

@@ -25,6 +25,10 @@
 .GTYPE   EQUB 0         \ the type whose faces the ship being recorded uses
 .GSUNON  EQUB 0         \ non-zero: SUN drew the sun this frame (LSO, SUNX valid)
 .GSUNR   EQUB 0         \ the sun's radius this frame
+.LLT     EQUB 24, 24, &E8 \ the light towards the sun, x, y, z (* 41.3): L_SUN
+                        \ (bank 4) writes it, L_REC (bank 6) reads it
+                        \ (gfx-light.asm); the fixed light until L_SUN first
+                        \ runs
 .GSTASH  EQUB 0         \ bit 7: a disc command has stashed HAZEL in buffer 0
                         \ (DOSCLI), which the next space-mode frame clears
 .PM_OK   EQUB 0         \ bit 7: PM_HOOK has computed this frame's beach ball

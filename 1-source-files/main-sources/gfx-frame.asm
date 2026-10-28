@@ -704,9 +704,8 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  JSR T_KOFF             \ (no kept rows: docs/renderer.md)
  JMP f_reset            \ not a space view: just forget what was recorded
 
-.ff1
- JSR L_SUN              \ the light for the next iteration's ships (gfx-light.asm,
-                        \ main RAM: game context, before ACCCON X is set below)
+.ff1                    \ (G_FRAME has run L_SUN, the light for the next
+                        \ iteration's ships, in game context)
 
  \ save the zero page the rasteriser uses (&06-&27) and the frame layer's
  \ (&D2-&E1), unrolled

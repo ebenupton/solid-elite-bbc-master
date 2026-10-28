@@ -22,6 +22,9 @@
 
 .G_FRAME
  STA gA
+ LDA QQ11               \ in a space view the light for the next iteration's
+ BNE P%+5               \ ships first (L_SUN, gfx-light.asm: at bank 4's end)
+ JSR L_SUN
  LDA #GFXBANK
  STA &F4
  STA &FE30
@@ -218,7 +221,10 @@ FOR hst, 1, 21
  ENDIF
 NEXT
 
-.G_HANGAR
+.G_HANGAR                \ (from HALL, with bank 4 paged: the light for the
+ LDA QQ11               \ hangar's ships too, L_SUN, gfx-light.asm, at bank
+ BNE P%+5               \ 4's end, as G_FRAME does)
+ JSR L_SUN
  LDA #GFXBANK
  STA &F4
  STA &FE30

@@ -9,16 +9,20 @@
 \ of nine hue ramps shared by every ship, each from 50% to 100% of the hue's
 \ own full brightness: gfx-light6.asm).
 \
-\ Master port: in bank 6, with the frame layer, which calls it (F_FRAME, F_SHIP)
-\ in game context only (never with ACCCON X set, which would hide the
-\ quarter squares QSL/QSH, main RAM at &7000, that it multiplies with).
-\ Its reads of QSL/QSH are marked "bankcheck: ok": the frame layer reads main
-\ RAM above &3000 nowhere else, as it may run with X set, but these run before
-\ F_FRAME sets X (L_SUN) or from F_SHIP, in game context (L_REC).
+\ Master port: assembled in two passes (build.sh writes a copy of this file
+\ for each, build/gfx-light-4.asm and -6.asm, with the other pass's IF
+\ LIGHTPASS block assembled out), each half running in
+\ game context only (never with ACCCON X set, which would hide the quarter
+\ squares QSL/QSH, main RAM at &7000, that it multiplies with): L_SUN at
+\ bank 4's end (elite-layout.asm, with S_SUN), from G_FRAME before F_FRAME;
+\ L_REC in bank 6, with the frame layer, from F_SHIP. L_REC's reads of
+\ QSL/QSH are marked "bankcheck: ok": the frame layer reads main RAM above
+\ &3000 nowhere else, as it may run with X set. LLT, L_SUN's result that
+\ L_REC reads, is in the glue area (gfx-gvars.asm).
 \ The frame layer's f_col (gfx-frame.asm) turns a level into the four row
 \ bytes at drawing time.
 \
-\ L_SUN (F_FRAME, once per main-loop iteration in a space view) keeps LV,
+\ L_SUN (G_FRAME, once per main-loop iteration in a space view) keeps LV,
 \ the unit vector towards the sun in view space (x right, y up, z in; 16-bit
 \ signed, 1 = &4000), and LLT = LV * 41.3 (signed bytes) for the next
 \ iteration's ships:
@@ -63,11 +67,12 @@
 
 
 {
+IF LIGHTPASS = 4        \ (elite-layout.asm: at bank 4's end, in game context)
 \ ------------------------------------------------------------------------------
 \ L_SUN
 \ ------------------------------------------------------------------------------
 
-.^L_SUN
+.*L_SUN
  LDA FRIN+1
  BEQ ls_fix             \ no slot 1 (title screen): the fixed light
  CMP #129
@@ -151,18 +156,18 @@
  BPL lse4
  BRA lse2
 .lse3
- STZ l7_s               \ S = QS(x) + QS(y) + QS(z) for the top bytes t
- STZ l7_t               \ (0..127; one of them 64 or more)
+ STZ lv_s               \ S = QS(x) + QS(y) + QS(z) for the top bytes t
+ STZ lv_t               \ (0..127; one of them 64 or more)
  LDX #6
 .lsq
  LDY lv_w+2,X
  LDA QSL,Y              \ bankcheck: ok
  CLC
- ADC l7_t
- STA l7_t
+ ADC lv_t
+ STA lv_t
  LDA QSH,Y              \ bankcheck: ok
- ADC l7_s
- STA l7_s
+ ADC lv_s
+ STA lv_s
  DEX
  DEX
  DEX
@@ -175,9 +180,9 @@
  ORA lv_m
  TAX
  LDA QSL,X              \ QS(n) - S (bankcheck: ok)
- CMP l7_t
+ CMP lv_t
  LDA QSH,X              \ bankcheck: ok
- SBC l7_s
+ SBC lv_s
  BCS P%+5
  STX lv_l
  LSR lv_m
@@ -186,9 +191,9 @@
  LDX #2                 \ LV = +/- (128 t / length) * 128
 .lse9
  TXA
- STA l7_t
+ STA lv_t
  ASL A
- ADC l7_t
+ ADC lv_t
  TAY
  LDA lv_w+2,Y           \ t: the dividend 128 t is (t >> 1, (t AND 1) << 7)
  LSR A
@@ -237,12 +242,12 @@
  LDA LVH,X
  CMP #&80
  ROR A                  \ h >> 1
- STA l7_t
+ STA lv_t
  CMP #&80
  ROR A
  CMP #&80
  ROR A                  \ h >> 3
- STA l7_s
+ STA lv_s
  CMP #&80
  ROR A
  CMP #&80
@@ -250,9 +255,9 @@
  CMP #&80
  ROR A                  \ h >> 6
  CLC
- ADC l7_s
+ ADC lv_s
  CLC
- ADC l7_t
+ ADC lv_t
  STA LLT,X
  DEX
  BPL lvl1
@@ -312,7 +317,7 @@
 \ X = &FF; A = a, sign-magnitude), truncated towards zero
 
 .lv_mul
- STA l7_s               \ sign of the product in bit 7, then of v
+ STA lv_s               \ sign of the product in bit 7, then of v
  AND #&7F
  STA lv_m
  CPX #&FF
@@ -328,8 +333,8 @@
  STY lv_u+1
  STZ lv_u+2
  TYA
- EOR l7_s
- STA l7_s
+ EOR lv_s
+ STA lv_s
  TYA
  BPL lvm3
  SEC                    \ |v|
@@ -366,7 +371,7 @@
 .lvm6
  LDA lv_a+1             \ (X A) = acc / 256, signed
  LDX lv_a+2
- BIT l7_s
+ BIT lv_s
  BPL lvm7
  EOR #&FF
  CLC
@@ -381,13 +386,31 @@
  RTS
 
 
+\ L_SUN's variables (renderer state, not game state; LLT, its result, which
+\ L_REC reads, is in the glue area: gfx-gvars.asm)
+.LVL     SKIP 3         \ LV: the unit vector towards the sun (16-bit, 1 = &4000)
+.LVH     SKIP 3
+.lv_ok   EQUB 0         \ bit 7: LV is set up; bit 6: from the sun
+.lv_cnt  SKIP 1         \ iterations since LV was last seeded from the sun
+.lv_t    SKIP 1
+.lv_s    SKIP 1
+.lv_w    SKIP 9         \ L_SUN: the sun's |x|, |y|, |z| (24-bit each)
+.lv_sg   SKIP 3         \ and their signs (bit 7)
+.lv_l    SKIP 1         \ the length, in units of the top byte
+.lv_m    SKIP 1         \ lv_mul: multiplier magnitude (and the search's bit)
+.lv_u    SKIP 3         \ lv_mul: |v|, shifted
+.lv_a    SKIP 3         \ lv_mul: accumulator
+.lv_k2   SKIP 2         \ MV40's K2
+ENDIF
+
+IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
 \ ------------------------------------------------------------------------------
 \ L_REC (F_SHIP, with ship record F_NSHIP's XX2 copy written; Y is kept)
 \ ------------------------------------------------------------------------------
 
 .l7_off EQUB 22, 16, 10 \ INWK offset of the x high byte: sidev, roofv, nosev
 
-.^L_REC
+.*L_REC
  LDA GNF
  BNE P%+3
  RTS
@@ -566,25 +589,9 @@
  RTS
 
 
-\ ------------------------------------------------------------------------------
-\ Variables (renderer state, not game state)
-\ ------------------------------------------------------------------------------
-
-.^LLT      EQUB 24, 24, &E8 \ the light towards the sun, x, y, z (* 41.3; L_SUN):
-                        \ the fixed light until L_SUN first runs
-.LVL     SKIP 3         \ LV: the unit vector towards the sun (16-bit, 1 = &4000)
-.LVH     SKIP 3
-.lv_ok   EQUB 0         \ bit 7: LV is set up; bit 6: from the sun
-.lv_cnt  SKIP 1         \ iterations since LV was last seeded from the sun
+\ L_REC's variables (renderer state, not game state)
 .l7_t    SKIP 1
 .l7_s    SKIP 1
-.lv_w    SKIP 9         \ L_SUN: the sun's |x|, |y|, |z| (24-bit each)
-.lv_sg   SKIP 3         \ and their signs (bit 7)
-.lv_l    SKIP 1         \ the length, in units of the top byte
-.lv_m    SKIP 1         \ lv_mul: multiplier magnitude (and the search's bit)
-.lv_u    SKIP 3         \ lv_mul: |v|, shifted
-.lv_a    SKIP 3         \ lv_mul: accumulator
-.lv_k2   SKIP 2         \ MV40's K2
 .lr_a    SKIP 3         \ l_dot's operands
 .lr_b    SKIP 3
 .lr_c    SKIP 3         \ L_REC: Ls, then d
@@ -593,4 +600,5 @@
 .lr_f    SKIP 1         \ L_REC: the face
 .lr_r    SKIP 1         \ L_REC: its XX2
 .lr_y    SKIP 1
+ENDIF
 }

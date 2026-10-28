@@ -39,3 +39,4 @@ run.bat
 3-assembled-output/flow.txt
 3-assembled-output/direct.txt
 3-assembled-output/elite-stubs.asm
+3-assembled-output/gfx-light-*.asm

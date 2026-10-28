@@ -55,6 +55,11 @@ PYTHON?=python
 #     which elite-data.asm includes as BDATA) and writes the tables that the
 #     dashboard's routines include (dashtab-*.asm), into 3-assembled-output
 #
+#   * 2-build-files/lightpass.py writes a copy of gfx-light.asm for each of
+#     its passes (gfx-light-4.asm: L_SUN, at bank 4's end; gfx-light-6.asm:
+#     L_REC, in bank 6), with the other half assembled out, into
+#     3-assembled-output
+#
 #   * 2-build-files/streams.py emits elite-source.asm in three passes, low,
 #     hot and cold (docs/memory-map.md, "The source and its passes"). First
 #     ("measure") it writes the hot pass in one copy, and the hot data in
@@ -96,6 +101,7 @@ all:
 	echo _MATCH_ORIGINAL_BINARIES=$(match-original-binaries) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
 	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
+	$(PYTHON) 2-build-files/lightpass.py
 	$(PYTHON) 2-build-files/streams.py measure > 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-measure.asm -d > 3-assembled-output/measure-symbols.txt
 	$(PYTHON) 2-build-files/streams.py place >> 3-assembled-output/compile.txt

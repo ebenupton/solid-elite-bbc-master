@@ -148,12 +148,12 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E00-&1DD4`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| The shared workspace | main `&0E00-&1DDE`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
-| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, `gfx-light.asm`), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
+| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
 | The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
@@ -226,7 +226,11 @@ against the model.
 ## Lighting
 
 The sun is the light source in flight. `L_SUN`, once per frame, keeps the
-light's direction. It is reseeded from the sun's position every 32
+light's direction (`LLT`, in the glue area). It runs in game context, so it
+is at bank 4's end: `G_FRAME` calls it in a space view before it pages bank
+6 for `F_FRAME`, and `G_HANGAR` for the hangar. `gfx-light.asm` holds it and
+`L_REC` as two passes, which `2-build-files/lightpass.py` writes out for
+bank 4 and bank 6. It is reseeded from the sun's position every 32
 iterations and rotated by the roll and pitch in between. On the title screen
 and in the hangar the light is fixed, from the top right and the viewer.
 `L_REC`, as each ship is recorded, writes each visible face's level,
