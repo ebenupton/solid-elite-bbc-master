@@ -1,25 +1,58 @@
 \ ******************************************************************************
 \
 \ frame_cold.asm - the frame layer's bookkeeping for screens drawn directly
-\ (outside record mode, i.e. QQ11 or GFORCE non-zero) that then carry on in
-\ record mode without a TT66: DEATH prints "GAME OVER" and nWq draws the
-\ stardust while QQ11 = 6, then sets QQ11 = 0 and runs the main loop. FRAME
-\ must know what text main RAM (buffer 0) already shows, and the directly
-\ drawn stars must go (in record mode STARS1 only records new positions, so
-\ nothing else would ever remove them from buffer 0).
+\ (outside record mode, i.e. QQ11 or GFORCE non-zero), and for those that
+\ then carry on in record mode without a TT66: DEATH and TITLE (TT66 13,
+\ whose TTX66K may print the hyperspace countdown directly, then QQ11 = 0)
+\ and the briefing's LL9B. FRAME must know what text main RAM (buffer 0)
+\ already shows, and the directly drawn stars must go (in record mode STARS1
+\ only records new positions, so nothing else would ever remove them from
+\ buffer 0).
 \
 \ INCLUDEd at the end of bank 6 (after its data), wrapping the text-map entry points of
-\ frame.asm (f_char0, f_delchar0, f_clrtext0, f_direct0, f_enter), so that
+\ frame.asm (f_char1, f_delchar0, f_clrtext0, f_direct0, f_enter), so that
 \ none of the per-frame code moves.
 \
 \ ******************************************************************************
 
-\ F_CHAR: TT26's character K3 at (XC-1, YC) (see f_char0)
+\ F_CHAR: TT26's character K3 at (XC-1, YC): in record or space mode into
+\ the text map (f_char1); otherwise CHPR draws it directly, and it is noted
+\ (the first DLMAX after a screen clear) or given to the map's cells that
+\ buffer 0 may show (f_drule). A, X and Y are not kept
 
 .F_CHAR
- JSR f_sync
+ BIT GMODE
+ BMI fch_r
+ LDA QQ11
+ ORA GFORCE
+ BNE fch_d
+.fch_r
+ JSR fsy1               \ (the direct text noted first, if any)
  LDA K3
- JMP f_char0
+ LDX XC
+ DEX
+ LDY YC
+ JMP f_char1
+.fch_d
+ LDX f_dlog
+ CPX #DLMAX
+ BCS fchd2
+ LDA XC
+ DEC A
+ STA f_dlx,X
+ LDA YC
+ STA f_dly,X
+ LDA K3
+ STA f_dlk,X
+ INC f_dlog
+ RTS
+.fchd2
+ JSR f_dflush
+ LDA K3
+ LDX XC
+ DEX
+ LDY YC
+ JMP f_drule
 
 \ F_DELCHAR: clear the text map cell at (XC, YC) (TT26's delete)
 
@@ -43,8 +76,8 @@
  PLX
  RTS
 
-\ F_DIRECT: TT66 is about to blank main RAM and draw directly (f_direct0
-\ clears the text map and buffer 0's shown map): no direct text or stars
+\ F_DIRECT: TT66 is about to blank shadow RAM and draw directly (f_direct0
+\ clears the text map): no direct text or stars
 
 .F_DIRECT
  LDA QQ12               \ docked: S_SUN forgets where the sun is (after a
@@ -67,8 +100,9 @@
  STA YC
  RTS
 .fdr1
+ JSR f_dflush           \ (the last screen's noted text given to the map)
  JSR f_direct0          \ (which clears F_DSS with R_SS: no stars noted)
- STZ f_dtext
+ STZ f_dlog             \ nothing noted on the new screen
  RTS
 
 \ f_poly2: f_item's polygon detail (T_POLY), and a station's docking slot
@@ -147,8 +181,7 @@
 
 \ f_enter2: the first record-mode frame since F_DIRECT. Main RAM is visible
 \ (X = 0): remove the directly drawn stars before f_enter copies the border
-\ to shadow RAM, then give buffer 0's shown map (which f_enter clears) the
-\ text drawn directly, if any.
+\ to shadow RAM, then give the text map the text drawn directly, if any.
 
 .f_enter2
  JSR f_unstar
@@ -161,50 +194,136 @@
  STZ f_hw2r
                         \ fall through into f_sync (QQ11 = 0 here)
 
-\ f_sync: called before each change to the text map. Outside record mode
-\ TT26 and CLYNS also draw the change into main RAM, so between F_DIRECT
-\ (which blanks main RAM and clears both maps) and the first change made in
-\ record mode, buffer 0 shows exactly the text map: just note that here
-\ (f_dtext), and at that first record-mode change (or the first frame) copy
-\ the text map to buffer 0's shown map. In space mode (GMODE bit 7: the
-\ frames are running, as in the mission briefing, whose text is printed
-\ outside record mode while LL9B draws the ship as a frame) TT26 draws
-\ nothing (H_CHAR), as in record mode. Preserves X and Y.
+\ f_sync: called before each change to the text map. Outside record and space
+\ mode (GMODE bit 7: the frames are running, as in the mission briefing,
+\ whose text is printed outside record mode while LL9B draws the ship as a
+\ frame) CHPR draws the text directly, into shadow RAM (buffer 1): the
+\ characters F_CHAR noted are given to the map's cells by f_drule before the
+\ map changes otherwise (f_dflush). At the first change in record or space
+\ mode (or the first frame), they go into the map as characters (f_char1),
+\ erasing nothing in buffer 1, which shows them: so the screens that carry
+\ on in record mode keep the hyperspace countdown TTX66K drew. Preserves X
+\ and Y.
 
 .f_sync
  BIT GMODE
  BMI fsy1
  LDA QQ11
  ORA GFORCE
- BEQ fsy1
- STA f_dtext            \ direct: buffer 0 = the text map, as far as text goes
- RTS
+ BNE f_dflush
 .fsy1
- LDA f_dtext
+ LDA f_dlog
  BEQ fsy9
- STZ f_dtext
- PHX
- LDA #5*F_STM           \ (Master port: the direct-mode buffer is 1, shadow)
- LDX #0                 \ buffer 1 shows the text map: N1 and M1 where the
- LDY #2*F_STM+2*F_STN   \ cell is not empty
- JSR f_stset
- LDX #23
-.fsy3
- LDA F_TMR,X
- STA F_SHR1,X
- DEX
- BPL fsy3
- JSR f_tchall
- PLX
+ CMP #DLMAX+1
+ BCS fsy8               \ (given to the map already: f_dflush)
+ DEC f_mk0              \ (non-zero: f_mark leaves buffer 1 alone)
+ CLC
+ JSR fdl0
+ STZ f_mk0
+.fsy8
+ STZ f_dlog
 .fsy9
  RTS
 
-.f_dtext EQUB 0
+\ f_dflush: the noted direct text, if not yet given to the map, given to its
+\ cells by f_drule; then nothing more is noted until the next screen clear
+\ (F_DIRECT) or record-mode change (f_sync). Preserves X and Y.
+
+.f_dflush
+ LDA f_dlog
+ CMP #DLMAX+1
+ BCS fdl9
+ SEC
+ JSR fdl0
+ LDA #DLMAX+1
+ STA f_dlog
+.fdl9
+ RTS
+
+.fdl0                   \ the noted characters, in order, to f_drule (C set)
+ PHX                    \ or f_char1 (C clear); X and Y kept
+ PHY
+ ROR f_dmode
+ LDX #0
+.fdl1
+ CPX f_dlog
+ BCS fdl8
+ PHX
+ LDA f_dly,X
+ TAY
+ LDA f_dlk,X
+ PHA
+ LDA f_dlx,X
+ TAX
+ PLA
+ BIT f_dmode
+ BPL fdl2
+ JSR f_drule
+ BRA fdl3
+.fdl2
+ JSR f_char1
+.fdl3
+ PLX
+ INX
+ BRA fdl1
+.fdl8
+ PLY
+ PLX
+ RTS
+
+.f_dlog EQUB 0          \ characters noted since the screen's clear (DLMAX + 1:
+                        \ given to the map already)
+.f_dmode EQUB 0         \ bit 7: fdl0 to f_drule
+.f_dlx  SKIP DLMAX      \ their columns, rows and characters
+.f_dly  SKIP DLMAX
+.f_dlk  SKIP DLMAX
+
+\ f_drule: character A drawn directly into the cell at column X, row Y. A
+\ cell holding 0 or &80 is left alone (buffer 0 shows nothing there, or is
+\ to erase it anyway); one holding A or &80 + A is toggled, as CHPR's EOR
+\ and f_char1 do it; one holding another character, or remembering one,
+\ becomes &80: buffer 0 may show that character, which is to go
+
+.f_drule
+ CPY #24
+ BCS frl9
+ CPX #32
+ BCS frl9
+ STA f_tmp
+ STY f_row
+ JSR f_cell
+ JSR f_tmget
+ STX f_ysav             \ (the cell)
+ TXA
+ AND #&7F
+ BEQ frl9
+ LDX f_row
+ CMP f_tmp
+ BNE frl2
+ LDA f_ysav             \ the same character: drawn again or removed
+ EOR #&80
+ BMI frl1
+ INC F_TMR,X
+ BRA frl4
+.frl1
+ DEC F_TMR,X
+ BRA frl4
+.frl2
+ LDA #&80               \ another: forgotten
+ BIT f_ysav
+ BMI frl4
+ DEC F_TMR,X
+.frl4
+ JSR f_tmst
+ LDA #3
+ STA F_TCH,X
+.frl9
+ RTS
 
 \ f_b0new: a disc command has used buffer 0 (main RAM &4000-&5FFF) to stash
 \ HAZEL (DOSCLI, elite-source.asm), so it no longer holds the last frame of
-\ the previous space-mode session that its rasteriser state, disc colour and
-\ shown-text map describe: clear it and forget that state, as F_INIT leaves
+\ the previous space-mode session that its rasteriser state and disc colour
+\ describe: clear it and forget that state, as F_INIT leaves
 \ it, for f_enter to carry on from (it then copies the border across)
 
 .f_b0new
@@ -230,13 +349,9 @@
  LDA #0                 \ its rasteriser state: empty
  JSR T_SETBUF
  JSR T_RESETBUF
- LDA #10*F_STM          \ and its shown text: none
- JSR f_stand
- LDX #23
-.fbn3
- STA F_SHR0,X
- DEX
- BPL fbn3
+ LDA #&FF               \ and no cells f_mark erased: its text shows nothing,
+ STA f_mrt              \ right for any F_TCH (the text map, frame.asm)
+ STZ f_mrb
  RTS
 
 \ f_unstar: EOR away the stars PIXEL drew directly into main RAM since

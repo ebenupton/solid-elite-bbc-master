@@ -96,200 +96,112 @@ F_CPO = F_CPE           \ (the odd rows' bytes are the even rows')
 \ (elite-gfx.asm), which it leaves to the ship records.
 
 \ ------------------------------------------------------------------------------
-\ Text map: 24 rows x 32 columns of desired characters (F_TM), and for each
-\ cell what each buffer shows (F_ST, at F_TM + &300). A cell of F_TM is its
-\ character (&20-&7F), or 0, or, once cleared, &80 + the character it had
-\ (empty, remembering the character). For buffer b, bit b+2 of F_ST (F_STN)
-\ says it shows a character in the cell, and bit b (F_STM) that this is the
-\ cell's character, or the one it remembers: so a cell cleared and given
-\ its character back (TT66 and a view's title) is shown as it was, as with
-\ the original's shown maps. The text steps erase a cell where a buffer shows
-\ a character that is not the cell's (N, and not M or the cell empty), and
-\ draw a non-empty cell where it shows none (not N). F_TMR counts the
-\ non-empty cells of each text map row, F_SHR0/F_SHR1 those each buffer
-\ shows, so empty rows cost nothing.
+\ Text map: 24 rows x 32 columns of desired characters (F_TM). A cell holds
+\ its character (&20-&7F), or 0, or, once cleared, &80 + the character it
+\ had (empty, remembering it), or &80 (empty: f_drule's mark for a cell a
+\ buffer may show anything in). F_TMR counts each row's non-empty cells.
+\ F_TCH holds, per row, bit b (P) for buffer b: the row has changed since
+\ buffer b's text steps last ran on it. Nothing else records what a buffer
+\ shows; between frames, for each buffer b and row:
+\
+\   * P clear: b shows exactly the row's characters (nothing in an empty
+\     cell);
+\   * P set: a cell holding c or &80 + c shows c or nothing, one holding 0
+\     nothing, one holding &80 anything.
+\
+\ A cell given a different character (not into an empty, never-shown cell,
+\ not its remembered one: f_char1) is erased at once in both buffers' next
+\ frames, through their dirty extents (f_mark). A buffer's text steps, in a
+\ row with P set, erase each cell with bit 7 set (f_text1), draw every
+\ character (f_text2) and clear P; elsewhere they redraw only the
+\ characters something was drawn over this frame. So a cell cleared and
+\ given its character back (TT66 and a view's title) is left alone in both
+\ buffers, as with the original's shown maps. Once both buffers have erased
+\ a cleared cell it holds 0 (f_text1). A buffer's screen cleared (TTX66,
+\ f_b0new) shows nothing: right for any P, as everything in the map since
+\ (the screen's text) set P.
+\
+\ Outside record and space mode CHPR draws into shadow RAM (buffer 1) and
+\ the map changes only so that buffer 0 (main RAM, the last space-mode
+\ frame: f_enter) knows what of its text the screen's text has overprinted
+\ (f_drule), with one exception: the first DLMAX characters after a screen
+\ clear are noted (f_dlx/f_dly/f_dlk, f_dlog) and given to the map at the
+\ first change in record or space mode (f_sync), as the screens that carry
+\ on in record mode without a TT66 (DEATH's and TITLE's TT66 13, then QQ11
+\ = 0; the briefing's LL9B) have drawn at most TTX66K's hyperspace
+\ countdown (ee3: three characters) directly, which then stays on the
+\ screen (docs/renderer.md, "The text map").
 \ ------------------------------------------------------------------------------
 
-F_STM = 1               \ F_ST: buffer 0 shows the cell's character
-F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
+DLMAX = 3               \ (TTX66K's ee3: TT11, three digits)
 
-.f_tmclear              \ clear the text map and buffer 1's shown cells (Master
- LDX #0                 \ port: buffer 1, shadow RAM, is the direct-mode screen,
-.ftc1                   \ which TTX66 blanks; buffer 0 keeps its own: it still
- LDA F_TM,X             \ holds that picture)
- BEQ P%+7
- ORA #&80
- STA F_TM,X
- LDA F_TM+256,X
- BEQ P%+7
- ORA #&80
- STA F_TM+256,X
- LDA F_TM+512,X
- BEQ P%+7
- ORA #&80
- STA F_TM+512,X
- INX
- BNE ftc1
- LDA #5*F_STM           \ buffer 1 shows nothing
- JSR f_stand
- LDX #23
-.ftc2
- STA F_TMR,X
- STA F_SHR1,X
- DEX
- BPL ftc2
- JMP f_tchall
-
-\ f_stand: every cell's F_ST AND A: a buffer's shown cells cleared (f_tmclear,
-\ f_enter, f_b0new). Returns A = 0
-
-.f_stand
- STA fsa1+1
- STA fsa2+1
- STA fsa3+1
- LDX #0
-.fsa0
- LDA F_ST,X
-.fsa1
- AND #0                 \ patched
- STA F_ST,X
- LDA F_ST+256,X
-.fsa2
- AND #0                 \ patched
- STA F_ST+256,X
- LDA F_ST+512,X
-.fsa3
- AND #0                 \ patched
- STA F_ST+512,X
- INX
- BNE fsa0
- TXA
- RTS
-
-\ f_stset: every cell's F_ST = (F_ST AND A) OR (X if the text map's cell is
-\ empty, Y if not): buffer 1's shown cells set from the text map (f_sync)
-
-.f_stset
- STA fss_k+1
- STX fss_z+1
- STY fss_n+1
- LDA #HI(F_TM)
- STA fss_t+2
- LDA #HI(F_ST)
- STA fss_s+2
- STA fss_d+2
- LDX #0
-.fss_t
- LDA F_TM,X             \ patched
- BEQ fss_z
- BMI fss_z
-.fss_n
- LDA #0                 \ patched
- BRA fst2
-.fss_z
- LDA #0                 \ patched
-.fst2
- STA fss_o+1
-.fss_s
- LDA F_ST,X             \ patched
-.fss_k
- AND #0                 \ patched
-.fss_o
- ORA #0                 \ patched
-.fss_d
- STA F_ST,X             \ patched
- INX
- BNE fss_t
- INC fss_t+2
- INC fss_s+2
- INC fss_d+2
- LDA fss_t+2
- CMP #HI(F_TM)+3
- BNE fss_t
- RTS
-
-\ f_cell: X = column, Y = row -> f_ptr = row*32 + column (offset into a map)
-\ Returns the offset in f_off (2 bytes) and also patches the map accessors
-\ f_tmld/f_tmst and f_stld/f_stst.
+\ f_cell: X = column, Y = row -> the map accessors f_tmld/f_tmst patched to
+\ its cell (row*32 + column)
 
 .f_cell
  TYA
  LSR A
  LSR A
  LSR A
- STA f_off+1            \ row DIV 8 = high byte of row*32
+ STA f_tmld+2           \ row DIV 8 = high byte of row*32
  TYA
  ASL A
  ASL A
  ASL A
  ASL A
  ASL A                  \ (row MOD 8) * 32
- STA f_off
- TXA
- ORA f_off
- STA f_off
+ STX f_tmld+1
+ ORA f_tmld+1
  CLC
  ADC #LO(F_TM)
  STA f_tmld+1
  STA f_tmst+1
- STA f_stld+1
- STA f_stst+1
- LDA f_off+1
+ LDA f_tmld+2
  ADC #HI(F_TM)
  STA f_tmld+2
  STA f_tmst+2
- ADC #3                 \ (C = 0) F_ST = F_TM + &300
- STA f_stld+2
- STA f_stst+2
  RTS
 
-.f_off  EQUW 0
 .f_row  EQUB 0
-.F_TCH  SKIP 24         \ per text row: bit b set = buffer b's shown row may
-                        \ differ from the text map (f_text1/f_text2 scan it whole)
-.f_tbit EQUB 0          \ this frame's buffer bit (1 or 2): its M bit in F_ST
+.f_tcol  EQUB 0
+.F_TCH  SKIP 24         \ per text row: bit b set (P) = the row changed since
+                        \ buffer b's text steps last ran on it
+.f_tbit EQUB 0          \ this frame's buffer's bit in F_TCH (1 or 2)
+.f_obit EQUB 0          \ and the other buffer's
 
-.f_tchall               \ every row changed, for both buffers (keeps X; A = 0)
- PHX
- LDX #23
- LDA #3
-.fta1
- STA F_TCH,X
- DEX
- BPL fta1
- PLX
- LDA #0
- RTS
+\ f_char1 (F_CHAR, frame_cold.asm; f_sync): character A into the cell at
+\ column X, row Y. EOR semantics like the original: printing the same
+\ character again removes it.
 
-\ f_char0 (F_CHAR, frame_cold.asm): A = character, (XC-1, YC) = cell. EOR
-\ semantics like the original: printing the same character again removes it.
-
-.f_char0
- STY f_ysav
- PHA
- LDX XC
- DEX
- LDY YC
+.f_char1
  CPY #24
  BCS fch9
  CPX #32
  BCS fch9
  STY f_row
- JSR f_cell
- PLA
- JSR f_tmget            \ X = current content
- BEQ fch1               \ empty: store the character
- BMI fch1
+ STX f_tcol
  STA f_tmp
- CPX f_tmp
- BEQ fch2               \ same character: remove it
- JSR f_tmstore          \ different: replace
- JMP fch8
+ JSR f_cell
+ JSR f_tmget            \ X = the cell
+ BEQ fch1               \ empty, never shown: store the character
+ TXA
+ BMI fch3
+ CMP f_tmp
+ BEQ fch2               \ the same character: remove it
+ JSR f_mark             \ another: replace it (erased in both buffers)
+ BRA fch4
+.fch3
+ AND #&7F               \ cleared: the character it remembers is shown as it
+ CMP f_tmp              \ was; another is drawn over an erased cell
+ BEQ fch1
+ JSR f_mark
 .fch1
- JSR f_tmstore
  LDX f_row
  INC F_TMR,X
- JMP fch8
+.fch4
+ LDA f_tmp
+ JSR f_tmst
+ BRA fch8
 .fch2
  JSR f_tmclr
  LDX f_row
@@ -298,35 +210,16 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  LDX f_row
  LDA #3
  STA F_TCH,X
- LDY f_ysav
- RTS
 .fch9
- PLA
- LDY f_ysav
- RTS
-
-.f_tmstore              \ A = the new character, X = the cell's content (not
- STA f_tmp              \ A): if it is not A's, or A's remembered, neither
- TXA                    \ buffer shows the cell's character now (M = 0)
- AND #&7F
- CMP f_tmp
- BEQ fts1
-.f_stld
- LDA F_ST               \ patched
- AND #3*F_STN
-.f_stst
- STA F_ST               \ patched
-.fts1
- LDA f_tmp
-.f_tmst
- STA F_TM               \ patched
  RTS
 
 .f_tmclr                \ the cell (not empty) cleared: it remembers its
  JSR f_tmget            \ character, which each buffer shows or not as before
  TXA
  ORA #&80
- BNE f_tmst             \ (always)
+.f_tmst
+ STA F_TM               \ patched
+ RTS
 
 .f_tmget
 .f_tmld
@@ -335,6 +228,97 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 
 .f_ysav EQUB 0
 .f_tmp  EQUB 0
+
+\ f_mark: the cell at column f_tcol, row f_row is given a character where a
+\ buffer may show another: erase it in both buffers' next frames (buffer 0's
+\ only while f_mk0 is set, f_sync), as f_text1's erases do there: its
+\ pixels, clipped to the space views' clip window (x 2..253,
+\ y 1..191, F_FRAME), into the buffer's dirty extents (R_DIRTYLb/R_DIRTYRb,
+\ main RAM), its pixel rows no longer kept in it (KF bit b,
+\ gfx-raster_kept.asm), and the rows noted (f_mrt/f_mrb) for f_text1 to
+\ give to the rasteriser's dirty row range (R_PRDYT/R_PRDYB, bank 5)
+
+.f_mark
+ LDA f_tcol
+ ASL A
+ ASL A
+ ASL A
+ PHA
+ CMP #2
+ BCS P%+4
+ LDA #2
+ STA fmk_l+1
+ PLA
+ ORA #7
+ CMP #254
+ BCC P%+4
+ LDA #253
+ STA fmk_r+1
+ LDA f_row
+ ASL A
+ ASL A
+ ASL A
+ STA fmk_y+1            \ the cell's pixel rows 8r .. 8r + 7 (8r + 8: fmk_e)
+ ADC #8                 \ (C = 0: r <= 23)
+ STA fmk_e+1
+ LDX #0                 \ buffer 0, then 1
+.fmk0
+ LDA fbp_dl,X
+ STA fmk_d1+2
+ STA fmk_d2+2
+ LDA fbp_dr,X
+ STA fmk_d3+2
+ STA fmk_d4+2
+ LDA fmk_kb,X
+ STA fmk_k+1
+.fmk_y
+ LDY #0                 \ patched: 8r
+ BNE P%+3               \ (row 0: from y = 1)
+ INY
+ TYA
+ CMP f_mrt,X
+ BCS P%+5
+ STA f_mrt,X
+.fmk1
+.fmk_l
+ LDA #0                 \ patched: the cell's left end
+.fmk_d1
+ CMP R_DIRTYL0,Y        \ patched
+ BCS P%+5
+.fmk_d2
+ STA R_DIRTYL0,Y        \ patched
+.fmk_r
+ LDA #0                 \ patched: its right end
+.fmk_d3
+ CMP R_DIRTYR0,Y        \ patched
+ BCC P%+5
+.fmk_d4
+ STA R_DIRTYR0,Y        \ patched
+ LDA KF,Y
+.fmk_k
+ AND #0                 \ patched: not buffer X's bit
+ STA KF,Y
+ INY
+.fmk_e
+ CPY #0                 \ patched: 8r + 8
+ BCC fmk1
+ DEY
+ TYA
+ CMP f_mrb,X
+ BCC P%+5
+ STA f_mrb,X
+ INX
+ CPX #2
+ BCS fmk9
+ LDA f_mk0
+ BEQ fmk0
+.fmk9
+ RTS
+
+.fmk_kb EQUB &FE, &FD   \ (KF: bit b for buffer b, gfx-tramp.asm's tkbit)
+.f_mrt  EQUB 255, 255   \ per buffer: the pixel rows f_mark has marked since
+.f_mrb  EQUB 0, 0       \ its last frame (top 255: none)
+.f_mk0  EQUB 0          \ non-zero: f_mark leaves buffer 1 alone
 
 \ f_delchar0 (F_DELCHAR, frame_cold.asm): clear the text map cell at X =
 \ column, Y = row
@@ -359,8 +343,9 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  LDY f_ysav
  RTS
 
-\ f_clrtext0 (F_CLRTEXT, frame_cold.asm): clear text map rows X to Y inclusive
-\ (each cell remembers its character; F_ST is unchanged)
+\ f_clrtext0 (F_CLRTEXT, frame_cold.asm; f_direct0): clear text map rows X
+\ to Y inclusive (each cell remembers its character; a row with no
+\ character is left as it is). Y is kept
 
 .f_clrtext0
  STY f_ysav
@@ -388,12 +373,11 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 .fct5
  DEY
  BPL fct3
- LDA #0
  LDX f_row
- STA F_TMR,X
-.fct6
+ STZ F_TMR,X
  LDA #3
  STA F_TCH,X
+.fct6
  INX
  CPX #24
  BCS fct9
@@ -420,7 +404,10 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA GFRONT
  TSB &FE34              \ ACCCON D = 1: show shadow RAM (X as it is)
  CLI
- JSR f_tmclear          \ (A = 0; X only, so Y is kept)
+ LDX #0                 \ the text map cleared (Y is kept)
+ LDY #23
+ JSR f_clrtext0
+ LDA #0
  LDX #NDSTAR-1          \ the stars will be re-recorded too (and no
 .fdi1                   \ direct-mode stars noted: F_DSS)
  STA R_SS,X
@@ -912,14 +899,8 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  JSR T_RESETBUF
  LDA #&FF
  STA F_DCOL+1
- LDA #5*F_STM           \ buffer 1 shows nothing
- JSR f_stand
- LDX #23
-.fen9
- STA F_SHR1,X
- DEX
- BPL fen9
- JSR f_tchall
+ STA f_mrt+1            \ (and no cells f_mark erased: its text shows nothing,
+ STZ f_mrb+1            \ right for any F_TCH: the text map, frame.asm)
  STZ F_BACK             \ buffer 1 is on show: draw into buffer 0 first
  STZ GFLIP
  LDA #&80
@@ -936,7 +917,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 
 \ ------------------------------------------------------------------------------
 \ Buffer-dependent operands: f_bufpatch points this layer's accesses to the
-\ current buffer's rasteriser arrays (R_DIRTYLb etc.) and shown-text map.
+\ current buffer's rasteriser arrays (R_DIRTYLb etc.).
 \ ------------------------------------------------------------------------------
 
 MACRO FPATCH lab, a0, a1
@@ -969,21 +950,11 @@ ENDMACRO
  STA fdc_ol+2
  LDA fbp_or,X
  STA fdc_or+2
- LDA fbp_sr,X
- STA ft_sr1+2
- STA ft_sr2+2
- STA ft_sr3+2
- LDA fbp_srl,X
- STA ft_sr1+1
- STA ft_sr2+1
- STA ft_sr3+1
  RTS
 .fbp_dl EQUB HI(R_DIRTYL0), HI(R_DIRTYL1)
 .fbp_dr EQUB HI(R_DIRTYR0), HI(R_DIRTYR1)
 .fbp_ol EQUB HI(R_DISCL0), HI(R_DISCL1)
 .fbp_or EQUB HI(R_DISCR0), HI(R_DISCR1)
-.fbp_sr EQUB HI(F_SHR0), HI(F_SHR1)
-.fbp_srl EQUB LO(F_SHR0), LO(F_SHR1)
 ASSERT LO(R_DIRTYL0) = LO(R_DIRTYL1) AND LO(R_DIRTYR0) = LO(R_DIRTYR1)
 ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
 
@@ -2187,7 +2158,7 @@ ASSERT LT_HL1 = LT_HL0 + 17 AND LT_HL2 = LT_HL0 + 34 AND LT_HL3 = LT_HL0 + 51
 
 F_TCOL = &FF            \ text ink: yellow (logical colour 3)
 
-\ f_rowptr: X = text row -> fz_p = F_TM + 32*row, fz_q = F_ST + 32*row
+\ f_rowptr: X = text row -> fz_p = F_TM + 32*row (X kept)
 
 .f_rowptr
  TXA
@@ -2204,65 +2175,51 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
  CLC
  ADC #LO(F_TM)
  STA fz_p
- STA fz_q
  LDA fz_p+1
  ADC #HI(F_TM)
  STA fz_p+1
- ADC #3                 \ (C = 0) F_ST = F_TM + &300
- STA fz_q+1
  RTS
 
-\ f_text1: cells shown in this buffer that must change: give them back their
-\ background by marking them dirty before R_DISCROWS repaints
+\ f_text1: this buffer's text before the repair. The rows f_mark marked since
+\ its last frame go into the rasteriser's dirty row range (R_MARKDIRTY with an
+\ empty extent: only the rows). Then in each row that changed since its last
+\ text steps (F_TCH), the cleared cells are erased, given back their
+\ background by marking them dirty; one the other buffer has erased already
+\ is forgotten (0). A row with no character is then done.
 
 .f_text1
- LDA F_BACK             \ this buffer's bit in F_TCH, and its M bit in F_ST
- INC A                  \ (into the text steps' masks)
+ LDX F_BACK
+ LDY f_mrt,X
+ CPY #192
+ BCS ft10
+ LDA #255
+ STA R_XL
+ STZ R_XR
+ JSR T_MARKDIRTY        \ (keeps R_XL, R_XR)
+ LDX F_BACK
+ LDY f_mrb,X
+ JSR T_MARKDIRTY
+ LDX F_BACK
+ LDA #255
+ STA f_mrt,X
+ STZ f_mrb,X
+.ft10
+ LDA F_BACK             \ this buffer's bit in F_TCH, and the other's
+ INC A
  STA f_tbit
- STA ft_e1+1
- ASL A                  \ its N bit
- ASL A
- STA ft_n2+1
- ORA f_tbit             \ both
- STA ft_n1+1
- STA ft_m1+1
- STA ft_b2+1
- EOR #&FF               \ neither
- STA ft_c1+1
+ EOR #3
+ STA f_obit
  LDX #23                \ rows 23..0 (each row is independent)
 .ft11
-.ft_sr1
- LDA F_SHR0,X           \ patched
- BEQ ft18x              \ X = row still
- LDA F_TCH,X            \ shown row = text map row: nothing to remove
+ LDA F_TCH,X
  AND f_tbit
  BEQ ft18x
  STX fz_i
  JSR f_rowptr
  LDY #31
 .ft12
- LDA (fz_q),Y           \ a character shown (N) that is not the cell's (not
-.ft_n1                  \ M), or the cell is empty (M is never set without N)
- AND #0                 \ patched: N and M
- BEQ ft17a
-.ft_m1
- CMP #0                 \ patched: N and M
- BNE ft15
- LDA (fz_p),Y
- BEQ ft15
- BMI ft15
-.ft17a
- DEY
- BPL ft12
- BMI ft18
-.ft15
- LDA (fz_q),Y           \ this cell goes: it shows nothing, and is marked
-.ft_c1                  \ dirty
- AND #0                 \ patched: neither N nor M
- STA (fz_q),Y
- LDX fz_i
-.ft_sr2
- DEC F_SHR0,X           \ patched
+ LDA (fz_p),Y           \ cleared (bit 7): erase it
+ BPL ft17
  STY fz_u
  TYA
  ASL A
@@ -2295,11 +2252,21 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
  BCC ft13
 .ft16
  LDY fz_u
+ LDX fz_i
+ LDA F_TCH,X            \ the other buffer erased it at its last frame: no
+ AND f_obit             \ buffer shows it now
+ BNE ft17
+ LDA #0
+ STA (fz_p),Y
 .ft17
  DEY
  BPL ft12
-.ft18
  LDX fz_i
+ LDA F_TMR,X            \ no character to draw: the row is done (else
+ BNE ft18x              \ f_text2 finishes it)
+ LDA F_TCH,X
+ EOR f_tbit
+ STA F_TCH,X
 .ft18x
  DEX
  BPL ft11
@@ -2320,7 +2287,8 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
  CMP R_XL
  RTS                    \ C clear if XR < XL... invert below
 
-\ f_text2: draw the text map's cells that this buffer doesn't show yet, or
+\ f_text2: draw the characters of each row that changed since this buffer's
+\ last text steps (F_TCH, whose bit is then cleared), and elsewhere those
 \ whose pixels something overwrote this frame
 
 .f_text2
@@ -2335,6 +2303,15 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
 .ft2r
  STX fz_i
  JSR f_rowptr
+ LDA F_TCH,X            \ changed for this buffer: the whole row (then it is
+ AND f_tbit             \ unchanged)
+ BEQ ft2w
+ EOR F_TCH,X
+ STA F_TCH,X
+ STZ f_wl
+ LDY #31
+ BRA ft27
+.ft2w
  LDA #255               \ W = union of R_WL/R_WR and DIRTY over the 8 lines
  STA f_wl
  LDA #0
@@ -2372,83 +2349,35 @@ F_TCOL = &FF            \ text ink: yellow (logical colour 3)
  INY
  CPY fz_n
  BCC ft22
- LDA f_wl               \ as cell columns: wl DIV 8 .. wr DIV 8
+ LDA f_wr               \ as cell columns: wl DIV 8 .. wr DIV 8 (nothing
+ BEQ ft2x               \ written in this row: WR = 0)
  LSR A
  LSR A
  LSR A
- STA f_wl
- LDA f_wr
- BEQ ft25
- LSR A
- LSR A
- LSR A
- STA f_wr
- JMP ft26
-.ft25
- LDA #255               \ nothing written in this row
- STA f_wl
- LDA #0
- STA f_wr
-.ft26
- LDX fz_i               \ row unchanged for this buffer: only the cells
- LDA F_TCH,X            \ written over (columns f_wl..f_wr)
- AND f_tbit
- BNE ft2f
- LDY f_wr
- CPY f_wl
- BCC ft2x
+ TAY
  LDA f_wl
- STA ft_end
- BRA ft27
-.ft2x
- JMP ft29
-.ft2f
- EOR F_TCH,X            \ whole row (then it is unchanged)
- STA F_TCH,X
- STZ ft_end
- LDY #31
-.ft27
+ LSR A
+ LSR A
+ LSR A
+ STA f_wl
+.ft27                   \ columns Y down to f_wl
  LDA (fz_p),Y
  BEQ ft28
  BMI ft28
- LDA (fz_q),Y
-.ft_e1
- AND #0                 \ patched: M (f_text1 has erased the other characters,
- BEQ ft2d               \ so M = N here): not shown yet
- CPY f_wl
- BCC ft28
- CPY f_wr
- BEQ ft2d
- BCS ft28
-.ft2d
- LDA (fz_q),Y
-.ft_n2
- AND #0                 \ patched: N
- BNE ft2e
- LDX fz_i
-.ft_sr3
- INC F_SHR0,X           \ patched
-.ft2e
- LDA (fz_q),Y           \ shown now
-.ft_b2
- ORA #0                 \ patched: E and N
- STA (fz_q),Y
- LDA (fz_p),Y
  STY fz_u
  JSR f_glyph
  LDY fz_u
 .ft28
- CPY ft_end
- BEQ ft2e9
+ CPY f_wl
+ BEQ ft2x
  DEY
- JMP ft27
-.ft2e9
+ BRA ft27
+.ft2x
  LDX fz_i
  JMP ft29
 
 .f_wl EQUB 0
 .f_wr EQUB 0
-.ft_end EQUB 0
 
 \ f_glyph: draw character A at column Y, text row fz_i, ink F_TCOL, only on
 \ the glyph's pixels and only inside the clip window

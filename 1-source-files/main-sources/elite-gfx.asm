@@ -210,11 +210,7 @@ INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HAL
  SKIP F_DL + 1536 - P%
 .F_DLEND
 .F_TM   SKIP 768        \ text map: desired characters, 24 rows of 32
-.F_ST   SKIP 768        \ what each buffer shows in each cell (gfx-frame.asm)
-ASSERT F_ST = F_TM + &300
 .F_TMR  SKIP 24         \ non-empty cells per row
-.F_SHR0 SKIP 24
-.F_SHR1 SKIP 24
 .F_DSX  SKIP NDSTAR     \ the stars drawn directly (gfx-frame_cold.asm's F_DSTAR,
 .F_DSY  SKIP NDSTAR     \ f_unstar): x and y (their sizes, F_DSS, in the shared
                         \ workspace)

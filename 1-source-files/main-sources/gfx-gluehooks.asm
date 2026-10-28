@@ -11,11 +11,12 @@
 
 \ The text map: CHPR (WRCHV, so any ROM may be paged: the cold area, or DFS
 \ printing a catalogue) and CLYNS keep the frame layer's text map up to date
-\ in every mode (so a screen that carries on in record mode without a TT66
-\ still has its text), and draw on the screen only outside record mode. These
-\ stubs page bank 6 in and the caller's bank (&F4, ANDY included) back, and
-\ live below &3000 as CHPR runs with ACCCON X set. A, X, Y are not kept (F_CHAR
-\ and F_DELCHAR keep Y, F_CLRTEXT X and Y)
+\ in record and space mode, and outside them note what the screen's text does
+\ to it (gfx-frame.asm's text map, gfx-frame_cold.asm's F_CHAR), and draw on
+\ the screen only outside record mode. These stubs page bank 6 in and the
+\ caller's bank (&F4, ANDY included) back, and live below &3000 as CHPR runs
+\ with ACCCON X set. A, X, Y are not kept (F_DELCHAR keeps Y, F_CLRTEXT X and
+\ Y)
 
 .G_CHAR
  LDA &F4
