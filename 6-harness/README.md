@@ -112,6 +112,7 @@ moon=scenery`.
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
 | `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
 | `mfbcmp.mjs` | The renderer's regression check: hashes both screen buffers at the end of every K-th iteration's frame over the gate's run, or with `--frames` at every frame the frame layer finishes (keyed iteration.n), for comparing two builds whose game state is identical, which must draw the same pixels; `--cmp` compares two runs, and `--dump N` writes an iteration's buffers. `--mask row,col0,col1` adds to each frame's hash one with those text cells blanked, so that `--cmp` fails only on frames that differ outside them. |
+| `mcountsheet.mjs` | Puts the hyperspace countdown's cells side by side, from the original and two builds' screenshots of a replayed session (the development tree's agentplay replay); it made `images/countdown/sheet.png`. |
 | `mflips.mjs` | The flip-interval distribution: how many fields each frame of the space view is shown for, over the gate's run (or the title screen, `--title SECS`), per pilot phase. With the 25 fps cap the shortest is 2. |
 | `verify.sh` | The gate. |
 

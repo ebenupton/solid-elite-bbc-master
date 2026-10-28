@@ -91,8 +91,8 @@ would have drawn, then returns from the routine itself:
   pass.
 * `LASLI` (our lasers), `BOMBOFF` (the energy bomb's lightning) and `SIGHT`
   (the laser sights) record their lines.
-* `CHPR` and `CLYNS` keep a 32x24 **text map** of the characters on screen,
-  in record mode and outside it.
+* `CHPR` and `CLYNS` keep a 32x24 **text map** of the characters the
+  frames draw (see "The text map").
 
 The launch and hyperspace rings are drawn directly, even in record mode
 (`HFS2` sets `GFORCE`). Outside record mode every hook returns at once, so the
@@ -123,8 +123,9 @@ back buffer, two frames old:
    only z's low 16 bits were kept, so a planet 65536-69631 away hid a
    station in front of it on a docking run (`6-harness/mstation.mjs`).
 5. Draw the lens flare, if the sun is on screen (below).
-6. Draw the text, in the cells whose character changed or whose pixels were
-   drawn over, then the laser sights.
+6. Draw the text: in the rows that changed, erase the cleared cells and
+   draw the row; elsewhere draw the cells whose pixels were drawn over. Then
+   the laser sights.
 7. Plot the stars last, only into screen bytes that are wholly black (see
    "Stars behind fills").
 8. Request a flip at the next vsync. `H_VSYNC`, from `IRQ1`, shows the
@@ -164,7 +165,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
-| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
+| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
 | The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles and the moon, `PF_HOOK` and `pf_moon` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
@@ -228,6 +229,83 @@ are the only black polygon details, each with four vertices.
 `test_raster.py` models the rule, and `6-harness/mstarocc.mjs` puts a grid
 of stars over the planet's sea, a dark ship, the docking slot and the sun
 beside the planet, and screenshots them.
+
+## The text map
+
+The frames draw the text from one structure, the text map `F_TM` in bank 6
+(768 bytes: the characters wanted in the 24 rows of 32 cells), with `F_TMR`
+(24: the characters per row) and `F_TCH` (24: per row, bit b for buffer b).
+Nothing records which characters each buffer shows.
+
+**Why a whole map.** Besides the space views' few strings, the frames draw
+the mission 1 briefing, which prints whole pages in space mode while
+`LL9B`'s frames run: token 10's pages are 317 and 369 cells counting spaces
+(420 at most). The title screen has about 90 cells, a flight view at most
+about 61, `DEATH` about 39. A list of characters at two bytes an entry would
+be larger than the map and would need an overflow path; the map has
+neither a bound to keep nor an overflow.
+
+**A cell** holds its character, 0, &80 + the character it had (cleared,
+remembering it), or &80 (a buffer may show anything there). `F_TCH`'s bit b
+(P) says the row has changed since buffer b's text steps last ran on it.
+Between frames, for each buffer and row: if P is clear, the buffer shows
+exactly the row's characters; if P is set, a cell holding c or &80 + c
+shows c or nothing, one holding 0 nothing, one holding &80 anything. Every
+change keeps that true (`f_char1`, `f_delchar0`, `f_clrtext0`):
+
+* a character into an empty cell, or into a cleared cell remembering it
+  (`TT66`, then the view's title): P set for both buffers, nothing erased,
+  so a title cleared and printed again is left alone in both buffers;
+* the same character printed again: the cell is cleared (`CHPR`'s EOR);
+* a character into a cell holding, or remembering, another: the cell is
+  erased at once in both buffers' next frames (`f_mark`): its pixels go into
+  the buffer's dirty extents, its pixel rows are no longer kept in it (`KF`),
+  and the rows go into the rasteriser's dirty row range;
+* a character printed over the one that replaced it since the last frame
+  leaves the cell as it is (`f_eor`: a ring of the last four replacements,
+  forgotten at each frame's text steps). That is EOR's undo: `TT107` prints
+  the hyperspace countdown's next number over the current one, then the
+  current one again to take it out, so the space views show 15, 14, 13 ...
+  as the original does (`images/countdown/sheet.png`: SNG47, the map
+  without `f_eor` and with it, at a countdown's first ticks, made by
+  `6-harness/mcountsheet.mjs`).
+
+A buffer's text steps, in a row with P set: `f_text1` erases the cells with
+bit 7 set, and `f_text2` draws every character of the row and clears P. In
+the other rows `f_text2` draws only the characters something was drawn over
+this frame. A cleared screen shows nothing, which is right for any P.
+
+**Outside record and space mode** `CHPR` draws into shadow RAM (buffer 1)
+and the map does not follow the screen. Main RAM (buffer 0) still holds the
+last space-mode frame, and only what the screen's text does to the cells
+buffer 0 may show is recorded (`f_drule`): a character drawn over a cell
+holding or remembering the same character toggles it; over another it
+becomes &80, which is then erased; a cell holding 0 is left alone.
+
+**The direct text a frame can inherit.** After `DEATH`'s and `TITLE`'s `TT66
+13`, which carry on in record mode, the only text printed directly before
+the next space-mode frame is `TTX66K`'s hyperspace countdown (`ee3`: three
+cells at (1..3, 1)), when a countdown is running. So `F_CHAR` notes the
+first three characters drawn directly after a screen clear, and the first
+change in record or space mode (or the first frame) puts them into the map
+(`f_sync`). A fourth character, a delete or `CLYNS` on a direct screen, or a
+`TT66` first gives the noted characters to `f_drule` instead: the screens
+that print more than three characters directly always end with a `TT66`
+before any frame.
+
+**Cost and checks.** In bank 6, `F_TM` 768 bytes, `F_TMR` and `F_TCH` 24
+each, the direct notes 11, `f_eor`'s ring 14, and `f_mark` 136 with its
+tables. The gate's flight runs at 194,178 cycles an iteration (10.30
+iterations per emulated second), and the docked screens draw text with no
+upkeep of what each buffer shows (about 5% fewer busy cycles,
+`mdocktime.mjs`). `6-harness/mfbcmp.mjs --frames` hashes both buffers at
+every frame of the gate's run (and the development tree's replays do the
+same over sessions with deaths, escape pods, the briefings, hyperspace,
+dockings and view changes); with `--mask 1,1,3` it shows which frames
+differ only in the countdown's cells. Against the per-cell shown state
+this map replaced, 305,743 frames are identical but for 8,688 that differ
+only in those three cells, where the space views now show the original's
+number.
 
 ## Kept solid rows
 
