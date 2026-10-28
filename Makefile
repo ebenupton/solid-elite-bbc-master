@@ -22,6 +22,11 @@ PYTHON?=python
 #
 #   verify=no           Do not compare the game binaries with the originals
 #
+#   bands=on            Banded planets: a quarter of the crater planets, by
+#                       the system's seed, are drawn with latitude bands
+#                       (gfx-planet7.asm's pf_bands); off by default, when no
+#                       planet has bands and their code is assembled out
+#
 # So, for example:
 #
 #   make commander=max match=no verify=no
@@ -48,6 +53,10 @@ PYTHON?=python
 # _MATCH_ORIGINAL_BINARIES
 #   TRUE  = Match binaries to released version (i.e. fill workspaces with noise)
 #   FALSE = Zero-fill workspaces
+#
+# _PLANET_BANDS
+#   TRUE  = Banded planets (bands=on)
+#   FALSE = No banded planets (the default)
 #
 # The build (docs/memory-map.md):
 #
@@ -93,6 +102,12 @@ else
   match-original-binaries=TRUE
 endif
 
+ifeq ($(bands), on)
+  planet-bands=TRUE
+else
+  planet-bands=FALSE
+endif
+
 .PHONY:all
 all:
 	echo _VERSION=4 > 1-source-files/main-sources/elite-build-options.asm
@@ -100,6 +115,7 @@ all:
 	echo _REMOVE_CHECKSUMS=TRUE >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MATCH_ORIGINAL_BINARIES=$(match-original-binaries) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
+	echo _PLANET_BANDS=$(planet-bands) >> 1-source-files/main-sources/elite-build-options.asm
 	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
 	$(PYTHON) 2-build-files/lightpass.py
 	$(PYTHON) 2-build-files/streams.py measure > 3-assembled-output/compile.txt

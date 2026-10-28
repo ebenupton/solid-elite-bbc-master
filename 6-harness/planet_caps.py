@@ -322,6 +322,19 @@ def pf_tilt(inwk, x, y, f):
     return out
 
 
+PFB_N = (64, 96, 128, 150)
+PFB_S = (32, 64, 96, 128)
+
+
+BANDS = True                          # banded planets in the build (the Makefile's bands=on)
+
+
+def pf_banded(qq2):
+    """a crater planet (TYPE 130) whose seed makes it banded (in a build with
+    banded planets)"""
+    return BANDS and qq2[3] & 3 == 0
+
+
 def pf_records(inwk, qq2, typ):
     """PF_HOOK's style: (base, [(vec, c8, cneg, kn)]): a meridian planet's
     beach ball (its two great circles, normal to roofv and sidev: colour B
@@ -332,8 +345,11 @@ def pf_records(inwk, qq2, typ):
 
 
 def pf_caps(inwk, qq2):
-    """pf_craters: the crater planet's caps [(vec, c8, cneg, kn)] from its
-    orientation (INWK) and the system's seed (QQ2)"""
+    """pf_craters or pf_bands: the crater planet's caps [(vec, c8, cneg, kn)]
+    from its orientation (INWK) and the system's seed (QQ2)"""
+    if pf_banded(qq2):
+        v = pf_tilt(inwk, 9, 21, 0b1010)
+        return [(v, PFB_N[(qq2[5] >> 4) & 3], 0, PFN[3]), (v, PFB_S[qq2[5] >> 6], 1, PFN[3])]
     caps = [(pf_tilt(inwk, 15, 0, 0), 222, 0, PFN[0])]
     n = qq2[4] & 3
     if n:

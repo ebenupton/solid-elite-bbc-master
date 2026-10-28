@@ -110,6 +110,10 @@ MG = dict(INWK=0x9C, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
           TYPE=0x85, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
 MG['K%'] = 0x0400
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
+# banded planets (gfx-planet7.asm's _PLANET_BANDS, the Makefile's bands=on):
+# tested on (they are off in the default build), or as BANDS=off has it
+BANDS = os.environ.get('BANDS', 'on') == 'on'
+MERID_GAME += '_PLANET_BANDS = %s\n' % ('TRUE' if BANDS else 'FALSE')
 # the planet's styles (gfx-planet7.asm in the meridian window after
 # gfx-kept7.asm)
 CAPS7 = os.path.join(MS, 'gfx-planet7.asm')
@@ -442,6 +446,7 @@ def test_lines(self, n):
 # ------------------------------------------------------------ the circle engine
 import math as _m
 import planet_caps as PCM                       # noqa: E402  (the model, beside this file)
+PCM.BANDS = BANDS
 
 
 def _rand_frame(rnd):
@@ -637,7 +642,7 @@ def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
     base, circs = PCM.pf_records(inwk, qq2, typ) if on else (0, [])
     base, recs = _body(cx, cy, r, base, circs)
     n = sum(1 for c in recs if c is not None and not c['none'])
-    k = 0 if typ == 128 else 1
+    k = 0 if typ == 128 else 2 if PCM.pf_banded(qq2) else 1
     if mem[MG['PF_CLS']] != k | (0x80 if (n or base) else 0):
         raise AssertionError('PF_HOOK: PF_CLS %02X (type %d r %d)' % (mem[MG['PF_CLS']], typ, r))
     return inwk, base, recs, n or base, cyc

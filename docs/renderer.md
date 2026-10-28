@@ -322,6 +322,19 @@ across, as Elite's crater; then, as the seed's bits have it, one on `nosev`
 tilted towards `sidev` and one on `sidev` tilted towards `roofv`, 15 to 30
 degrees across. No two axes are within 63 degrees, so they never overlap.
 
+**Banded planets** are an option, `make bands=on` (`_PLANET_BANDS`), off by
+default, when their code is assembled out. With it, a quarter of the
+crater planets (by the seed; Lave is a meridian planet and keeps its beach
+ball) are drawn with two latitude circles about the axis the planet spins
+about, `nosev - sidev` (`MVEIT` pitches `roofv` and `nosev` and rolls `roofv`
+and `sidev` alike, so that axis stays where it is): north of one latitude
+(14 to 36 degrees) and south of another (-7 to -30 degrees), EOR'd, so the
+polar zones are colour A and the belt between them colour B. As the axis
+does not turn, the belt stands still while the planet spins. Two
+parallels can put four crossings in a row, which the disc layer holds.
+`test_raster.py` tests the planet code with bands on (`BANDS=off` in its
+environment for the default), and `planet_caps.py`'s `BANDS` follows it.
+
 The disc layer already draws up to four boundaries a row. It keeps two of
 them a row for each buffer (`R_BDN`, `R_BDP`, `R_BDX0`, `R_BDX1`), so that
 the row's next change can be drawn as strips; a row with three or four is

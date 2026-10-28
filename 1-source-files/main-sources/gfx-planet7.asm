@@ -15,7 +15,11 @@
 \     divide it);
 \
 \   * class 1, a crater planet (TYPE 130): one to three craters, small caps
-\     from the system's seed (pf_craters), base 0.
+\     from the system's seed (pf_craters), base 0;
+\
+\   * class 2, a banded crater planet (a quarter of them, by the seed: only
+\     in a build with make bands=on, _PLANET_BANDS): two
+\     latitude circles about the spin axis, EOR'd (pf_bands), base 0.
 \
 \ Elite's state is not touched: Elite's zero page &10-&28 (the engine's
 \ workspace) is saved and restored, and A, X, Y and the flags are preserved.
@@ -34,6 +38,15 @@
  LSR A                  \ planet (128) 0
  AND #1
  STA PF_CLS
+ IF _PLANET_BANDS       \ (banded planets: make bands=on)
+ BEQ pfh4
+ LDA QQ2+3              \ s1_hi bits 0-1 both clear (a quarter of the crater
+ AND #3                 \ planets): banded, class 2 (Lave is a meridian
+ BNE pfh4               \ planet, so it keeps its beach ball)
+ LDA #2
+ STA PF_CLS
+.pfh4
+ ENDIF
  LDA K+1                \ the detail only below a radius of 256, as PL9 has
  BNE pfh9               \ it, and from 6 up, as its meridians
  LDA K
@@ -61,6 +74,13 @@
  JSR pf_beach
  BRA pfh3
 .pfh2
+ IF _PLANET_BANDS
+ CMP #2
+ BNE pfh6
+ JSR pf_bands
+ BRA pfh3
+.pfh6
+ ENDIF
  JSR pf_craters
 .pfh3
  LDA PC_N               \ (records, or a base colour)
@@ -150,6 +170,46 @@
 .pfc9
  RTS
 .pfs_c EQUB 247, 241, 232, 222
+
+IF _PLANET_BANDS        \ (make bands=on)
+
+\ pf_bands: a banded planet's two latitude circles, the edges of its belt,
+\ about the axis the planet spins about. Its pitch and roll (MVEIT part 8:
+\ pitch turns roofv and nosev, roll roofv and sidev, alike) turn it about
+\ nosev - sidev, which stays put. North of the one edge (cosine c1) and
+\ south of the other (-c2), EOR'd: the belt between them is colour B, the
+\ two polar zones colour A. c1 and c2 from the seed (s2_hi bits 4-7)
+
+.pf_bands
+ LDX #9                 \ (nosev - sidev) / 2
+ LDY #21
+ LDA #%1010
+ JSR pf_tilt
+ LDA QQ2+5
+ LSR A
+ LSR A
+ LSR A
+ LSR A
+ PHA
+ AND #3
+ TAX
+ LDA pfb_n,X
+ STA pcc
+ STZ pcneg
+ JSR pc_circ
+ PLA
+ LSR A
+ LSR A
+ TAX
+ LDA pfb_s,X
+ STA pcc
+ LDA #&80
+ STA pcneg
+ JMP pc_circ
+.pfb_n EQUB 64, 96, 128, 150    \ the north edge's latitude: 14 to 36 degrees
+.pfb_s EQUB 32, 64, 96, 128     \ the south edge's: -7 to -30 degrees
+
+ENDIF
 
 \ pf_tilt: pcv = (+/- vector X) / 2 + (+/- vector Y) / 2^(k+1), as
 \ sign-magnitude words (X, Y = 9 nosev, 15 roofv, 21 sidev; Y = 0: none), A

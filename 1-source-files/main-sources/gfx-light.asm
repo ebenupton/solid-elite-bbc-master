@@ -9,9 +9,9 @@
 \ of nine hue ramps shared by every ship, each from 50% to 100% of the hue's
 \ own full brightness: gfx-light6.asm).
 \
-\ Master port: assembled in two passes (build.sh writes a copy of this file
-\ for each, build/gfx-light-4.asm and -6.asm, with the other pass's IF
-\ LIGHTPASS block assembled out), each half running in
+\ Master port: assembled in two passes (2-build-files/lightpass.py writes a
+\ copy of this file for each, 3-assembled-output/gfx-light-4.asm and -6.asm,
+\ with the other pass's IF LIGHTPASS block assembled out), each half running in
 \ game context only (never with ACCCON X set, which would hide the quarter
 \ squares QSL/QSH, main RAM at &7000, that it multiplies with): L_SUN at
 \ bank 4's end (elite-layout.asm, with S_SUN), from G_FRAME before F_FRAME;

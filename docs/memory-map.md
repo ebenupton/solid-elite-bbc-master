@@ -60,7 +60,7 @@ routine of the game stays at its place in the original's source.
    * The frame layer is bank 6.
    * The meridian window is bank 7 after the cold pass: the circle engine
      that makes the planet's surface detail and its styles (the beach
-     ball, the craters), the kept solid rows' polygon part and the lens
+     ball, the craters, the bands), the kept solid rows' polygon part and the lens
      flare, which need about 5K that none of the others has. Only their
      stubs page it in.
    The renderer's routines that run in game context, `S_SUN` (the sun near

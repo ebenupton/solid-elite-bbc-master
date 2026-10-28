@@ -2722,10 +2722,10 @@ SGOUT = 20
 \ ------------------------------------------------------------------------------
 \ Planet surface detail, filled: per-row colour boundaries for the disc layer
 \ (R_NDN, R_NDX0-3, R_NDP: the disc alternates between colour A and colour B
-\ at each boundary): circles on the planet's sphere, the beach ball's or the
-\ craters' (PF_HOOK, gfx-planet7.asm, makes them in game context; PC_ROWS,
-\ gfx-merid.asm's circle engine, the rows), both in the meridian window (bank
-\ 7).
+\ at each boundary): circles on the planet's sphere, the beach ball's, the
+\ craters' or the bands' (PF_HOOK, gfx-planet7.asm, makes them in game
+\ context; PC_ROWS, gfx-merid.asm's circle engine, the rows), both in the
+\ meridian window (bank 7).
 \ ------------------------------------------------------------------------------
 
 \ f_nobounds: rows R_NDT..R_NDB have no boundaries (plain disc)
@@ -2744,7 +2744,7 @@ SGOUT = 20
  BEQ P%+4
  BCS fnb9
  BIT PF_CLS             \ the detail PF_HOOK made this frame (the beach
- BPL fnb9               \ ball or craters): from the circle engine's
+ BPL fnb9               \ ball, craters or bands): from the circle engine's
  JSR f_bcol             \ PC_ROWS
  JMP T_CAPS
 .fnb9
