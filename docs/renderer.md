@@ -378,7 +378,9 @@ the tool again after changing it:
   `HZDATA.bin` and `symbols.txt`, the blueprints, which do not depend on the
   tables). It parses the 33 blueprints, rebuilds each face's polygon (faces
   that share a plane are merged when one of them has no closed outline of
-  its own, as the Adder's back has), turns detail edges into filled details,
+  its own, as the Adder's back has; boundary vertices well off a face's
+  plane that close a boundary of their own, the Cougar's wings, are left
+  out of it and become fins), turns detail edges into filled details,
   fins and lines, finds each ship's symmetries, and gives the faces colours
   so that adjacent faces never match. It prints a report per ship. The
   game no longer assembles the blueprints' edge lists (the `EDGE` macro,

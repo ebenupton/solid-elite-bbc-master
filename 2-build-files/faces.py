@@ -271,6 +271,22 @@ def reconstruct(s):
                     del adj[v]
                     changed = True
         cand = sorted(adj)
+        # Wings: a chain of boundary vertices well off the face's plane, the
+        # rest closing a boundary of their own (the Cougar's wings, 1-7-8-2
+        # and 5-9-10-6, are listed on both body faces at their root, 0 and 1,
+        # 3 and 4). The polygon is the body's; the chain is left to the
+        # details, where it is a fin standing on the body edge (structure).
+        if len(cand) >= 4:
+            ext0 = max(math.dist(V[a], V[b]) for a in cand for b in cand)
+            hs = sorted(_dot(nh, V[v]) for v in cand)
+            h0 = hs[len(hs) // 2]
+            off = {v for v in cand if abs(_dot(nh, V[v]) - h0) > 0.04 * ext0}
+            if off:
+                adj2 = {v: {o for o in adj[v] if o not in off} for v in cand if v not in off}
+                if len(adj2) >= 3 and all(len(a) == 2 for a in adj2.values()):
+                    notes.append(f'face {f}: vertices {sorted(off)} off its plane (a wing) -> left out of the polygon')
+                    adj = adj2
+                    cand = sorted(adj)
         if len(cand) < 3:
             polys.append([])
             notes.append(f'face {f}: no closed boundary ({len(B)} edges) -> n=0')
@@ -679,8 +695,10 @@ def structure(s):
             alone = [v for v in chain if set(s['verts'][v]['faces']) <= {A, B}]
             fins.append({'faces': (A, B), 'vis': vis, 'verts': chain})
             notes.append('edges %s: fin %s standing on the edge between faces %d and %d -> '
-                         'two-sided filled triangle, drawn when face %d or %d is visible%s'
-                         % (g, chain, A, B, A, B, ' (vertex %s lists only those faces)' % alone if alone else ''))
+                         'two-sided filled %s, drawn when face %d or %d is visible%s'
+                         % (g, chain, A, B, 'triangle' if len(chain) == 3 else
+                            'polygon (%d triangles: f_fins draws triangles)' % (len(chain) - 2),
+                            A, B, ' (vertex %s lists only those faces)' % alone if alone else ''))
             continue
         for i in g:
             e = E[i]
@@ -702,6 +720,18 @@ def structure(s):
             adjs.add(frozenset((a, b)))
     s['nodes'], s['dets'], s['fins'], s['adj'], s['notes2'] = nodes, dets, fins, adjs, notes
     return s
+
+
+def fins_emitted(s):
+    """The fins as the frame layer draws them: triangles (f_fins). A longer fin
+    (the Cougar's wings, four vertices) is a fan of triangles from its first
+    vertex, each on the same two faces, in the fin's colour."""
+    out = []
+    for d in s['fins']:
+        vs = d['verts']
+        for i in range(1, len(vs) - 1):
+            out.append(dict(d, verts=[vs[0], vs[i], vs[i + 1]]))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1133,9 +1163,9 @@ def emit(ships, path):
                 d['vis'], f1 | f2 << 4, c, len(d['verts']),
                 ''.join(', %d' % (4 * v) for v in d['verts']), what, d['verts'],
                 d.get('fam') or ('unlit %d' % d['col'])))
-        L.append(' EQUB %d                       \\ fins' % len(s['fins']))
+        L.append(' EQUB %d                       \\ fins' % len(fins_emitted(s)))
         nbytes += 1
-        for d in s['fins']:
+        for d in fins_emitted(s):
             item(d, 'fin')
         L.append(' EQUB %d                       \\ details' % len(s['dets']))
         nbytes += 1
