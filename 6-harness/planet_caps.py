@@ -326,7 +326,8 @@ PFB_N = (64, 96, 128, 150)
 PFB_S = (32, 64, 96, 128)
 
 
-BANDS = True                          # banded planets in the build (the Makefile's bands=on)
+BANDS = True                          # banded planets in the build (make bands=on)
+RINGS = True                          # planet rings in the build (make rings=on)
 
 
 def pf_banded(qq2):
@@ -440,3 +441,58 @@ def pf_moon(inwk, qq2, cx, cy, r, pz, sunz=None, E=None, view=0):
     behindsun = sunz is not None and sunz < z24
     cap = (pf_tilt(inwk, 15, 0, 0), MOON_C8, 0, PFN[0]) if mr >= 10 else None
     return dict(x=mx, y=my, r=mr, z16=min(z24, 0xFFFF), z24=z24, behind=behind, behindsun=behindsun, cap=cap)
+
+
+# ------------------------------------------------------------ the rings
+
+PFR_R = (102, 115, 128, 141)          # the ring's radius over the planet's (x 64)
+
+
+def _sm16(lo, hi):
+    m = lo | ((hi & 0x7F) << 8)
+    return -m if hi & 0x80 else m
+
+
+def pf_ring(inwk, qq2, cx, cy, r):
+    """pf_ring: the ring's dots [(x, y, back)] (on the screen only), or None.
+    The ring lies in the plane of the planet's equator, normal to the axis it
+    spins about (nosev - sidev): two conjugate radii, roofv and (nosev +
+    sidev) / sqrt(2), scaled to the ring's radius on the screen, give its
+    points P(t) = cos t A1 + sin t A2 (t = k pi / N, k = 0 .. N - 1) and -P(t);
+    a point is behind the planet's centre if its z is negative"""
+    h = moon_hash(qq2)
+    if not RINGS or (h >> 4) & 7 != 4 or r < 8:
+        return None
+    S = PFR_R[(h >> 2) & 3] * r
+    S3 = (S * 21845) >> 16                     # the radius in pixels x 64 / 3
+    S3r2 = S3 + ((S3 * 27146) >> 16)            # and times sqrt(2)
+    u1 = [_sm16(inwk[15 + 2 * i], inwk[16 + 2 * i]) for i in range(3)]
+    u2 = [_sm16(lo, hi) for lo, hi in pf_tilt(inwk, 9, 21, 0b1000)]   # (nosev + sidev) / 2
+
+    def sc(k, v):
+        m = (k * abs(v)) >> 15
+        return -m if v < 0 else m
+    A1 = [sc(S3, v) for v in u1]                # 12.4 pixels
+    A2 = [sc(S3r2, v) for v in u2]
+    N = 32 if S >= 120 * 64 else 16
+    dots = []
+    for k in range(N):
+        i = k * (32 // N)
+        s8 = SIN16[i] if i <= 16 else SIN16[32 - i]
+        c8 = SIN16[16 - i] if i <= 16 else -SIN16[i - 16]
+
+        def prod(c, a):
+            p = abs(c) * abs(a)
+            return -p if (c < 0) != (a < 0) else p
+        P = [(prod(c8, a) + prod(s8, b)) >> 8 for a, b in zip(A1[:2], A2[:2])]
+        hz = lambda a: -(abs(a) >> 8) if a < 0 else abs(a) >> 8     # (z: A's high bytes)
+        Pz = prod(c8, hz(A1[2])) + prod(s8, hz(A2[2]))
+        for sg in (1, -1):
+            x = cx + ((sg * P[0]) >> 4)
+            y = cy - ((sg * P[1]) >> 4)
+            if 0 <= x <= 255 and 0 <= y <= 191:
+                dots.append((x, y, sg * Pz < 0))
+    return dots
+
+
+SIN16 = [min(255, int(256 * math.sin(i * math.pi / 32) + 0.5)) for i in range(17)]   # (pf_ring's pfr_sin)

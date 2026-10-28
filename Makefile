@@ -32,6 +32,12 @@ PYTHON?=python
 #                       (gfx-planet7.asm's pf_bands); off by default, when no
 #                       planet has bands and their code is assembled out
 #
+#   rings=on            Planet rings: an eighth of the systems, by the seed,
+#                       have a dotted ring (gfx-planet7.asm's pf_ring,
+#                       gfx-frame.asm's f_ring); off by default, when no
+#                       planet has a ring and their code and variables are
+#                       assembled out
+#
 # So, for example:
 #
 #   make commander=max match=no verify=no
@@ -66,6 +72,10 @@ PYTHON?=python
 # _PLANET_BANDS
 #   TRUE  = Banded planets (bands=on)
 #   FALSE = No banded planets (the default)
+#
+# _PLANET_RINGS
+#   TRUE  = Planet rings (rings=on)
+#   FALSE = No planet rings (the default)
 #
 # The build (docs/memory-map.md):
 #
@@ -123,6 +133,12 @@ else
   planet-bands=FALSE
 endif
 
+ifeq ($(rings), on)
+  planet-rings=TRUE
+else
+  planet-rings=FALSE
+endif
+
 .PHONY:all
 all:
 	echo _VERSION=4 > 1-source-files/main-sources/elite-build-options.asm
@@ -132,6 +148,7 @@ all:
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MOON_SOLID=$(moon-solid) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _PLANET_BANDS=$(planet-bands) >> 1-source-files/main-sources/elite-build-options.asm
+	echo _PLANET_RINGS=$(planet-rings) >> 1-source-files/main-sources/elite-build-options.asm
 	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
 	$(PYTHON) 2-build-files/lightpass.py
 	$(PYTHON) 2-build-files/streams.py measure > 3-assembled-output/compile.txt

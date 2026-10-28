@@ -753,6 +753,9 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  JSR f_discs            \ the disc layer (sun or planet), incremental
  JSR f_disc2            \ the other disc, if both are on screen (incremental)
  JSR f_moon             \ the moon, if any (incremental)
+ IF _PLANET_RINGS
+ JSR f_ring             \ the ring, if any (dots; rings=on)
+ ENDIF
 .ff_lin                 \ (F_HANGAR points this call at f_hback for its frame)
  JSR f_lines            \ planet meridians, craters, enemy lasers
  JSR f_ships            \ filled ships, far to near
@@ -796,6 +799,9 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA F_PLON
  STA GSUNON
  STA MN_ON
+ IF _PLANET_RINGS
+ STA RG_N
+ ENDIF
  LDA #LO(F_DL)
  STA F_DLP
  LDA #HI(F_DL)
@@ -2771,6 +2777,71 @@ FC_PLLE = &5F : FC_PLLO = &AF
  LDA #FC_PLLO
  STA R_DBO
  RTS
+
+IF _PLANET_RINGS        \ (make rings=on)
+
+\ ------------------------------------------------------------------------------
+\ The ring (gfx-planet7.asm's pf_ring makes its dots in game context: RG_X,
+\ RG_Y, RG_F, RG_N of them): each dot drawn in yellow (marked dirty, for the
+\ next frame on this buffer to repair), but a dot behind the planet's centre
+\ and inside its disc, which the planet hides
+\ ------------------------------------------------------------------------------
+
+.f_ring
+ LDA RG_N
+ BNE frg0
+ RTS
+.frg0
+ LDA #&FF
+ STA R_COLE
+ STA R_COLO
+ LDX #0
+.frg1
+ STX fm_i
+ LDA RG_F,X
+ BPL frg3
+ LDA F_PLON             \ behind: inside the planet's disc?
+ BEQ frg3
+ LDA RG_Y,X
+ SEC
+ SBC F_PLY
+ STA fz_t
+ LDA #0
+ SBC F_PLY+1
+ JSR f_abs16
+ BCS frg3
+ CMP F_PLR
+ BEQ frg2
+ BCS frg3
+.frg2
+ TAY
+ LDX fm_i
+ LDA RG_X,X
+ SEC
+ SBC F_PLX
+ STA fz_t
+ LDA #0
+ SBC F_PLX+1
+ JSR f_abs16
+ BCS frg3
+ CMP F_HW,Y
+ BCC frg4
+ BEQ frg4
+.frg3
+ LDX fm_i
+ LDA RG_X,X
+ LDY RG_Y,X
+ TAX
+ LDA #1
+ JSR T_DOT
+.frg4
+ LDX fm_i
+ INX
+ CPX RG_N
+ BCC frg1
+ RTS
+
+ENDIF                   \ (_PLANET_RINGS)
 
 \ ------------------------------------------------------------------------------
 \ The moon (gfx-planet7.asm's pf_moon makes it in game context: MN_ON, MN_X,

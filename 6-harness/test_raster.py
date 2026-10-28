@@ -114,6 +114,10 @@ MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # tested on (they are off in the default build), or as BANDS=off has it
 BANDS = os.environ.get('BANDS', 'on') == 'on'
 MERID_GAME += '_PLANET_BANDS = %s\n' % ('TRUE' if BANDS else 'FALSE')
+# planet rings (_PLANET_RINGS, the Makefile's rings=on): likewise tested on
+# (off in the default build), or as RINGS=off has it; defined before the
+# shared workspace (gfx-planetv.asm's RG_ variables)
+RINGS = os.environ.get('RINGS', 'on') == 'on'
 # the planet's styles (gfx-planet7.asm in the meridian window after
 # gfx-kept7.asm) and the variables the frame reads (gfx-planetv.asm: in the
 # shared workspace, ws_block, where elite-gfx.asm includes it; else here at
@@ -195,6 +199,7 @@ def assemble(org):
     w = os.path.join(d, 'w.asm')
     with open(w, 'w') as f:
         f.write(gfx_constants() + '\n')
+        f.write('_PLANET_RINGS = %s\n' % ('TRUE' if RINGS else 'FALSE'))
         f.write(ws_block() + '\n')
         if WINDOWS:
             f.write('ORG &%X\n' % tr.HZ)
@@ -459,6 +464,7 @@ def test_lines(self, n):
 import math as _m
 import planet_caps as PCM                       # noqa: E402  (the model, beside this file)
 PCM.BANDS = BANDS
+PCM.RINGS = RINGS
 
 
 def _rand_frame(rnd):
@@ -731,8 +737,8 @@ def beach_rows(self, f, spans, cx, cy, rad):
 
 
 def test_pfhook(self, n):
-    """PF_HOOK on random crater and meridian planets: the class, the moon, and
-    the rows (PC_ROWS) against the model of its style's circles"""
+    """PF_HOOK on random crater and meridian planets: the class, the moon, the
+    ring, and the rows (PC_ROWS) against the model of its style's circles"""
     rnd, m, mem = self.rnd, self.m, self.m.mem
     self.set_clip((1, 254, 1, 191))
     for i in range(n):
@@ -744,6 +750,8 @@ def test_pfhook(self, n):
         qq2 = [rnd.randrange(256) for _ in range(6)]
         if rnd.random() < 0.5:          # (a moon: h bits 0-1 = 1)
             qq2[5] = (qq2[5] & 0xFC) | ((1 ^ qq2[1] ^ qq2[3]) & 3)
+        if rnd.random() < 0.4:          # (a ring: h bits 4-6 = 4)
+            qq2[5] = (qq2[5] & 0x8F) | ((0x40 ^ qq2[1] ^ qq2[3]) & 0x70)
         pz = rnd.randrange(24576 * 256 // max(r, 1) // 2, 24576 * 256 // max(r, 1) * 2 + 1)
         pz = min(pz, (1 << 23) - 1)
         pos = [max(-(1 << 23) + 1, min((1 << 23) - 1, c)) for c in
@@ -765,7 +773,7 @@ def test_pfhook(self, n):
         self._check_moon(inwk, qq2, typ, cx, cy, r, E, view)
         if on:
             self._pfrows(base, recs, cx, cy, r, 'PF_HOOK (type %d centre %d,%d r %d)' % (typ, cx, cy, r))
-    return '%d moons' % len(self.stats.get('moons', []))
+    return '%d moons, %d rings' % (len(self.stats.get('moons', [])), len(self.stats.get('rings', [])))
 
 
 def _check_moon(self, inwk, qq2, typ, cx, cy, r, E=None, view=0):
@@ -779,6 +787,13 @@ def _check_moon(self, inwk, qq2, typ, cx, cy, r, E=None, view=0):
         sunz = mem[k + 6] | (mem[k + 7] << 8) | (mem[k + 8] << 16)
     want = PCM.pf_moon(inwk, qq2, cx, cy, r, pz, sunz, E, view) if 6 <= r < 256 else None
     s = m.syms
+    ring = (PCM.pf_ring(inwk, qq2, cx, cy, r) if 6 <= r < 256 else None) or []
+    n = mem[s['RG_N']] if RINGS else 0
+    got = [(mem[s['RG_X'] + i], mem[s['RG_Y'] + i], bool(mem[s['RG_F'] + i] & 0x80)) for i in range(n)]
+    if sorted(got) != sorted(ring):
+        raise AssertionError('PF_HOOK ring: %s, the model %s (r %d)' % (got[:6], ring[:6], r))
+    if ring:
+        self.stat('rings', 1)
     on = mem[s['MN_ON']]
     if want is None:
         if on & 0x80:

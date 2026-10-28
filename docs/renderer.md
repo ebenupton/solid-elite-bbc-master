@@ -457,6 +457,25 @@ checks it: over 1,600 iterations |E| stays within 0.8%, its angle to the
 station less the planet within about 0.3 degrees, and the drawn centre
 within 1.4 pixels of planet + E projected.
 
+## Planet rings
+
+Planet rings are an option, `make rings=on` (`_PLANET_RINGS`), off by
+default, as the bands are: then `pf_ring`, its helpers, tables and
+variables (bank 7), `f_ring` (bank 6) and the dots' arrays (the shared
+workspace) are assembled out. With it, an eighth of the systems (by the
+seed) have a ring: a dotted ellipse in the plane of the planet's equator,
+normal to the spin axis `nosev - sidev`, so its shape on the screen stays
+put while the planet turns. `pf_ring` uses conjugate diameters: two radii,
+`roofv` and (`nosev` + `sidev`) / sqrt(2), scaled to the ring's radius on
+the screen (1.6 to 2.2 planet radii), give its points P(t) = cos t A1 + sin
+t A2 and -P(t), t = i pi / 32 (32 or 64 dots); a point is behind the
+planet's centre if its z is negative. The dots go to `RG_X`, `RG_Y` and
+`RG_F` (`gfx-planetv.asm`, in the shared workspace), and the frame layer's
+`f_ring` draws them in yellow after the moon (`T_DOT`, marked dirty), but
+not a dot behind the planet's centre and inside its disc. `test_raster.py`
+assembles the planet code with rings on (`RINGS=off` in its environment for
+the default), checking the dots against `planet_caps.py`'s `pf_ring`.
+
 ## The sun near the planet
 
 Elite has one slot, `FRIN+1`, for the sun and the space station. Every 32

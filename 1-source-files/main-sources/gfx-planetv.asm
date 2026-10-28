@@ -4,7 +4,7 @@
 \ reads: in the renderer's shared workspace (main RAM below &3000,
 \ elite-gfx.asm), where both the meridian window (bank 7, which writes them
 \ in game context) and the frame layer (bank 6, with ACCCON X either way)
-\ see them. Variables only: F_INIT clears MN_ON, and f_reset after
+\ see them. Variables only: F_INIT clears MN_ON and RG_N, and f_reset after
 \ every frame
 \
 \ ******************************************************************************
@@ -18,6 +18,14 @@
 .MN_Z   SKIP 2
 .MN_N   SKIP 1          \ its crater's slots: PCMAX .. MN_N - 1
 .MN_INV SKIP 1
+
+\ The ring's dots (pf_ring, gfx-planet7.asm; f_ring, bank 6; rings=on)
+IF _PLANET_RINGS
+.RG_N   SKIP 1          \ dots this frame
+.RG_X   SKIP 64
+.RG_Y   SKIP 64
+.RG_F   SKIP 64         \ bit 7: behind the planet
+ENDIF
 
 \ The moon as each buffer last showed it (f_moon, f_moon0: gfx-frame.asm),
 \ by buffer

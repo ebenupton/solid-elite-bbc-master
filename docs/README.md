@@ -63,6 +63,7 @@ every iteration. The memory map's hardware findings are in
     make                        (BeebAsm 1.11 and Python 3, as upstream)
     make verify                 (the gate: Node.js, jsbeeb and py65, see 6-harness)
     make bands=on               (banded planets, an option: renderer.md)
+    make rings=on               (planet rings, an option: renderer.md)
     make moon=scenery           (the moon not solid, for a lockstep comparison
                                  with SNG47 in a moon system: renderer.md)
 
