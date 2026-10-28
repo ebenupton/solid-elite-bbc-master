@@ -1246,7 +1246,8 @@ ENDIF
 \
 \       Name: WP
 \       Type: Workspace
-\    Address: &0841 to &0CA9
+\    Address: &0E41 to &12A9
+\             (Port: &0841 to &0CA9, see the ORG below)
 \   Category: Workspaces
 \    Summary: Ship slots, variables
 \
@@ -2896,7 +2897,7 @@ IF _COMPACT
 
  LDA MOS                \ If MOS = 0 then this is a Master Compact, so jump to
  BEQ jvec               \ jvec to skip reading the ADC channels (as the Compact
-                        \ doesn't have them)
+                        \ has a digital joystick rather than an analogue one)
 
 ENDIF
 
@@ -2906,7 +2907,7 @@ ENDIF
  TAY                    \ The BMI is commented out in the original source
 
  LDA VIA+&19            \ Fetch the high byte of the value on this ADC channel
-                        \ (bits 8-15 of the 12-bit value)
+                        \ at SHEILA &19 to read the relevant joystick position
 
  STA JOPOS,Y            \ Store this value in the appropriate JOPOS byte
 
@@ -2917,35 +2918,43 @@ ENDIF
  BCC P%+4
 
  LDA #0                 \ Set the ADC status byte at SHEILA &18 to 0 to reset
- STA VIA+&18            \ the data latch, ready for the next channel
+ STA VIA+&18            \ the data latch
 
 .jvec
 
  PLY                    \ Restore Y from the stack
 
  LDA VIA+&44            \ Read 6522 System VIA T1C-L timer 1 low-order counter
-                        \ (SHEILA &44), which clears the timer 1 interrupt flag
+                        \ (SHEILA &44)
+                        \ 
+                        \ Port: reading it clears the timer 1 interrupt flag
 
  LDA &FC                \ Restore the value of A from before the call to the
-                        \ interrupt handler (as the MOS stores it in &FC)
+                        \ interrupt handler (the MOS stores the value of A in
+                        \ location &FC before calling the interrupt handler)
 
  RTI                    \ Return from interrupts, so this interrupt is not
                         \ passed on to the next interrupt handler
 
 .LINSCN
 
- LDA VIA+&41            \ Read 6522 System VIA input register IRA (SHEILA &41),
-                        \ which clears the vertical sync interrupt
+ LDA VIA+&41            \ Read 6522 System VIA input register IRA (SHEILA &41)
+                        \ 
+                        \ Port: reading it clears the vertical sync interrupt
 
  LDA &FC                \ Fetch the value of A from before the call to the
-                        \ interrupt handler (as the MOS stores it in &FC)
+                        \ interrupt handler (the MOS stores the value of A in
+                        \ location &FC before calling the interrupt handler)
 
  PHA                    \ Store the original value of A on the stack
 
  LDA VSCAN+1            \ Set the line scan counter to the value of VSCAN+1
- STA DL                 \ (Port: 72, and it doesn't change), so
+ STA DL                 \ (which contains 30 by default and doesn't change), so
                         \ routines like WSCAN can set DL to 0 and then wait for
-                        \ it to change to non-zero to catch the vertical sync
+                        \ it to change to this value to catch the vertical sync
+                        \ 
+                        \ Port: VSCAN+1 contains 72, and WSCAN only needs DL to
+                        \ become non-zero
 
                         \ Port: the original restarted timer 1 here (T1C-L =
                         \ VSCAN+1, T1C-H = VSCAN: 14622 us from now), so the
@@ -3049,6 +3058,7 @@ ENDIF
                         \ pending and runs now)
 
  RTS                    \ Return from the subroutine
+
 \ ******************************************************************************
 \
 \       Name: DOVDU19
@@ -3087,10 +3097,12 @@ ENDIF
 
 .DOVDU19
 
- STA VNT3+1             \ Store the new colour in VNT3+1 (Port: the palette is
-                        \ fixed now, so this is kept only as a variable),
+ STA VNT3+1             \ Store the new colour in VNT3+1, in the IRQ1 routine,
                         \ which modifies which TVT3 palette block gets applied
                         \ to the mode 1 part of the screen
+                        \ 
+                        \ Port: the palette is fixed now, so VNT3+1 is kept
+                        \ only as a variable
 
  RTS                    \ Return from the subroutine
 
@@ -13716,9 +13728,20 @@ ENDIF
  BPL BL1                \ or &FF; BIT keeps A = x_hi)
 
  INC FLAG               \ Flag is &FF so this is the first call to BLINE, so
-                        \ increment it to set it to 0
+                        \ increment FLAG to set it to 0, as then the next time
+                        \ we call BLINE it can draw the first line, from this
+                        \ point to the next
 
 .BL5
+
+                        \ The following inserts a &FF marker into the LSY2 line
+                        \ heap to indicate that the next call to BLINE should
+                        \ store both the (X1, Y1) and (X2, Y2) points. We do
+                        \ this on the very first call to BLINE (when FLAG is
+                        \ &FF), and on subsequent calls if the segment does not
+                        \ fit on-screen, in which case we don't draw or store
+                        \ that segment, and we start a new segment with the next
+                        \ call to BLINE that does fit on-screen
 
  LDY LSP                \ If byte LSP-1 of LSY2 = &FF, jump to BL7 to tidy up
  LDA #&FF               \ and return from the subroutine
@@ -13726,12 +13749,16 @@ ENDIF
  CLC                    \ Port: clear C for the CNT addition at BL7 (keeps Z)
  BEQ BL7
 
- STA LSY2,Y             \ Otherwise put a &FF marker at the end of the heap
+ STA LSY2,Y             \ Otherwise we just tried to plot a segment but it
+                        \ didn't fit on-screen, so put the &FF marker into the
+                        \ heap for this point, so the next call to BLINE starts
+                        \ a new segment
 
  INC LSP                \ Increment LSP to point to the next point in the heap
 
  BNE BL7                \ Jump to BL7 to tidy up and return from the subroutine
-                        \ (this BNE is effectively a JMP, as LSP never wraps)
+                        \ (this BNE is effectively a JMP, as LSP will never be
+                        \ zero)
 
 .BL1
 
@@ -17383,7 +17410,6 @@ ENDIF
  PRINT "S.ELTB ", ~CODE_B%, " ", ~P%, " ", ~LOAD%, " ", ~LOAD_B%
 \SAVE "3-assembled-output/ELTB.bin", CODE_B%, P%, LOAD%
 
-
 \ ******************************************************************************
 \
 \ ELITE C FILE
@@ -17807,7 +17833,6 @@ ENDIF
 .HA1
 
  RTS                    \ Return from the subroutine
-
 
 \ ******************************************************************************
 \
@@ -21875,7 +21900,6 @@ ENDIF
  STA P
 
  RTS                    \ Return from the subroutine
-
 
 \ ******************************************************************************
 \
@@ -39873,8 +39897,10 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine copies a commander file into the commbuf file buffer at &087E
-\ (Port: &0E7E in the original), and then saves it.
+\ This routine copies a commander file into the commbuf file buffer at &0E7E,
+\ and then saves it.
+\
+\ Port: commbuf is at &087E (see WP).
 \
 \ ******************************************************************************
 
@@ -40014,10 +40040,11 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine loads a commander file into the commbuf file buffer at &087E
-\ (Port: &0E7E in the original), and then copies it to the TAP% staging area
-\ (though the latter is not used in this version, as it's left over from the
-\ Commodore 64 version).
+\ This routine loads a commander file into the commbuf file buffer at &0E7E, and
+\ then copies it to the TAP% staging area (though the latter is not used in this
+\ version, as it's left over from the Commodore 64 version).
+\
+\ Port: commbuf is at &087E (see WP).
 \
 \ ------------------------------------------------------------------------------
 \
@@ -44428,7 +44455,6 @@ ENDMACRO
 
  JMP LL50               \ Jump to LL50 to move on to the next vertex
 
-
 .LL67
 
  JSR LL28               \ Call LL28 to calculate:
@@ -48702,7 +48728,7 @@ ENDIF
 \
 \ ------------------------------------------------------------------------------
 \
-\ This routine contains an RTS so we can return from a subroutine with
+\ This routine contains an RTS so we can return from the SFRMIS subroutine with
 \ a branch instruction.
 \
 \ It also contains the DEMON label, which is left over from the 6502 Second
@@ -49096,8 +49122,6 @@ DOSBUF = &6000          \ the command's copy, in buffer 0 after HAZEL's stash
 \    Summary: Denotes the end of the main game code, from ELITE A to ELITE H
 \
 \ ******************************************************************************
-
-
 
 .F%
 
