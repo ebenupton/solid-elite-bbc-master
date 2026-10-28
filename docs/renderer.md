@@ -388,6 +388,30 @@ feed a spinning planet's rows through `R_DISCROWS`. `6-harness/mplanet.mjs`
 poses planet scenes and dumps each frame with the planet routines' cycles,
 for `2-build-files/planetvis.py` to render.
 
+What each style costs, in cycles a frame (`6-harness/mplanet.mjs`, the
+planet at the screen's centre, 16 frames of spin at 22.5 degrees each, the
+mean): the set-up is `G_PFHOOK` (`PF_HOOK` and its `pc_circ` calls), the
+rows `T_CAPS` (`PC_ROWS`), and the disc `T_DISCROWS` (the disc layer,
+incremental between frames). A crater planet's caps are as the seed gives
+them, and a cap on the far side costs its set-up only; the plain disc is
+the frames with no detail (a crater planet whose only crater is hidden).
+The bands are a `make bands=on` build's.
+
+| Style | Radius | Set-up | Rows | Disc | Total |
+|---|---|---|---|---|---|
+| Plain disc | 30 / 60 / 90 | 18.0K | 0 | 27.5K / 34.8K / 43.0K | 45.5K / 52.8K / 60.9K |
+| Beach ball | 30 / 60 / 90 | 25.6K | 29.4K / 53.4K / 77.7K | 69.2K / 132.9K / 200.6K | 124.2K / 211.9K / 303.9K |
+| Craters, 1 cap | 30 / 60 / 90 | 18.2K | 6.8K / 11.4K / 16.3K | 33.6K / 56.3K / 80.6K | 58.7K / 85.9K / 115.0K |
+| Craters, 2 caps | 30 / 60 / 90 | 36.1K | 11.7K / 19.6K / 27.5K | 46.6K / 83.8K / 125.2K | 94.5K / 139.5K / 188.8K |
+| Craters, 3 caps | 30 / 60 / 90 | 53.8K | 18.0K / 29.8K / 41.6K | 56.6K / 104.4K / 156.7K | 128.5K / 187.9K / 252.0K |
+| Bands | 30 / 60 / 90 | 38.7K | 33.8K / 60.3K / 87.1K | 26.7K / 43.5K / 59.4K | 99.3K / 142.5K / 185.1K |
+
+The beach ball is the dearest: its two great circles cross every row, and
+as the planet spins every boundary moves, so the disc layer repaints most
+of the disc each frame. The bands cost about as much in rows but stand
+still under the spin, so the disc layer has little to repair. A cap's rows
+scale with its size, not the disc's.
+
 `images/planets` holds a still of each style, made by
 `2-build-files/stills.sh` from posed scenes: `beach.png`, `caps.png` and
 `caps2.png` (Leesti's craters), `nobands.png` (a banded seed as the default
@@ -573,6 +597,24 @@ the station crossing it), `sheet.png`, and `spawn.png`, the frame after the
 station appears in the game's own way (`msunnear.mjs --spawn`), with the
 sun drawn where the game's own sun was.
 
+## Every disc, incremental
+
+Like the original's sun, every disc keeps what it drew and redraws only
+what changed:
+
+* the planet or the sun as the disc layer (`R_DISCROWS`: each buffer's
+  spans and boundaries);
+* the smaller of them, the second disc (`R_DISC2`);
+* the moon, by rows (`f_moon`).
+
+The ring is dots, explosions are particles, the hangar is rectangles and
+lines, and the hyperspace and launch rings and the charts' circles are
+lines. The one exception is the lens flare: its ghosts are dithered discs
+and dotted rings ORed over the frame, marked dirty and repaired by the
+layer the next frame on the buffer. An OR over whatever is under it has to
+be redrawn wherever that changes, and it keeps nothing on the screen by
+design.
+
 ## The hangar
 
 The hangar, shown on docking, is one frame of the renderer:
@@ -651,9 +693,12 @@ tables.
 
 ## Speed
 
-The gate's run gives 11.82 flight iterations per emulated second, against
-SNG47's 13.97 (0.846 times), at 169,148 cycles a flight iteration, with the
-frame rate capped at 25 frames a second. With the cap it first gave 11.73
+The gate's run gives 10.29 flight iterations per emulated second, against
+SNG47's 13.97 (0.736 times), with the frame rate capped at 25 frames a
+second. Before the planets' circle engine it gave 11.82 (0.846 times, at
+169,148 cycles a flight iteration); most of the difference is the crater
+system's stretch of the run (iterations 800 to 2799), where two true caps
+cost more than the polygon crater did. With the cap it first gave 11.73
 (170,540 cycles); the disc layer's two boundaries a row and its short paths
 for one-colour and emptied rows brought it to 11.82. Without the cap it gave
 11.99 (0.858 times, 166,791 cycles), with a tenth of its frames shown for a
