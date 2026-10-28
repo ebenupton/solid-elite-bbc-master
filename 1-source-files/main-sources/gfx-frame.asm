@@ -1644,9 +1644,11 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 
 \ f_ship: draw one ship. Every face is flat-shaded (FC_FACETAB: n + 16 * hue
 \ ramp, unit normal, n XX3 offsets; the record's XX2 copy holds the face's
-\ level, gfx-light.asm, and f_col its ramp entry). Fins standing behind the body are drawn
-\ first, then the visible faces, the surface details over them and the other
-\ fins (see faces.asm for the order).
+\ level, gfx-light.asm, and f_col its ramp entry). The visible faces are drawn,
+\ then the surface details over them and the fins (see faces.asm for the
+\ order); not a fin with neither of its faces visible, behind the body, as LL9
+\ has not projected its vertex on the body edge (the missile's list only those
+\ two faces), and XX3 holds whatever was there before.
 
 .f_ship                 \ A = ship index
  TAX
@@ -1698,13 +1700,7 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  JSR f_behind           \ hidden behind the planet?
  BCC P%+3
  RTS
-
- LDY #0                 \ fins behind the body (neither of their faces visible)
- LDA (fz_dt),Y
- BEQ fsh_nf0
- TYA
- JSR f_fins
-.fsh_nf0
+.fsh_nf0                \ (past f_behind: harness/mstation.mjs)
 
  LDA #0
  STA f_f
@@ -1947,11 +1943,11 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  BCC fiv1
  RTS
 
-\ f_fins: A = k: draw the fins (two-sided triangles standing on the body edge
-\ between face1 and face2) with exactly k of those two faces visible. A fin
-\ with neither visible is behind the body, one with one or both in front of
-\ it, and only the fin on the corner facing the viewer (both visible) can hide
-\ another fin.
+\ f_fins: A = k (1 or 2): draw the fins (two-sided triangles standing on the
+\ body edge between face1 and face2) with exactly k of those two faces
+\ visible. A fin with one or both visible is in front of the body, and only
+\ the fin on the corner facing the viewer (both visible) can hide another fin.
+\ (One with neither visible is behind the body and is not drawn: f_ship.)
 
 .f_fins
  STA f_k

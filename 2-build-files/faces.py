@@ -639,9 +639,17 @@ def structure(s):
                 chain.append([w for w in adj[chain[-1]] if w not in chain][0])
             vis = min([evis] + [s['verts'][v]['vis'] for v in chain])
             A, B = sorted(fin)
+            # LL9 projects a fin vertex when one of the faces it lists is
+            # visible: every one must list A or B (the fin is drawn when one
+            # of them is). The frame layer draws no fin with neither visible
+            # (behind the body): a vertex that lists no other face is then
+            # not projected (the missile's, on the body's edge)
+            assert all({A, B} & set(s['verts'][v]['faces']) for v in chain), (chain, A, B)
+            alone = [v for v in chain if set(s['verts'][v]['faces']) <= {A, B}]
             fins.append({'faces': (A, B), 'vis': vis, 'verts': chain})
             notes.append('edges %s: fin %s standing on the edge between faces %d and %d -> '
-                         'two-sided filled triangle' % (g, chain, A, B))
+                         'two-sided filled triangle, drawn when face %d or %d is visible%s'
+                         % (g, chain, A, B, A, B, ' (vertex %s lists only those faces)' % alone if alone else ''))
             continue
         for i in g:
             e = E[i]
@@ -1041,8 +1049,9 @@ def emit(ships, path):
           '\\   with XX2 = 255: cull by its winding, as its face).',
           '\\   Fins (n = 3, two-sided, zero thickness, standing on the body edge',
           '\\   between face1 and face2): k = number of face1, face2 visible; draw',
-          '\\   k = 0 before the faces (behind the body), k = 1 after the details,',
-          '\\   then k = 2 (the fin nearest the viewer) last.',
+          '\\   k = 1 after the details, then k = 2 (the fin nearest the viewer)',
+          '\\   last; not k = 0 (behind the body: LL9 does not project a vertex on',
+          '\\   the body edge that lists only face1 and face2).',
           '\\   An unlit polygon detail (the docking slots: black) has 4 * its fill',
           '\\   visibility added to its colour byte: if XX4 > that, some vertices',
           '\\   are unprojected, and f_poly2 draws only its side from vertex 0 to 1.',

@@ -23,8 +23,9 @@
 \   with XX2 = 255: cull by its winding, as its face).
 \   Fins (n = 3, two-sided, zero thickness, standing on the body edge
 \   between face1 and face2): k = number of face1, face2 visible; draw
-\   k = 0 before the faces (behind the body), k = 1 after the details,
-\   then k = 2 (the fin nearest the viewer) last.
+\   k = 1 after the details, then k = 2 (the fin nearest the viewer)
+\   last; not k = 0 (behind the body: LL9 does not project a vertex on
+\   the body edge that lists only face1 and face2).
 \   An unlit polygon detail (the docking slots: black) has 4 * its fill
 \   visibility added to its colour byte: if XX4 > that, some vertices
 \   are unprojected, and f_poly2 draws only its side from vertex 0 to 1.
