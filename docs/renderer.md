@@ -457,6 +457,15 @@ checks it: over 1,600 iterations |E| stays within 0.8%, its angle to the
 station less the planet within about 0.3 degrees, and the drawn centre
 within 1.4 pixels of planet + E projected.
 
+[elite-agent](https://github.com/8bitkick/elite-agent)'s moon mode places
+the moon as the port does and steers clear of it; the development tree's
+agentplay runs it, and films an arrival in a moon system to the docking
+(the system (155, 60), reached from (156, 57), with the moon beside the
+planet in the front view at the arrival), with the moon and then the sun
+near the planet, with its flare, each on the screen for most of a minute.
+`images/moon/approach-sheet.png` is a sheet of the film's frames, and
+`images/moon/approach.json` its record.
+
 ## Planet rings
 
 Planet rings are an option, `make rings=on` (`_PLANET_RINGS`), off by

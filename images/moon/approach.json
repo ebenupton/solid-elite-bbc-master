@@ -1,0 +1,37 @@
+{
+ "system": [
+  155,
+  60
+ ],
+ "start": "156,57",
+ "arrive": 154,
+ "docked": 3328,
+ "phase": "tail",
+ "frames": 7878,
+ "seconds": 315.1,
+ "size": [
+  448,
+  300
+ ],
+ "moonNearest": 418,
+ "moonNearestIter": 2487,
+ "findings": 0,
+ "seed": 1,
+ "cand": "master/build/elite-master-sng47.ssd",
+ "speedup": 64,
+ "seen": {
+  "moonSeconds": 59.6,
+  "sunSeconds": 43.8,
+  "bothSeconds": 0,
+  "iters": 3174
+ },
+ "film": {
+  "frames": 3421,
+  "seconds": 136.8
+ },
+ "published": {
+  "speed": 1.6,
+  "seconds": 85.5,
+  "note": "moonmovie.mjs film sped up 1.6x (setpts) to fit 60-90 s"
+ }
+}
