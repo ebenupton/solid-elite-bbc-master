@@ -3,8 +3,9 @@
 \ gfx-flare.asm - the lens flare (docs/renderer.md, "Lens flare"): the
 \ part in shadow RAM, run with ACCCON X = 1
 \
-\ From the demo port's lens flare (src/flare*.asm, docs/renderer.md and the
-\ model, here 2-build-files/flare.py), with the same recipe, arithmetic and pixels.
+\ From the demo port's lens flare (src/flare*.asm and docs/FLARE.md there),
+\ with the same recipe, arithmetic and pixels; its model is
+\ 2-build-files/flare.py, which also generates the tables below.
 \ When SUN has drawn the sun this frame, in the front view, with its centre on
 \ the screen (x 1..255, y 0..191) and not inside the planet's disc, eight
 \ ghosts go over the frame after the lasers and before the text, sights and
@@ -410,8 +411,10 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  BCC fsr1
  RTS
 
-\ The tables (2-build-files/flare.py: GHOSTS, LADDER, BAYER, RING, hw_table: fl_htab
-\ is in gfx-raster.asm, in run page 19's tail, as it must be in one page)
+\ The tables (2-build-files/flare.py --tables, from its GHOSTS, LADDER, BAYER,
+\ RING and hw_table; --verify checks them byte for byte, 6-harness/verify.sh runs
+\ it: fl_rad, fl_ink, fl_ni, fl_mt, fl_dk, fl_ring, and fl_htab below, as
+\ assembled)
 
                         \ the ghosts, by number (k = 8, 5, 3, -1, -3, -4, -6,
                         \ -8: centre C + k D / 8; 8: the ring round the sun):

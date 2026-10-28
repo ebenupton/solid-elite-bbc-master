@@ -401,7 +401,11 @@ the tool again after changing it:
   hangar's tans.
 * The lens flare's tables (`gfx-flare.asm`) come from `flare.py`, the model
   the 6502 code matches pixel for pixel (`--check` compares an emulator
-  frame against it).
+  frame against it). `--tables` prints them (`fl_rad`, `fl_ink`, `fl_ni`,
+  `fl_mt`, `fl_dk`, `fl_ring` and `fl_htab`, from its `GHOSTS`, `LADDER`,
+  `BAYER`, `RING` and `hw_table`), and `--verify` checks the source's tables,
+  and `fl_htab` as assembled into `MERID.bin`, byte for byte; the gate runs
+  it after the build.
 
 `2-build-files/dashboard.py` (with `swatch35.py`, the dither cells) does run
 in the build. It draws the dashboard's image and writes its routines'

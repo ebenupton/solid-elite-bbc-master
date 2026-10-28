@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Lens flare model for the filled CMYK MODE 1 Elite (docs/renderer.md; gfx-flare.asm).
+"""Lens flare model for the filled CMYK MODE 1 Elite, and the generator of the
+lens flare's tables in 1-source-files/main-sources/gfx-flare.asm
+(docs/renderer.md, "Lens flare"; first written for the demo port, as its
+tools/flare.py).
 
 A cheap 1990s lens flare: when the sun's centre is on (or near) the screen,
 a chain of dithered see-through circles ("ghosts") along the line from the
@@ -10,8 +13,19 @@ pixel for pixel.
 
 Screens are 192 x 256 arrays of logical colours (0 K, 1 C, 2 M, 3 Y).
 
-    python3 2-build-files/flare.py              renders the study sheets into
+    python3 2-build-files/flare.py      renders the study sheets into
                                         3-assembled-output/flare/ (3x scale)
+    python3 2-build-files/flare.py --tables
+                                        prints gfx-flare.asm's tables (fl_rad,
+                                        fl_ink, fl_ni, fl_mt, fl_dk, fl_ring,
+                                        fl_htab) from GHOSTS, LADDER, BAYER,
+                                        RING and hw_table
+    python3 2-build-files/flare.py --verify [SRC] [BUILD]
+                                        checks them byte for byte against
+                                        gfx-flare.asm's literal tables and,
+                                        if built, the assembled bytes
+                                        (3-assembled-output: symbols.txt,
+                                        MERID.bin); exit status 1 if not
     python3 2-build-files/flare.py --check A B SX SY SR [OUT]
                                         A: emulator screenshot without the
                                         flare, B: the same frame with it, SX SY
@@ -20,6 +34,7 @@ Screens are 192 x 256 arrays of logical colours (0 K, 1 C, 2 M, 3 Y).
                                         differences)
 """
 import os
+import re
 import sys
 import math
 import numpy as np
@@ -373,7 +388,101 @@ def check(base_png, emu_png, sx, sy, sr, out_png=None):
     return lev, len(ys), star
 
 
+# ---------------------------------------------------------------- the tables
+# gfx-flare.asm's tables, by ghost number (GHOSTS' order) where they are per
+# ghost. A ring's radius byte is its scale (1 for 30, 0 for 15: RING is of
+# radius 15); a ring's density index has &80 added.
+HTAB_R = [3, 4, 5, 7, 10, 18]           # fl_h3 ... fl_h18, in fl_htab's order
+
+
+def ink_byte(ink):
+    """The ink in all four pixels of a MODE 1 byte (bit 4+p: 2, bit p: 1)."""
+    return (0xF0 if ink & 2 else 0) | (0x0F if ink & 1 else 0)
+
+
+def tables():
+    """{label: [bytes]} for the tables gfx-flare.asm takes from the model."""
+    t = {}
+    t['fl_rad'] = [(1 if r == 30 else 0) if kind == 'o' else r for k, r, ink, n, kind in GHOSTS]
+    t['fl_ink'] = [ink_byte(ink) for k, r, ink, n, kind in GHOSTS]
+    t['fl_ni'] = [LADDER.index(n) + (0x80 if kind == 'o' else 0) for k, r, ink, n, kind in GHOSTS]
+    mt = []                             # fl_mt: density index 1..5, rows 0..3
+    for n in LADDER[1:6]:
+        for y in range(4):
+            mt.append(sum(0x88 >> p for p, on in enumerate(row_mask(n, y, 0)) if on))
+    t['fl_mt'] = mt
+    ks = [k for k, r, ink, n, kind in GHOSTS]
+    t['fl_dk'] = [0] + [a - b for a, b in zip(ks, ks[1:])]
+    t['fl_ring'] = [c for p in RING[:9] for c in p]
+    t['fl_htab'] = [h for r in HTAB_R for h in hw_table(r)]
+    return t
+
+
+def print_tables():
+    for name, b in tables().items():
+        print('.%-7s EQUB %s' % (name, ', '.join('&%02X' % x for x in b)))
+
+
+def asm_literals(src):
+    """The literal tables in gfx-flare.asm: the EQUB lines from a table's label
+    (or, for fl_mt, its 'fl_mt = P% - 4' line) to the next line that is not an
+    EQUB; fl_hl's LO() entries and the FLHW macro are not literals."""
+    out, cur = {}, None
+    for line in open(src):
+        code = line.split('\\')[0].rstrip()
+        m = re.match(r'^\.(fl_\w+)\s*(.*)$', code) or re.match(r'^(fl_mt)\s*=', code)
+        if m:
+            cur = m.group(1)
+            rest = m.group(2) if m.lastindex and m.lastindex >= 2 else ''
+            out[cur] = []
+            code = ' ' + rest
+        if cur and re.match(r'^\s*EQUB\s', code):
+            try:
+                out[cur] += [int(v.strip().replace('&', '0x'), 0) & 0xFF
+                             for v in code.split('EQUB', 1)[1].split(',')]
+            except ValueError:          # (an expression: not a literal table)
+                out[cur], cur = None, None
+        elif cur and code.strip():
+            cur = None
+    return out
+
+
+def verify(src, build):
+    """Exit status 0 if every table matches: the literals in src, and fl_htab
+    (FLHW, a BeebAsm macro) as assembled into build's MERID.bin."""
+    want, bad = tables(), 0
+    lit = asm_literals(src)
+    for name, b in want.items():
+        if name == 'fl_htab':
+            continue
+        got = lit.get(name)
+        ok = got == b
+        bad += not ok
+        print('%-8s %s' % (name, 'identical' if ok else 'DIFFERS: source %s, model %s' % (got, b)))
+    sym, merid = os.path.join(build, 'symbols.txt'), os.path.join(build, 'MERID.bin')
+    if os.path.exists(sym) and os.path.exists(merid):
+        sy = dict((k, int(v)) for k, v in re.findall(r"'([^']+)':(\d+)", open(sym).read()))
+        at = sy['fl_htab'] - sy['MERID_START']
+        got = list(open(merid, 'rb').read()[at:at + len(want['fl_htab'])])
+        ok = got == want['fl_htab']
+        bad += not ok
+        print('%-8s %s (assembled, %s)' % ('fl_htab', 'identical' if ok else 'DIFFERS', merid))
+    else:
+        print('fl_htab  not checked (no build in %s)' % build)
+    print('FLARE TABLES %s' % ('PASS' if not bad else 'FAIL'))
+    return 0 if not bad else 1
+
+
 def main():
+    if '--tables' in sys.argv:
+        print_tables()
+        return
+    if '--verify' in sys.argv:
+        i = sys.argv.index('--verify')
+        a = sys.argv[i + 1:]
+        src = a[0] if a else os.path.join(ROOT, '1-source-files', 'main-sources', 'gfx-flare.asm')
+        build = a[1] if len(a) > 1 else os.path.join(ROOT, '3-assembled-output')
+        sys.exit(verify(src, build))
     os.makedirs(OUT, exist_ok=True)
     if '--check' in sys.argv:
         i = sys.argv.index('--check')

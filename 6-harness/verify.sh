@@ -7,7 +7,9 @@
 #     original binaries still match 4-reference-binaries/sng47. Once the
 #     build has the filled renderer's rasteriser, its soak test
 #     (6-harness/test_raster.py --quick: every primitive against a
-#     pixel-exact model, on py65) runs first.
+#     pixel-exact model, on py65) runs first, and once the build has the
+#     lens flare, its tables are checked against their generator
+#     (2-build-files/flare.py --verify).
 #  2. determinism: 6-harness/mcompare.mjs --iters N (default 10000) of the
 #     released SNG47 disc (4-reference-binaries/sng47) against the new build
 #     (5-compiled-game-discs/elite-master-sng47.ssd, with its own symbols),
@@ -71,6 +73,10 @@ if grep -iE "error|assertion failed" "$LOG/build.log" 3-assembled-output/compile
 fi
 SAME=$(python3 2-build-files/crc32.py 4-reference-binaries/sng47 3-assembled-output 2>/dev/null | grep -c " Yes ")
 echo "build: PASS ($SAME of 5 binaries identical to the SNG47 reference)"
+if grep -q "'fl_htab'" "$CSYMS"; then
+    # the lens flare's tables as their generator makes them (2-build-files/flare.py)
+    python3 2-build-files/flare.py --verify > "$LOG/flare.log" 2>&1 || { cat "$LOG/flare.log"; echo "flare tables: FAIL"; fail flare; }
+fi
 
 # ---- 2. determinism (and speed)
 OPTS=
