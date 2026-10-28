@@ -111,6 +111,7 @@ moon=scenery`.
 | `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: `S_SUN`, the disc layer, the second disc, the lens flare and the whole frame. |
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
 | `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
+| `mfbcmp.mjs` | The renderer's regression check: hashes both screen buffers at the end of every K-th iteration's frame over the gate's run, or with `--frames` at every frame the frame layer finishes (keyed iteration.n), for comparing two builds whose game state is identical, which must draw the same pixels; `--cmp` compares two runs, and `--dump N` writes an iteration's buffers. |
 | `mflips.mjs` | The flip-interval distribution: how many fields each frame of the space view is shown for, over the gate's run (or the title screen, `--title SECS`), per pilot phase. With the 25 fps cap the shortest is 2. |
 | `verify.sh` | The gate. |
 
