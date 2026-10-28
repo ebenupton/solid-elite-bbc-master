@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1E10          \ The address where the code will be run (Port: the
+ CODE% = &1E13          \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low
@@ -31296,7 +31296,7 @@ ENDIF
 \   Category: Universe
 \    Summary: Set up various aspects of arriving in a new system
 \  Deep dive: A sense of scale
-\       Area: cold
+\       Area: cold, again
 \
 \ ------------------------------------------------------------------------------
 \

@@ -45,6 +45,13 @@ GFXBANK = 6
 MERIDBANK = 7           \ the meridian window (gfx-merid.asm): bank 7, after the
                         \ cold area
 ELITEBANK = HOMEBANK
+R_S2L0 = &9A00          \ the second disc's spans as each buffer last drew them
+R_S2L1 = &9B00          \ (gfx-raster_disc2.asm), in bank 5, where R_DISC2 runs:
+R_S2R0 = &8F40          \ left ends in the room below the per-x tables, right
+R_S2R1 = &BF40          \ ends after the disc window and after R_DISC2 (empty:
+                        \ 255, 0); each array whole in a page, a buffer's and
+                        \ the other's at the same low byte (R_SETBUF patches
+                        \ the high bytes)
 
 NDSTAR = NOST+1         \ stars 1..NOSTM (Master port: NOSTM <= NOST = 20)
 
@@ -80,6 +87,9 @@ ORG &1000
                         \ back for each disc command (DOSCLI; the loader takes
                         \ them first)
 .R_SY       SKIP NDSTAR
+.R_S2T      SKIP 2          \ the second disc's rows in each buffer as drawn
+.R_S2B      SKIP 2          \ (none: 255, 0) and its colour (R_COLE): R_DISC2,
+.R_S2C      SKIP 2          \ gfx-raster_disc2.asm (f_disc2 reads the rows)
 RVOFF = &182            \ R_DIRTYR0's offset in raster_vars (asserted below)
 RVBASE = &12B5 - RVOFF  \ (&14B5 when it was measured: two pages lower)
 ASSERT P% <= RVBASE
@@ -91,6 +101,10 @@ R_PTB = R_NDISCL
 ASSERT LO(R_PTA) <> LO(R_PTB) AND LO(R_PTA) + 191 < 256   \ (k_pre tells them apart)
 .R_SN       SKIP 1          \ star count 0..NDSTAR
 .R_SCOL     SKIP 1          \ star colour byte (R_INIT: &FF)
+.ss_pl      SKIP 9          \ S_SUN's ss_dif: the planet's and the sun's
+.ss_su      SKIP 9          \ coordinates (INWK's, sign-magnitude; gfx-ssun.asm)
+.ss_zs      SKIP 37         \ S_SUN's: the zero page kept round MV40 and SOLAR
+.WS_KGAP                    \ (gfx-ssun.asm: NI% <= 37)
 ALIGN &100
 .KF         SKIP 192        \ the kept solid rows (gfx-raster_kept.asm), per row:
                             \ bit b set if the row is kept in buffer b, bit 7 if
@@ -106,10 +120,18 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
                             \ %01100000 as TIDY's (L_REC, f_winding)
 .GSPLV      SKIP 4          \ part 5's XX2 for the splinter's faces (SPLV)
 .GSHT       SKIP 4          \ SHAND's workspace
+.F_SUX      SKIP 2          \ the sun's centre this frame (F_PLANET from SUN, or
+.F_SUY      SKIP 2          \ S_SUN: gfx-ssun.asm), with GSUNR and GSUNON
+.FL_BEH     SKIP 1          \ bit 7: the sun is behind the planet (f_flt, for
+                            \ R_FLARE's probes)
+.SS_OK      SKIP 1          \ bit 7: S_SUN knows where the sun is from the planet
+                            \ (F_DIRECT clears it while we are docked)
+.ss_d       SKIP 9          \ S_SUN's D = sun - planet (x, y, z: lo, hi, top, two's
+                            \ complement), as ss_turn (MV40) turns it
 .WS_GAP                     \ (free to the main code)
 SKIP CODE% - P%
 .WS_END
-PRINT "Shared workspace: ", ~WS_START, "-", ~WS_GAP-1, " (free ", &1000-DFSIN-1, ", ", RVBASE-R_SY-NDSTAR, ", ", KF-R_SCOL-1, " and ", CODE%-WS_GAP, " to the main code at ", ~CODE%, ")"
+PRINT "Shared workspace: ", ~WS_START, "-", ~WS_GAP-1, " (free ", &1000-DFSIN-1, ", ", RVBASE-R_S2C-2, ", ", KF-WS_KGAP, " and ", CODE%-WS_GAP, " to the main code at ", ~CODE%, ")"
 ASSERT WS_END = CODE%   \ (one block, ending where the main code starts)
 ASSERT HI(KF) = HI(KF + 191)    \ (KF,Y: no page crossing)
 ASSERT HI(R_WR) = HI(R_WR + 191)
@@ -117,20 +139,26 @@ ASSERT HI(R_WR) = HI(R_WR + 191)
 CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables,
 ORG &9000               \ the row runs, the boundary arrays, the stars, the lens
 INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ ...), then the disc window at &8000
+INCLUDE "1-source-files/main-sources/gfx-raster_disc2.asm"   \ the second disc (R_DISC2: run with the disc
+                               \ window paged in, from R_DISCROWS)
+ASSERT P% <= R_S2R1            \ (buffer 1's spans' right ends follow it)
 .B5_END
 ASSERT B5_END <= &C000
 CLEAR r_tfree, r_tables \ (gfx-raster.asm skips it)
 ORG r_tfree             \ R_LINE's cold part, in the room below the per-x
 INCLUDE "1-source-files/main-sources/gfx-raster_lcold.asm"   \ tables (gfx-raster.asm's r_tfree)
 .B5_GAP
-ASSERT B5_GAP <= r_tables
+ASSERT B5_GAP <= R_S2L0       \ (the second disc's spans' left ends follow it)
+ASSERT R_S2L1 + 192 <= r_tables AND R_S2R1 + 192 <= &C000 AND R_S2L0 + 192 <= R_S2L1
+ASSERT LO(R_S2L0) = LO(R_S2L1) AND LO(R_S2R0) = LO(R_S2R1) AND LO(R_S2L0) <= &40 AND LO(R_S2R0) <= &40
 ORG &8000
 INCLUDE "1-source-files/main-sources/gfx-raster_disc.asm"
 INCLUDE "1-source-files/main-sources/gfx-raster_kept.asm"   \ kept solid rows: bank 5's part
 
 .B5LO_END
-ASSERT B5LO_END <= &9000
-PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", &9000-B5LO_END, "), shared &9000-", ~B5_END-1,  " free ", &C000-B5_END, " (+ ", r_tables-B5_GAP, " at ", ~B5_GAP, ")"
+ASSERT B5LO_END <= R_S2R0 AND R_S2R0 + 192 <= &9000   \ (buffer 0's spans' right
+                                \ ends after the disc window's code)
+PRINT "Bank 5: rasteriser: disc window &8000-", ~B5LO_END-1, " (free ", R_S2R0-B5LO_END, " before R_S2R0), shared &9000-", ~B5_END-1,  " free ", R_S2R1-B5_END, " before R_S2R1 (+ ", R_S2L0-B5_GAP, " at ", ~B5_GAP, ", ", R_S2L1-R_S2L0-192, " and ", r_tables-R_S2L1-192, " after R_S2L0 and R_S2L1)"
 SAVE "3-assembled-output/BANK5.bin", &8000, B5_END, &8000
 
 CLEAR COLD_END%, &C000  \ bank 7 after the cold area (ROMSEL MERIDBANK): the
@@ -188,3 +216,4 @@ ASSERT F_ST = F_TM + &300
 PRINT "Bank 6: frame layer &8000-", ~B6_CODE_END-1, ", data ", ~F_HW, "-", ~B6_END-1, " free ", &C000-B6_END
 ASSERT B6_END <= &C000
 SAVE "3-assembled-output/BANK6.bin", &8000, B6_END, &8000
+

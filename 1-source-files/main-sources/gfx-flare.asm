@@ -95,6 +95,15 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  STX fl_dl2+2
  STY fl_dr1+2
  STY fl_dr2+2
+ LDA #HI(R_DISCL0)      \ this buffer's disc spans, for a sun behind the
+ LDY #HI(R_DISCR0)      \ planet (FL_BEH): buffer 0's if X is its R_DIRTYL
+ CPX #HI(R_DIRTYL0)     \ page
+ BEQ P%+6
+ LDA #HI(R_DISCL1)
+ LDY #HI(R_DISCR1)
+ STA flp_l+2
+ STY flp_r+2
+ ASSERT HI(R_DIRTYL0) <> HI(R_DIRTYL1)
                         \ how much of the sun is in sight: nine probes of
                         \ the back buffer as drawn so far (the ships, the
                         \ planet, the dots and the lasers on it; not the
@@ -152,7 +161,19 @@ FLHMAX = 26             \ the ring round the sun only for a sun this small
  CMP #191
  BCS flv8
  INC A
- TAY                    \ the byte: &4000 + (y DIV 8) * &200 + 8 * (x DIV
+ TAY
+ BIT FL_BEH             \ the sun behind the planet (the smaller disc, drawn
+ BPL flv2               \ round the planet's span: f_disc2): a probe inside
+ LDA fl_vx              \ the planet's span on its row is out of sight (its
+.flp_l                  \ pixel may be the planet's yellow)
+ CMP R_DISCL0,Y         \ patched: this buffer's
+ BCC flv2
+.flp_r
+ LDA R_DISCR0,Y         \ patched
+ CMP fl_vx
+ BCS flv8
+.flv2
+ TYA                    \ the byte: &4000 + (y DIV 8) * &200 + 8 * (x DIV
  LSR A                  \ 4) + y MOD 8
  LSR A
  AND #&FE
@@ -649,6 +670,9 @@ fl_mt = P% - 4          \ row masks of densities 1, 2, 4, 6, 8 / 16 (4x4
  EQUB 15, 0, 15, 3, 14, 6, 12, 8, 11, 11, 8, 12, 6, 14, 3, 15, 0, 15
 
 \ The flare's half-widths and variables
+IF HI(P%) <> HI(P% + 64)  \ (the table whole in a page: fl_hw's high byte is
+ SKIP &100 - LO(P%)     \ fixed; a correctness skip, not alignment for speed)
+ENDIF
 .fl_htab                \ the half-widths: the widest x with x^2 + d^2 <= r^2
 MACRO FLHW r            \ + r, d = 0..r (one page: fl_hw's high byte is
  FOR d, 0, r            \ fixed)

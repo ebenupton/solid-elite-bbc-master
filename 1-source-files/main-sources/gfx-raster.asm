@@ -106,6 +106,8 @@
 \              text overlay): stars then only ever replace black that stays
 \              black, so neither plotting nor erasing them touches R_WL/R_WR.
 \ R_DISCROWS   the incremental disc layer for the current buffer (see below).
+\              Enter with C clear: with C set it is R_DISC2, the second disc
+\              behind the layer (gfx-raster_disc2.asm, in bank 5), after it.
 \ R_MARKDIRTY  Y = row, extend this buffer's DIRTY[y] by R_XL..R_XR (use it
 \              for anything else drawn into the buffer, e.g. text, so the next
 \              R_DISCROWS on this buffer repairs it).
@@ -312,6 +314,8 @@ r_bdn = R_BDN0          \ per-buffer boundary rows (patched like r_dl)
 r_bdp = R_BDP0
 r_bdx0 = R_BDX00
 r_bdx1 = R_BDX10
+r_s2l = R_S2L0           \ the second disc's spans (R_DISC2: bank 5, elite-gfx.asm)
+r_s2r = R_S2R0
 
 \ ============================================================================
 \ R_SETBUF: A = buffer.  Patches every buffer-dependent operand (high byte).
@@ -379,6 +383,10 @@ r_bdx1 = R_BDX10
   STA r_pt150+2
   STA r_pt152+2
   STA r_pt399+2
+  STA r_pt506+2           \ (R_DISC2's: gfx-raster_disc2.asm)
+  STA r_pt508+2
+  STA r_pt510+2
+  STA r_pt513+2
   LDA r_sbh_sr,X          \ group r_sr
   STA r_pt18+2
   STA r_pt22+2
@@ -392,6 +400,24 @@ r_bdx1 = R_BDX10
   STA r_pt145+2
   STA r_pt151+2
   STA r_pt153+2
+  STA r_pt507+2
+  STA r_pt509+2
+  STA r_pt511+2
+  STA r_pt514+2
+  LDA r_sbh_s2l,X         \ group r_s2l: the second disc's spans (R_DISC2,
+  STA r_pt500+2           \ gfx-raster_disc2.asm)
+  STA r_pt501+2
+  STA r_pt502+2
+  STA r_pt512+2
+  STA r_pt516+2
+  STA r_pt518+2
+  LDA r_sbh_s2r,X         \ group r_s2r
+  STA r_pt503+2
+  STA r_pt504+2
+  STA r_pt505+2
+  STA r_pt515+2
+  STA r_pt517+2
+  STA r_pt519+2
   JMP r_sbpoly             \ (phase B's operands, in the polygon window)
 }
 \ ============================================================================
@@ -1524,12 +1550,12 @@ FOR y, 0, 191
   EQUB &40 + 2 * (y DIV 8)
 NEXT
 .long
-  STX R_XL                \ up to 12 bytes: masked ends, whole bytes stored
+  STX R_XL                \ up to 4 bytes: masked ends, whole bytes stored
   TYA                     \ through a byte pointer
   SEC
   SBC R_XL
-  CMP #48
-  BCS span
+  CMP #16                 \ (16 pixels or more: the run, 5 cycles a byte and
+  BCS span                \ about 90 to set up, against 26 a byte here)
   LDA RZ_PP               \ (RZ_PP holds a planted RTS's address: keep it)
   PHA
   LDA RZ_PP+1

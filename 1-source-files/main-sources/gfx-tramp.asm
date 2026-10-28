@@ -46,6 +46,7 @@
  JSR R_STARERASE
  JMP tback
 
+\ (C is passed through: R_DISCROWS with C clear, R_DISC2 with it set)
 .T_DISCROWS
  STA tA
  LDA #RASTBANK

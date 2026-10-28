@@ -36,6 +36,14 @@
 #     detail maths, which the renderer's circle engine replaces): its text
 #     stays, but each copy has only its labels and an RTS, at its place (so a
 #     reference to it still assembles, and returns at once).
+#   * ", again" after any of these ("Area: cold, again"): the block is also
+#     emitted a second time into 3-assembled-output/elite-source-again.asm (every other
+#     line blank, so line numbers stay), with no stubs, and with its own
+#     labels and the targets of its JSRs and JMPs named A_<name>: the
+#     renderer INCLUDEs it, and says where each call goes (the original
+#     routine, A_X = X, or a stand-in of its own). gfx-ssun.asm runs SOLAR's
+#     placing of the planet and the sun this way, with SOS1 and NWSHP noting
+#     INWK instead of making ships.
 #   * ", runs on" after any of these ("Area: hot, runs on"): a table that code
 #     reads past its end into the next block (DETOK2 reads TKN2 on into QQ16),
 #     so the next block must follow it, in the same pass and unit, as if it
@@ -143,6 +151,7 @@ TAGS = {"cold": "cold", "low": "low", "hot": "run", "hot, ACCCON X": "hotx", "no
 # therefore follow it as a fall-through does
 RUNSON = set()
 NONE = set()                               # (the "Area: none" blocks, by their first line)
+AGAIN = set()                              # (the ", again" blocks, by their first line)
 NOFALL = set("RTS RTI JMP BRA BRK".split())
 BRANCH = set("BCC BCS BEQ BMI BNE BPL BRA BVC BVS".split())
 
@@ -192,6 +201,9 @@ def blocks(lines, tags=TAGS):
             m = AREA.match(l)
             if m:
                 t = m.group(1).strip()
+                if t.endswith(", again"):      # (also emitted again, as it is)
+                    t = t[:-len(", again")]
+                    AGAIN.add(out[-1][0])
                 if t.endswith(", runs on"):    # (read past its end into the next block)
                     t = t[:-len(", runs on")]
                     RUNSON.add(out[-1][0])
@@ -812,6 +824,34 @@ def data(errors, phase, sy=None):
 ASM = []
 
 
+def again_copy(lines, bl):
+    """the ", again" blocks, every other line blank: each label a block
+    defines, and each JSR or JMP target outside the block, renamed A_<name>
+    (in the code, not the comments), so that the copy's labels are its own
+    and the file that INCLUDEs it decides where each call goes (the original
+    routine, A_X = X, or a stand-in .A_X)"""
+    out = [""] * len(lines)
+    for s, e, name, area in bl:
+        if s not in AGAIN:
+            continue
+        own = set()
+        for i in range(s, e):
+            m = re.match(r"^\.([A-Za-z_]\w*)", code_part(lines[i]))
+            if m:
+                own.add(m.group(1))
+        for i in range(s, e):
+            c = code_part(lines[i])
+            if not c:
+                out[i] = lines[i]
+                continue
+            n = len(lines[i]) - len(lines[i].lstrip())
+            code = re.sub(r"\b(JSR|JMP)\s+([A-Za-z_]\w*)", lambda m: "%s A_%s" % (m.group(1), m.group(2)), c)
+            code = re.sub(r"(?<![\w%])([A-Za-z_]\w*)\b",
+                          lambda m: "A_" + m.group(1) if m.group(1) in own else m.group(1), code)
+            out[i] = " " * n + code + lines[i][lines[i].index(c) + len(c):]
+    return out
+
+
 def stub_none(lines, bl):
     """each "Area: none" block's code: only its labels, then an RTS on its
     last code line (the lines between blanked, so line numbers stay)"""
@@ -835,6 +875,8 @@ def main():
         sys.exit("usage: streams.py measure|place")
     lines = open(SRC, encoding="latin-1").read().split("\n")
     bl = blocks(lines)
+    with open(OUT % "again", "w", encoding="latin-1") as f:
+        f.write("\n".join(again_copy(lines, bl)))
     stub_none(lines, bl)
     ACTIVE[:] = active_lines(lines)
     macros = set(m.group(1) for m in (re.match(r"^\s*MACRO\s+(\w+)", l) for l in lines) if m)
@@ -985,7 +1027,7 @@ def main():
         conts = [["hot1", sy["LOW_END%"], 0x4000, []], ["hot2", sy["QS_RUN%"], 0x8000, []],
                  ["hot3", 0x8000, 0xC000 - b4 - (sy["R4_END%"] - sy["R4_START%"]), []]]
         # (bank 4 ends with the hot data HAZEL has no room for, b4, then the
-        # renderer's game-context routine, L_SUN: elite-layout.asm)
+        # renderer's game-context routines, S_SUN and L_SUN: elite-layout.asm)
         used = {c[0]: 0 for c in conts}
         cur = 0
         for u0, u1 in units:

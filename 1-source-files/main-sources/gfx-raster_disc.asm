@@ -12,6 +12,9 @@
 \ ============================================================================
 .R_DISCROWS
 {
+  BCC t0                  \ C set: the second disc instead (f_disc2's T_DISCROWS:
+  JMP R_DISC2             \ gfx-raster_disc2.asm)
+.t0
   LDA R_NDT
   CMP R_CT
   BCS t1
@@ -2069,6 +2072,9 @@ c_BB  = &25
   LDA #&FF
   STA R_PRDYT,X
   STA R_PRDST,X
+  STA R_S2T,X             \ (the second disc's rows: none, and no colour, so
+  STZ R_S2B,X             \ that R_DISC2 draws its next rows whole and never
+  STZ R_S2C,X             \ reads its spans as they were: gfx-raster_disc2.asm)
   STZ R_PRDYB,X
   STZ R_PRDSB,X
   STZ R_PRSCNT,X

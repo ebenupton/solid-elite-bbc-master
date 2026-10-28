@@ -68,7 +68,7 @@ FILES = {"../../3-assembled-output/elite-source-config.asm": "main", "../../3-as
          "gfx-frame.asm": "bank6", "gfx-faces.asm": "bank6", "gfx-light6.asm": "bank6", "gfx-light.asm": "bank6", "gfx-finit.asm": "bank6",
          "gfx-frame_cold.asm": "bank6", "gfx-flare6.asm": "bank6", "gfx-hangar.asm": "bank6", "gfx-hangar6.asm": "bank6", "gfx-flare.asm": "bank7m",
          "gfx-merid.asm": "bank7m", "gfx-planet7.asm": "bank7m",
-         "gfx-raster_kept.asm": "bank5d", "gfx-kept7.asm": "bank7m"}
+         "gfx-raster_kept.asm": "bank5d", "gfx-raster_disc2.asm": "bank5", "gfx-ssun.asm": "bank4", "gfx-kept7.asm": "bank7m"}
 # the copies of elite-source.asm that 2-build-files/streams.py writes, one per area
 # (their line numbers are elite-source.asm's)
 SHOW = {"../../3-assembled-output/elite-source-%s.asm" % a: "elite-source.asm" for a in ("config", "low", "hot1", "hot2", "hot3", "cold")}

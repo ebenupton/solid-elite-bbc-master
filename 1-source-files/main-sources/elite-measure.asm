@@ -75,9 +75,10 @@
 
 .HZ_END
 
- CLEAR &8000, &C000     \ the size of L_SUN (at bank 4's end in the layout)
- ORG &8000
+ CLEAR &8000, &C000     \ the size of S_SUN and L_SUN (at bank 4's end in the
+ ORG &8000              \ layout)
 .R4_START%
+ INCLUDE "1-source-files/main-sources/gfx-ssun.asm"
  INCLUDE "3-assembled-output/gfx-light-4.asm"
 .R4_END%
 

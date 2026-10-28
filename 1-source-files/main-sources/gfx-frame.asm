@@ -667,9 +667,6 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
  STA GSUNON
  RTS
 
-.F_SUX EQUW 0
-.F_SUY EQUW 0
-
 \ F_SHPPT: record a distant ship as a 2x2 dot at (K3, K4), in its hue
 
 .F_SHPPT
@@ -752,7 +749,7 @@ F_STN = 4               \ F_ST: buffer 0 shows a character (buffer 1: x 2)
 
  JSR T_STARERASE        \ undo last time's stars in this buffer
  JSR f_discs            \ the disc layer (sun or planet), incremental
- JSR f_disc2            \ the other disc, if both are on screen (full spans)
+ JSR f_disc2            \ the other disc, if both are on screen (incremental)
 .ff_lin                 \ (F_HANGAR points this call at f_hback for its frame)
  JSR f_lines            \ planet meridians, craters, enemy lasers
  JSR f_ships            \ filled ships, far to near
@@ -974,7 +971,7 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
 
 \ f_discs: choose which of the sun and planet is the incremental disc layer
 \ (the bigger one), fill R_NDISCL/R and run R_DISCROWS. f_disc2 then draws the
-\ other, if any, as plain spans.
+\ other, if any, behind it (R_DISC2).
 
 .f_discs
  LDA #0
@@ -1022,6 +1019,7 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
  STA R_DCO
  JSR f_plrows           \ planet spans into R_NDISCL/R, R_NDT/R_NDB
  JSR f_bounds           \ and its surface detail as colour boundaries
+ CLC                    \ (C clear: the disc layer, R_DISCROWS)
  JMP T_DISCROWS
 .fds6
  LDA #FC_SUNE
@@ -1030,12 +1028,14 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
  STA R_DCO
  JSR f_sunrows
  JSR f_nobounds
+ CLC                    \ (C clear: the disc layer, R_DISCROWS)
  JMP T_DISCROWS
 .fds9
  LDA #1                 \ no disc
  STA R_NDT
  LDA #0
  STA R_NDB
+ CLC                    \ (C clear: the disc layer, R_DISCROWS)
  JMP T_DISCROWS
 
 .f_lay EQUB 0           \ disc layer: 0 none, 1 sun, 2 planet
@@ -1472,8 +1472,15 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .fhw9
  RTS
 
-\ f_disc2: the secondary disc, drawn in full every frame as spans (rare: both
-\ the sun and the planet on screen).
+\ f_disc2: the secondary disc (both the sun and the planet on screen: more
+\ often since the sun near the planet is drawn too, gfx-ssun.asm). It is the
+\ smaller disc, and the sun and the planet are the same size (PLANET's radius
+\ 24576 / z for both), so it is the further: R_DISC2 (gfx-raster_disc2.asm)
+\ draws what the layer's span (this buffer's R_DISCL/R, as T_DISCROWS has
+\ just left them) leaves of each of its rows, incrementally, as the layer is
+\ drawn. With no secondary disc it is called only to erase what this buffer
+\ still holds of one (R_S2T: its rows). It fills the rows R_DISC2 reads
+\ beyond the new ones (the old rows) with empty spans.
 
 .f_disc2
  LDA f_sec
@@ -1485,35 +1492,62 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  LDA #FC_PLANO
  STA R_COLO
  JSR f_plrows
- JMP fd22
+ BRA fd22
 .fd21
  LDA #FC_SUNE
  STA R_COLE
  LDA #FC_SUNO
  STA R_COLO
  JSR f_sunrows
-.fd22
- LDY R_NDT
+.fd22                   \ R_DISC2 reads the new spans over this buffer's old
+ LDX F_BACK             \ rows too (R_S2T..R_S2B): empty there, outside
+ LDA R_S2B,X            \ NDT..NDB (rows lo .. hi: old + new)
+ CMP R_NDB
+ BCS fd23
+ LDA R_NDB
 .fd23
- CPY R_NDB
- BEQ P%+4
- BCS fd29
- LDA R_NDISCL,Y
- CMP R_NDISCR,Y
- BEQ P%+4
- BCS fd28
- STA R_XL
- LDA R_NDISCR,Y
- STA R_XR
- STY fz_i
- JSR T_SPAN
- LDY fz_i
- JSR T_MARKDIRTY
- LDY fz_i
-.fd28
+ STA fz_t               \ hi
+ LDY R_S2T,X
+ CPY R_NDT
+ BCC fd24
+ LDY R_NDT              \ lo
+.fd24
+ CPY R_NDT              \ lo .. NDT-1
+ BCS fd26
+ CPY fz_t
+ BEQ fd25
+ BCS fd27
+.fd25
+ LDA #&FF
+ STA R_NDISCL,Y
+ LDA #0
+ STA R_NDISCR,Y
  INY
- BNE fd23
+ BNE fd24
+.fd26
+ LDY R_NDB              \ NDB+1 .. hi
+.fd2a
+ CPY fz_t
+ BCS fd27
+ INY
+ LDA #&FF
+ STA R_NDISCL,Y
+ LDA #0
+ STA R_NDISCR,Y
+ BRA fd2a
+.fd27
+ SEC                    \ (C set: R_DISC2)
+ JMP T_DISCROWS
 .fd29
+ LDX F_BACK
+ LDA R_S2T,X
+ INC A
+ BEQ fd28               \ (none in this buffer either)
+ LDA #&FF               \ no rows (as R_DISC2 keeps them: 255, 0)
+ STA R_NDT
+ STZ R_NDB
+ BRA fd22
+.fd28
  RTS
 
 \ ------------------------------------------------------------------------------

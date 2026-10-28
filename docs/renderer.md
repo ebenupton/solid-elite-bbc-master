@@ -105,10 +105,12 @@ back buffer, two frames old:
 
 1. Wait until the previous flip has happened.
 2. Erase this buffer's old stars, which were plotted only on black pixels.
-3. Per row, update the disc layer (the planet or the sun). From this
-   buffer's old disc span, its old dirty extent and the new span, write the
-   disc's colour where it is not already right, and black where something
-   old is no longer covered.
+3. Per row, update the disc layer (the bigger of the planet and the sun,
+   which is the nearer). From this buffer's old disc span, its old dirty
+   extent and the new span, write the disc's colour where it is not
+   already right, and black where something old is no longer covered. Then
+   the second disc, the smaller and further one, where the layer leaves
+   room (see "The sun near the planet").
 4. Fill the ships far to near, each face a dithered polygon in its lit
    colour, with their details and fins. Then draw the lines and the
    particles. All of these extend this buffer's dirty extent for each row.
@@ -154,9 +156,10 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E00-&1DDE`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars and the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
-| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, and the arithmetic and cold parts of both windows that use nothing of either window |
+| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
@@ -252,8 +255,7 @@ yellow, so it shows from as far away as the original's wireframe slot does.
 
 ## Lens flare
 
-When the sun is on screen in the front view, and not behind the planet, the
-frame draws eight ghosts along the line from the screen's centre through
+When the sun is on screen in the front view, the frame draws eight ghosts along the line from the screen's centre through
 the sun: six dithered discs and two dotted rings. They are ORed in their
 inks, so the light adds up. Three levels of brightness depend on how far the
 sun is from the centre. The flare extends each row's dirty extent, so the
@@ -276,14 +278,19 @@ with R capped at 127).
   row: `FC_SUNE` on even rows and `FC_SUNO` on odd ones, so a dithered row is
   compared pixel by pixel with its own colour byte (`fl_pxm`). ACCCON X is
   the frame layer's, so the reads see this buffer.
+* When the sun is the second disc, behind a bigger planet, a probe inside
+  the planet's span on its row is out of sight (`FL_BEH`, which `f_flt` sets),
+  as the planet's colours could pass the colour test; `R_FLARE` reads this
+  buffer's disc spans for it. So a sun rising over the limb turns the flare
+  up in steps.
 * With no probe in sight there is no flare, and nothing is marked dirty. In
   K mode the kept rows are forgotten only when the flare draws.
 * Otherwise every ghost's density steps down 0 (all nine in sight), 1 (seven
   or eight), 2 (four to six) or 3 (one to three) more rungs of its ladder
   (`fl_vred`).
 
-`f_flt`'s tests are still made first: the front view, the sun's centre on
-the screen, and the centre not inside the planet's disc. The probes take
+`f_flt`'s tests are still made first: the front view and the sun's centre
+on the screen. The probes take
 1,200-1,280 cycles a flared frame, so a hidden sun's flare costs about 1,440
 cycles where a drawn flare costs 14,000-28,000. `6-harness/mflarevis.mjs`
 puts the sun, and optionally a ship, on paths in front of the gate's pilot
@@ -366,6 +373,83 @@ engine alone on random circles, and its `beachball` and `capball` frames
 feed a spinning planet's rows through `R_DISCROWS`. `6-harness/mplanet.mjs`
 poses planet scenes and dumps each frame with the planet routines' cycles,
 for `2-build-files/planetvis.py` to render.
+
+## The sun near the planet
+
+Elite has one slot, `FRIN+1`, for the sun and the space station. Every 32
+iterations, part 15 of the main flight loop checks whether we are near the
+planet; if so, `WPLS` removes the sun from the screen and `NWSPS` puts the
+station in its slot. When the station is out of range, `KS4` makes a new sun
+overhead, and after a launch there is no sun at all. The game state must
+stay SNG47's, so none of that changes: the renderer draws the sun as
+scenery instead, where it would have been, for the frame only.
+
+`S_SUN` (`gfx-ssun.asm`, at bank 4's end with `L_SUN`) runs after every
+main-loop iteration, from `G_FRAME` with bank 4 paged, before `F_FRAME`. It
+writes only its own variables and the frame's (`F_SUX`, `F_SUY`, `GSUNR`,
+`GSUNON`, `SS_OK`); the zero page and the game's variables that it borrows
+are kept and put back.
+
+* **The sun in its slot**, and the planet within one sign unit on every
+  axis: in the frames with `MCNT AND 31` = 1 or 0 (the last before part 15
+  can swap the slot) it takes D = sun - planet (24-bit two's complement,
+  `ss_d`, in the shared workspace). Further out, D is forgotten.
+* **The station in the slot**: our own movement moves the planet and the
+  sun alike, so D only turns, and it is turned by our roll and pitch by
+  `MV40` itself (`ss_turn`: D into `INWK`'s coordinates, `MV40` with `TYPE`
+  129 and `DELTA` 0, so that `MV45` moves z by nothing and returns). In
+  record mode the sun is recorded at planet + D, as `PLANET` would draw it
+  (the view's axes as `PLUT`, `PLANET`'s tests on z, `PROJ`, the radius
+  24576 / z, `CHKON`).
+* **The station in the slot and D unknown** (we launched, so this system's
+  sun was never in the slot): D comes from the system's seeds by `SOLAR`'s
+  own code. The `SOLAR` block is tagged `Area: cold, again`, so `streams.py`
+  emits it a second time (`elite-source-again.asm`, with no stubs and its
+  labels and call targets named `A_<name>`), which `ss_seed` includes and
+  enters at `A_nobirths`, with stand-ins for `SOS1` and `NWSHP` that note
+  `INWK`'s coordinates instead of making ships ([memory-map.md](memory-map.md)).
+* Docked (`F_DIRECT` clears `SS_OK`), in witchspace or with no planet: no
+  sun.
+
+When `KS4` brings the game's own sun back, it is overhead, as in the
+original, and the drawn sun jumps there. The lighting keeps turning its
+light while the station has the slot.
+
+**Two discs.** `PLANET` gives the sun and the planet the same radius at the
+same z, so the bigger disc is the nearer. `f_discs` makes the bigger one
+the disc layer, and `f_disc2` draws the smaller one only where the layer's
+span on each row leaves room, up to two pieces a row: a sun behind a bigger
+planet is cut by its limb, a planet behind a bigger sun by the sun, and
+ships are drawn after both. A planet that is the second disc is a plain
+disc, without its surface detail.
+
+The second disc is incremental, as the original's sun is (its `SUNX` and
+line heap): `R_DISC2` (`gfx-raster_disc2.asm`, at the end of bank 5's
+shared region) keeps, for each buffer, the second disc's span on every row
+(`R_S2L0` and `R_S2L1` in the room below the per-x tables, `R_S2R0` after
+the disc window, `R_S2R1` after `R_DISC2`), its rows and its colour
+(`R_S2T`, `R_S2B`, `R_S2C`, in the shared workspace). After `R_DISCROWS`,
+everything that can have happened to the old pieces since the buffer's
+last frame is in the rows' written extents (`R_WL`, `R_WR`), so per row
+only the ends that moved, and what was written over the span, are drawn
+again; the old span is blacked and the new one drawn whole only when they
+are apart, one is empty or the colour changed. Its writes are masked to
+their pixels and go into the written extents, not the dirty ones, so the
+next frame does not repair them. `f_disc2` calls `T_DISCROWS` with C set,
+which `R_DISCROWS` sends to `R_DISC2`. `r_lput2` hands spans of 16 pixels or
+more to the row run.
+
+A frame with the sun in view costs `S_SUN` about 3,200 cycles and the
+second disc 2,500 (held still) to 17,600 (rising); in the front view the
+lens flare costs most, as anywhere. On the gate's docking approach, with a
+small sun in the front view, the windows run 3.1% and 7.0% slower than
+without it; elsewhere the cost is within 0.1%. `test_raster.py`'s `disc2`
+test drives two discs drifting, crossing, coming and going on two buffers,
+with ships, lines, dots, text, stars, resets and K mode, against the model
+every frame. `6-harness/msunnear.mjs` poses the scene (a big planet, the sun
+rising from behind its limb, the station crossing), `msunprof.mjs` profiles
+a stretch of the gate's run, and `2-build-files/sunnear.py` renders the
+frames, a sheet and a movie.
 
 ## The hangar
 
