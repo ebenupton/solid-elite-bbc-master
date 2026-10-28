@@ -126,7 +126,8 @@
 
 .HZDATA_END%
 
-.HZ_END
+.HZ_END                 \ (HAZEL holds the game data only: the renderer
+                        \ keeps nothing here, docs/memory-map.md rule 5)
 
  PRINT "HAZEL: game data &C000-", ~HZDATA_END%-1, ", free ", &DF00-HZ_END, " (+ 256 at &DF00, the MOS's)"
  ASSERT HZ_END <= &DF00  \ (&DF00-&DFFF is the MOS's: its FS numbers and

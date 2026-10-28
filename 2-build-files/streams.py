@@ -145,7 +145,8 @@ BRANCH = set("BCC BCS BEQ BMI BNE BPL BRA BVC BVS".split())
 # starts of the first two come from the measure (the low pass's end, the
 # quarter-square tables' end)
 HOTX = "hot3"                              # (where an ACCCON X unit goes: bank 4)
-HAZEL_START, HAZEL_END = 0xC000, 0xDF00    # (&DF00-&DFFF is the MOS's)
+HAZEL_START, HAZEL_END = 0xC000, 0xDF00    # (&DF00-&DFFF is the MOS's; HAZEL holds
+                                           # the game data only, none of the renderer's)
 
 
 def code_part(line):

@@ -70,11 +70,14 @@ routine of the game stays at its place in the original's source.
    whatever bank is paged. The data sits in the original's order from
    `XX21` at `&C000`. `NWSHP` reads past `E%`, to `E%-1,Y`, for the planet
    and the sun, into the missile's blueprint, as in the original, so the
-   order matters. HAZEL holds nothing else. The hot data would flow on into
-   bank 4, after the hot code; since the ships' edge lists went (nothing
-   reads them, "Removed" below), all of it fits in HAZEL, `QQ18` (the
-   recursive tokens, which the hot text printers read), `SNE` and `ACT`
-   included.
+   order matters. **HAZEL holds the game data only**: the renderer makes
+   no use of it at all (no code, tables, variables or stubs of its own
+   there; `bankcheck.py` fails the build on a renderer label or constant in
+   `&C000-&DFFF`), and `&DF00-&DFFF`, the MOS's, is off limits to
+   everything. The hot data would flow on into bank 4, after the hot code;
+   since the ships' edge lists went (nothing reads them, "Removed" below),
+   all of it fits in `&C000-&DEFF`, `QQ18` (the recursive tokens, which the
+   hot text printers read), `SNE` and `ACT` included.
 6. **HAZEL and disc access.** DFS and the MOS overwrite parts of HAZEL
    during a disc command and keep lasting state there. `DOSCLI`, through
    which every OSCLI goes, stashes all of HAZEL in screen buffer 0 (main

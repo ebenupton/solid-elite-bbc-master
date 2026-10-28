@@ -40,6 +40,8 @@
 #    code calls main RAM and HAZEL code directly but nothing in another bank,
 #    reads no other bank's data, and reads main RAM data only below &3000 (the frame layer may run with ACCCON
 #    X set, which hides main RAM above);
+#  * no label or constant of the renderer's is in HAZEL (&C000-&DFFF), and
+#    nothing labelled is in &DF00-&DFFF (the MOS's);
 #  * "hazel" is visible to every area: HAZEL (the game data,
 #    3-assembled-output/elite-data-hot.asm) and the renderer's shared
 #    workspace in main RAM below &3000 (elite-gfx.asm, gfx-raster_scr.asm,
@@ -156,6 +158,17 @@ try:
 except FileNotFoundError:
     pass
 errors = []
+# HAZEL (&C000-&DFFF) holds the game data only: no label or constant of the
+# renderer's (elite-gfx.asm and the gfx- files: code, tables, variables,
+# stubs) may be there, and &DF00-&DFFF is the MOS's (docs/memory-map.md, rule 5)
+for f in FILES:
+    if f == "elite-gfx.asm" or f.startswith("gfx-"):
+        for l in sorted(own[f]):
+            if 0xC000 <= addr.get(l, 0) < 0xE000:
+                errors.append("%s: the renderer's %s is in HAZEL (&%04X)" % (f, l, addr[l]))
+for l, v in addr.items():
+    if 0xDF00 <= v < 0xE000 and area.get(l) is not None:
+        errors.append("%s is at &%04X, the MOS's page of HAZEL" % (l, v))
 for f, a in FILES.items():
     prev, prevop = None, None
     for n, line, labels, mn, op, ok in statements(SRC + f):
