@@ -32,10 +32,12 @@
 \     with ACCCON X set first, as it comes first in the source), then the hot
 \     data that HAZEL has no room for (saved as BANK4);
 \
-\   * HAZEL: elite-data.asm's hot data (3-assembled-output/elite-data-hot.asm);
-\
 \   * the cold pass, sideways RAM bank 7: elite-source.asm's cold blocks,
-\     then elite-data.asm's (3-assembled-output/elite-data-cold.asm);
+\     then elite-data.asm's (3-assembled-output/elite-data-cold.asm, which
+\     defines the extended tokens' macros);
+\
+\   * HAZEL: elite-data.asm's hot data (3-assembled-output/elite-data-hot.asm;
+\     after the cold pass, as RUTOK uses the extended tokens' macros);
 \
 \ then the renderer (elite-gfx.asm).
 \ elite-data.asm's blocks tagged BDATA, the dashboard image, are assembled on
@@ -104,12 +106,39 @@
 
 \ ******************************************************************************
 \
+\ Port: the cold pass (docs/memory-map.md), paged in as ROMSEL = COLDBANK
+\ (7): sideways RAM bank 7 from &8000, the original's cold code and data in
+\ the original's order: the blocks of elite-source.asm tagged cold (with a
+\ seam, a JMP to a hot routine's stub, where a cold routine falls into a hot
+\ one), then those of elite-data.asm (the extended tokens TKN1 and their
+\ macros: RUPLA, RUGAL and RUTOK are hot data, in HAZEL). Saved as COLD7.
+\
+\ ******************************************************************************
+
+ CLEAR &8000, &C000
+ ORG &8000
+
+.COLD_START%
+
+ INCLUDE "3-assembled-output/elite-source-cold.asm"
+
+ INCLUDE "3-assembled-output/elite-data-cold.asm"    \ the extended tokens, TKN1
+
+.COLD_END%
+
+ PRINT "Bank 7 cold: &8000-", ~COLD_END%-1, " (the meridian window follows: elite-gfx.asm)"
+ ASSERT COLD_END% <= &C000
+ SAVE "3-assembled-output/COLD7.bin", &8000, COLD_END%, &8000
+
+\ ******************************************************************************
+\
 \ Port: HAZEL (&C000-&DFFF), visible whatever bank is paged: the hot data,
 \ elite-data.asm's blocks that are not tagged (3-assembled-output/elite-data-hot.asm,
 \ which 2-build-files/streams.py writes) in the original's order from &C000: XX21,
-\ E%, KWL%, KWH% and the blueprints from the missile's to the Dodo's (the
-\ hot data that follows, QQ18, SNE and ACT, flows on into bank 4). DOSCLI stashes all of HAZEL in screen buffer 0 around each disc
-\ command, so the data may sit anywhere in it; nothing the IRQ handler or
+\ E%, KWL%, KWH%, the blueprints from the missile's to the Dodo's, QQ18, SNE,
+\ ACT, then RUPLA, RUGAL and RUTOK (the extended descriptions' overrides,
+\ which the cold pass reads). DOSCLI stashes all of HAZEL in screen buffer 0
+\ around each disc command, so the data may sit anywhere in it; nothing the IRQ handler or
 \ CHPR uses during a command is here. Saved as HAZEL (it ends below &DF00: the MOS's own
 \ bytes from &DF00 on are left as the loader's disc accesses left them, and
 \ are not for the game's data), which the loader copies into place after its last disc
@@ -134,32 +163,6 @@
                         \ filing-system names, its lasting state)
  SAVE "3-assembled-output/HZDATA.bin", &C000, HZDATA_END%, &C000
  SAVE "3-assembled-output/HAZEL.bin", HZ_START, HZ_END, HZ_START
-
-\ ******************************************************************************
-\
-\ Port: the cold pass (docs/memory-map.md), paged in as ROMSEL = COLDBANK
-\ (7): sideways RAM bank 7 from &8000, the original's cold code and data in
-\ the original's order: the blocks of elite-source.asm tagged cold (with a
-\ seam, a JMP to a hot routine's stub, where a cold routine falls into a hot
-\ one), then those of elite-data.asm (the extended tokens TKN1, RUPLA, RUGAL
-\ and RUTOK). Saved as COLD7.
-\
-\ ******************************************************************************
-
- CLEAR &8000, &C000
- ORG &8000
-
-.COLD_START%
-
- INCLUDE "3-assembled-output/elite-source-cold.asm"
-
- INCLUDE "3-assembled-output/elite-data-cold.asm"    \ the extended tokens
-
-.COLD_END%
-
- PRINT "Bank 7 cold: &8000-", ~COLD_END%-1, " (the meridian window follows: elite-gfx.asm)"
- ASSERT COLD_END% <= &C000
- SAVE "3-assembled-output/COLD7.bin", &8000, COLD_END%, &8000
 
  PRINT "Addresses for the scramble routines in elite-checksum.py"
  PRINT "F% = ", ~F%

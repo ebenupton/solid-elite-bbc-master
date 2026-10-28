@@ -8713,7 +8713,6 @@ ENDIF
 \  Deep dive: Extended system descriptions
 \             Extended text tokens
 \             The Constrictor mission
-\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8775,7 +8774,6 @@ ENDIF
 \  Deep dive: Extended system descriptions
 \             Extended text tokens
 \             The Constrictor mission
-\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
@@ -8844,7 +8842,6 @@ ENDIF
 \  Deep dive: Extended system descriptions
 \             Extended text tokens
 \             The Constrictor mission
-\       Area: cold
 \
 \ ------------------------------------------------------------------------------
 \
