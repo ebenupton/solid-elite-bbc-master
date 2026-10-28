@@ -17,7 +17,8 @@
 #  3. regressions, with real key presses: dock, launch, dock again
 #     (mredock.mjs); save, load, a failed load and a catalogue through the
 #     game's disc menu (msavetest.mjs, once the build has DOSCLI, its disc
-#     glue); once the build has the filled renderer, the station drawn in
+#     glue); the same commander saved on SNG47 and on the build, the files
+#     compared byte for byte (msavebytes.mjs); once the build has the filled renderer, the station drawn in
 #     front of a planet just over 65536 away (mstation.mjs); and changes of
 #     view in flight against the reference over 1500 iterations
 #     (mcompare.mjs --views); once the build culls by the ship's handedness,
@@ -51,6 +52,8 @@ mkdir -p "$LOG"
 fail() { echo "VERIFY FAIL $1"; exit 1; }
 CAND=5-compiled-game-discs/elite-master-sng47.ssd
 CSYMS=3-assembled-output/symbols.txt
+REF=4-reference-binaries/sng47/elite-master-sng47.ssd
+RSYMS=4-reference-binaries/sng47/symbols.txt
 
 # ---- 1. the rasteriser's soak test, and the build
 if [ -f 1-source-files/main-sources/gfx-raster.asm ]; then
@@ -96,6 +99,13 @@ if grep -q "'DOSCLI_C'" "$CSYMS"; then
 else
     SAVE="no savetest: the original's disc access"
 fi
+# saves byte-identical: the same commander saved on SNG47 and on this build,
+# the files (and their catalogue entries) compared byte for byte
+node 6-harness/msavebytes.mjs --ref "$REF" --rsyms "$RSYMS" --cand "$CAND" --csyms "$CSYMS" \
+    --out "$LOG/savebytes" > "$LOG/savebytes.log" 2>&1
+grep -E "^savebytes:|^SAVEBYTES" "$LOG/savebytes.log"
+grep -q "^SAVEBYTES PASS" "$LOG/savebytes.log" || { tail -5 "$LOG/savebytes.log"; echo "savebytes: FAIL"; fail savebytes; }
+SAVE="$SAVE, savebytes"
 if grep -q "'F_PLANET'" "$CSYMS"; then
     # the station in front of a planet just over 65536 away (a docking run
     # with the planet behind it) must be drawn: F_PLANET once kept 16 bits of
