@@ -227,8 +227,14 @@ const fj = l => l.sort((p, q) => p - q).join(l.some(f => f > 9) ? "," : "");
 for (const [t, pid, h, z, x = 0, y = 0, chk = {}] of CASES) {
     cur = { t, p: POSES[pid], h, z, x, y }; xx3 = null; run = 0; drawn = null;
     const i0 = iters;
-    for (let k = 0; k < 4000 && (iters < i0 + 6 || run < 3); k++) await s.runFor(20000);
-    await s.runFor(100000);
+    // (and still three running after the wait for the frame to be shown: a TIDY in the wait mirrors the
+    // matrix for one iteration, and the frame shown may be that one's, which a timing change can bring
+    // about; wait for three running again then)
+    for (let tries = 0; tries < 8; tries++) {
+        for (let k = 0; k < 4000 && (iters < i0 + 6 || run < 3); k++) await s.runFor(20000);
+        await s.runFor(100000);
+        if (run >= 3) break;
+    }
     const fb = s._completeFb8, L = v.leftBorder, T = v.topBorder, W = FW - L - v.rightBorder, H = 625 - T - v.bottomBorder;
     const tag = `s${String(t).padStart(2, "0")}_${pid}${h}`;
     await sharp(Buffer.from(fb.buffer), { raw: { width: FW, height: 625, channels: 4 } })
