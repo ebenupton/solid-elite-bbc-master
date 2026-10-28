@@ -56,7 +56,7 @@ BANKED = [(OUT + "elite-source-hot3.asm", "4"), (OUT + "elite-data-hot4.asm", "4
           (SRC + "gfx-raster_kept.asm", "5"),
           (SRC + "gfx-frame.asm", "6"), (SRC + "gfx-flare6.asm", "6"),
           (SRC + "gfx-hangar.asm", "6"), (SRC + "gfx-faces.asm", "6"), (SRC + "gfx-frame_cold.asm", "6"),
-          (SRC + "gfx-merid.asm", "7"), (SRC + "gfx-kept7.asm", "7"),
+          (SRC + "gfx-merid.asm", "7"), (SRC + "gfx-kept7.asm", "7"), (SRC + "gfx-planet7.asm", "7"),
           (SRC + "gfx-flare.asm", "7")]
 
 # Each name is written once, from the first file that defines it: the game's

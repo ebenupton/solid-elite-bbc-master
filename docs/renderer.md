@@ -79,7 +79,7 @@ would have drawn, then returns from the routine itself:
   curve (`H_PCURVE`), and `BLINE` records its points. A meridian planet's
   equator and meridian are not worked out at all: `PL9` calls `H_MERID`,
   which hands the planet's orientation to the meridian window instead (see
-  "Beach ball planets"). `SUN` records the sun's half-widths.
+  "Planet surfaces"). `SUN` records the sun's half-widths.
 * `PIXEL2` records a star and `PIXEL` an explosion particle. `PIX1` no longer
   erases a star's old position, a choice that `pxpat` patches once per star
   pass.
@@ -155,13 +155,13 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map and each cell's shown state |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the beach ball planet's boundaries: `PM_HOOK` and `PM_MERID` (`gfx-merid.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
 build. ANDY is paged in only by the trampolines: `T_POLY` and `T_LINE` page
 ROMSEL `&85`, and the rest page bank 5. The meridian window is paged in
-only by its stubs, `G_MERHOOK`, `T_MERID`, `T_KPRE` and `T_FLARE`. `&F4` always matches
+only by its stubs, `G_PFHOOK`, `T_CAPS`, `T_KPRE` and `T_FLARE`. `&F4` always matches
 ROMSEL.
 
 ## The rasteriser
@@ -284,15 +284,22 @@ puts the sun, and optionally a ship, on paths in front of the gate's pilot
 and dumps each frame's back buffer with the probes' count and cycles;
 `2-build-files/flarevis.py` renders the dumps.
 
-## Beach ball planets
+## Planet surfaces
+
+Every feature of a planet's surface is drawn as a circle on its sphere: the
+boundary of the region {p : m.p >= d}, for a unit axis m and a cosine d. A
+meridian or the equator is a great circle (d = 0), a crater a small cap,
+and a band the region between two latitude circles about the spin axis. A
+**style** is a few such circles and a base colour, and a pixel's colour is
+the base EOR the parity of the regions it is in. Each circle is projected
+exactly, so the boundaries meet the limb and each other without tears.
 
 A meridian planet (type 128, Lave's among them) is drawn as the
 Demonstration Disc port's beach ball rather than with Elite's equator and
-meridian. The planet's surface is cut by two great circles, the planes
-normal to its `roofv` and `sidev` vectors. Where a point is on the same side
-of both it is colour B (green land), and elsewhere colour A. Each circle is
-projected exactly, so the boundaries meet the limb and each other without
-tears.
+meridian: the great circles normal to its `roofv` and `sidev` vectors, with
+base colour 1, so that where a point is on the same side of both it is
+colour B (green land), and elsewhere colour A. A crater planet keeps the
+original's crater path (`PLS22`'s polygon, recorded through `BLINE`).
 
 The disc layer already draws up to four boundaries a row. It keeps two of
 them a row for each buffer (`R_BDN`, `R_BDP`, `R_BDX0`, `R_BDX1`), so that
@@ -300,44 +307,48 @@ the row's next change can be drawn as strips; a row with three or four is
 stored as unknown (count `&80`), and its next change is repainted segment
 by segment. Over the gate's run 2.5% of the beach ball's rows have three
 boundaries and almost none four, and keeping only two is quicker (the rows'
-cycles fall 1.8%) and frees 1,039 bytes of bank 5. What the beach
-ball needs is the geometry, which is about 3K and has its own window: the
-meridian window, `gfx-merid.asm`, in bank 7 after the cold pass. It has two
-entry points, each behind one stub in the glue area:
+cycles fall 1.8%) and frees 1,039 bytes of bank 5. What the surface needs
+is the geometry, which has its own window: the meridian window, in bank 7
+after the cold pass, with the circle engine (`gfx-merid.asm`) and the
+styles (`gfx-planet7.asm`). It has two entry points, each behind one stub
+in the glue area:
 
-* `PM_HOOK` runs in game context. `H_MERID` calls it through `G_MERHOOK`
-  from `PL9`, in place of the equator and meridian (`PLS4`, `PLS1`, `PLS5`,
-  `PLS22` and `BLINE` no longer run for these planets). It works out the
-  circles' constants from the planet's orientation, its radius and its
-  centre, multiplying with the quarter squares. `H_MERID` leaves `TGT` and
-  `K2` as `PL25` did, as `MV40` reads `K2` later.
-* `PM_MERID` runs during the frame. `f_bounds` calls it through `T_MERID`
-  before the disc rows. Its row loop writes each row's boundaries into the
-  disc layer's arrays, which `R_DISCROWS` then draws like any other disc.
+* `PF_HOOK` runs in game context. `H_MERID` calls it through `G_PFHOOK`
+  from `PL9` (from `K`, `K3` and `K4`, before `PLS1` overwrites `K`), in
+  place of the equator and meridian (`PLS4`, `PLS1`, `PLS5`, `PLS22` and
+  `BLINE` no longer run for these planets). It makes the planet's class
+  (`PF_CLS`: 0 a meridian planet, 1 craters, 2 bands; bit 7 when it made the
+  detail this frame, which `H_CIRC` clears) and its circles' records.
+  `pc_circ` makes one circle's record (24 bytes) from its axis, its cosine
+  and the body: the projected ellipse's constants (`a`, `K0`, `K2` and `s0`,
+  multiplied with the quarter squares), its centre line at its centre row,
+  and two threshold rows, where the circle meets the limb. Along a row
+  m.p - d is concave on the visible hemisphere, so whether each of a row's
+  two crossings is a boundary, and the colour the row starts in, are
+  comparisons of the row with the two thresholds. A circle wholly hidden
+  keeps no record. `H_MERID` leaves `TGT` and `K2` as `PL25` did, as `MV40`
+  reads `K2` later.
+* `PC_ROWS` runs during the frame. `f_bounds` calls it through `T_CAPS`
+  before the disc rows, when `PF_HOOK` made the detail this frame. It fills
+  the rows with the base colour EOR the left limb's toggles, then for each
+  record walks the rows out from its centre row, stepping the ellipse's
+  terms as the beach ball's row loop did, and writes each row's boundaries
+  into the disc layer's arrays, which `R_DISCROWS` then draws like any
+  other disc.
 
 Each frame the planet spins as in the original, by 1/16 radian in roll and
-pitch, so the orientation's constants are worked out every frame. The
-window keeps what it can:
+pitch, so the records are made every frame. Keeping rows between frames
+would pay only for a circle that is hidden or edge-on, and is not done.
 
-* the radius's terms are recomputed only when the radius changes, and with
-  the radius as it was only the node rows (where each circle meets the
-  limb) are recomputed from the centre;
-* when the planet has only moved, `pm_shift` moves the last rows instead of
-  making them (about 100 cycles a row against 550), and is bit for bit what
-  the row loop would make.
-
-`MERIDHOLD` in `elite-gfx.asm` is 0. A larger value holds the orientation
-for that many frames, so the spin shows in steps, and the rows are kept
-outright while the planet stays put: 3 gives 13.56 flight iterations per
-second in the gate's run, 7 about 14, against 11.98 with 0 (measured
-before the three passes, which made 0 give 11.99). The held paths stay in
-the code, and `test_raster.py` tests them.
-
-The 6502 code matches a reference model, `6-harness/planet_analytic.py`,
-row for row: `test_raster.py`'s `merid` test runs the window alone on random
-planets (with Master Elite's own zero-page addresses for `K3` and `K4`), and
-its `beachball` frames feed the window's rows through `R_DISCROWS`. A crater
-planet is recorded and drawn as before.
+The 6502 code matches two reference models row for row:
+`6-harness/planet_caps.py` models the engine and the styles bit for bit,
+and the beach ball's rows are those of `6-harness/planet_analytic.py`
+pixel for pixel (but for a pair of equal boundaries where both of a row's
+crossings meet, which the engine leaves out). `test_raster.py`'s `merid`
+test runs `PF_HOOK` and `PC_ROWS` against both models on random planets
+(with Master Elite's own zero-page addresses for `K3` and `K4`), `caps` runs
+the engine alone on random circles, and its `beachball` frames feed the
+window's rows through `R_DISCROWS`.
 
 ## The hangar
 

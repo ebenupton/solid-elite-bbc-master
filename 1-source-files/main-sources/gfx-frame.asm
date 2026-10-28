@@ -2792,14 +2792,14 @@ F_NPT = P%-1            \ only caller, reloads Y on every path
  BEQ P%+4
  BCS fnb9
  LDA #1
- BIT PM_OK              \ a beach ball (PM_HOOK ran this frame): the
+ BIT PF_CLS             \ a beach ball (PF_HOOK ran this frame): the
  BPL fbd1               \ boundaries from the meridian window
  STA R_NDF              \ (gfx-merid.asm), colour B green land
  LDA #&5F
  STA R_DBE
  LDA #&AF
  STA R_DBO
- JMP T_MERID
+ JMP T_CAPS
 .fbd1
  LDX F_NCV              \ else a crater's curves (only a crater planet's are
  BEQ fnb9               \ recorded), colour B a dark crater

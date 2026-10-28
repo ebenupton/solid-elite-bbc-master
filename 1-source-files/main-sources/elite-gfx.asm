@@ -44,10 +44,6 @@ RASTPOLY = &85          \ the shared region (&9000-&BFFF); ANDY over bank 5, its
 GFXBANK = 6
 MERIDBANK = 7           \ the meridian window (gfx-merid.asm): bank 7, after the
                         \ cold area
-MERIDHOLD = 0           \ a beach ball's orientation is taken one frame in
-                        \ MERIDHOLD + 1 (gfx-merid.asm, PM_HOOK): its spin (1/16
-                        \ radian an iteration) shows in steps; its position and
-                        \ size follow every frame (0: as the demo port)
 ELITEBANK = HOMEBANK
 
 NDSTAR = NOST+1         \ stars 1..NOSTM (Master port: NOSTM <= NOST = 20)
@@ -142,6 +138,7 @@ ORG COLD_END%           \ meridian window, the beach ball planet's boundaries
 .MERID_START
 INCLUDE "1-source-files/main-sources/gfx-merid.asm"
 INCLUDE "1-source-files/main-sources/gfx-kept7.asm"    \ kept solid rows: the polygons' part (docs/renderer.md)
+INCLUDE "1-source-files/main-sources/gfx-planet7.asm"  \ the planet's caps: craters (PF_HOOK, PC_ROWS)
 INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (T_FLARE; its step in bank 6:
                                \ gfx-flare6.asm)
 .MERID_END

@@ -54,13 +54,7 @@
  JSR CHKON
  BCC P%+3
  RTS
- STZ PM_OK              \ (no meridians yet: PM_HOOK sets it)
- LDA TYPE               \ (a crater planet's boundaries overwrite the beach
- CMP #128               \ ball's rows in the disc layer's arrays)
- BEQ P%+5
- STZ PS_VALID
- LDA K                  \ the radius, for PM_HOOK (PLS1 overwrites K)
- STA PM_R
+ STZ PF_CLS             \ (no surface detail yet: PF_HOOK sets it)
  JSR G_PLANET
  LDA #0
  STA LSX2
@@ -107,15 +101,17 @@
 \ H_MERID: PL9 has a meridian planet (TYPE 128) of radius 6 or more that
 \ fits on the screen, and is about to draw its equator and meridian. In
 \ record mode the renderer colours the disc as a beach ball instead: the
-\ meridian window computes the frame's constants (G_MERHOOK, PM_HOOK), and
-\ H_MERID returns from PL9 (Elite's half ellipses are neither computed nor
-\ recorded) with TGT and K2 as PL9 would have left them: the game reads
-\ both later. In direct mode it returns, and PL9 draws the lines
+\ meridian window makes its circles (G_PFHOOK, PF_HOOK, from K, K3 and K4,
+\ before PLS1 overwrites K), and H_MERID returns from PL9 (Elite's half
+\ ellipses are neither computed nor recorded) with TGT and K2 as PL9 would
+\ have left them: the game reads both later. In direct mode it returns, and
+\ PL9 draws the lines
 
 .H_MERID
  LDA QQ11
  ORA GFORCE
  BNE hpc9
+ JSR G_PFHOOK           \ the planet's surface detail (gfx-planet7.asm)
  LDX #9                 \ K2 = nosev_x / z, as PL25 leaves it: MV40 adds
  JSR PLS1               \ K2 into the next object's y without setting it
  STA K2                 \ first (the sun's, when it follows the planet)
@@ -123,7 +119,7 @@
  STA TGT
  PLA                    \ (return from PL9)
  PLA
- JMP G_MERHOOK
+ RTS
 
 .hpc9
  RTS

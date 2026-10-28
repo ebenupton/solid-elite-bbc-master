@@ -127,11 +127,11 @@
  JSR F_PCURVE
  JMP gback
 
-.G_MERHOOK              \ (the meridian window's PM_HOOK, gfx-merid.asm: it
- LDA #MERIDBANK         \ keeps A, X, Y and the flags)
+.G_PFHOOK               \ (the planet's detail, gfx-planet7.asm: it keeps A,
+ LDA #MERIDBANK         \ X, Y and the flags)
  STA &F4
  STA &FE30
- JSR PM_HOOK
+ JSR PF_HOOK
  JMP gback
 
 .G_PPOINT

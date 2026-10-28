@@ -92,16 +92,23 @@ LINE7 = not os.path.exists(LINEA)                  # (before: R_LINE in bank 7, 
 
 
 SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, while they exist)
-# the meridian window (gfx-merid.asm: bank 7 after the cold area; here at MTEST),
-# with the game's symbols it reads: INWK, K3, K4 and MCNT at their places in
-# Master Elite's zero page (K3 and K4 are in &10-&28, which PM_HOOK saves and
-# uses: it must read them first), PM_OK, PM_R, PS_VALID below the workspace (at
-# &0C00: the workspace starts at &0E00), the
-# quarter squares at &7000 (after the test's screen)
+# the meridian window (gfx-merid.asm, the circle engine, and gfx-planet7.asm,
+# the styles: bank 7 after the cold area; here at MTEST), with the game's
+# symbols they read: INWK, K3, K4, TYPE and K at their places in Master Elite's
+# zero page (K3 and K4 are in &10-&28, which PF_HOOK saves and uses: it must
+# read them first), PF_CLS and QQ2 below the workspace (at &0C00: the workspace
+# starts at &0E00), FRIN and K% as the game has them, the quarter squares at
+# &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x9C, K3=0x14, K4=0x22, PM_OK=0x0C00, PM_R=0x0C01, PS_VALID=0x0C02, MCNT=0x84, QSL=0x7000, QSH=0x7200)
+MG = dict(INWK=0x9C, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
+          TYPE=0x85, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
+MG['K%'] = 0x0400
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
+# the planet's styles (gfx-planet7.asm in the meridian window after
+# gfx-kept7.asm)
+CAPS7 = os.path.join(MS, 'gfx-planet7.asm')
+CAPS = os.path.exists(CAPS7)
 # the kept solid rows (gfx-raster_kept.asm in the disc window, gfx-kept7.asm in
 # bank 7 after the meridian window): their variables (in the glue area in the
 # game; KF is in the shared workspace, as in the game) and the glue area's
@@ -193,8 +200,10 @@ def assemble(org):
                 f.write('INCLUDE "%s"\n' % LINEA)
             f.write('SAVE "ra.bin", &8000, P%\n')
             if os.path.exists(MERID):       # the meridian window (bank 7), with the game's
-                f.write(MERID_GAME + 'CLEAR &8000, &C000\nORG &%X\nINCLUDE "%s"\n' % (MTEST, MERID)
-                        + ('INCLUDE "%s"\n' % KEPT7 if KEPT else '') + 'SAVE "m.bin", &%X, P%%\n' % MTEST)
+                f.write(MERID_GAME)
+                f.write('CLEAR &8000, &C000\nORG &%X\nINCLUDE "%s"\n' % (MTEST, MERID)
+                        + ('INCLUDE "%s"\n' % KEPT7 if KEPT else '')
+                        + ('INCLUDE "%s"\n' % CAPS7 if CAPS else '') + 'SAVE "m.bin", &%X, P%%\n' % MTEST)
             if LINE7:
                 f.write('CLEAR &8000, &C000\nORG R7START\nINCLUDE "%s"\nSAVE "r7.bin", R7START, P%%\n' % tr.SRC7)
         else:                               # (bank 5 from &8000, the stubs, bank 7 from &8000)
@@ -419,9 +428,9 @@ def test_lines(self, n):
             raise AssertionError('line row range %s' % (pts,))
 
 
-# ------------------------------------------------------------ meridian window
+# ------------------------------------------------------------ the circle engine
 import math as _m
-import planet_analytic as PA                    # noqa: E402  (the model, beside this file)
+import planet_caps as PCM                       # noqa: E402  (the model, beside this file)
 
 
 def _rand_frame(rnd):
@@ -465,68 +474,6 @@ def _smag(v):
     return m & 255, (m >> 8) | (0x80 if v < 0 else 0)
 
 
-def merid_rows(self, vecs, cx, cy, r, spans, held=False, valid=False):
-    """PM_HOOK (game context) then PM_MERID (frame) on the machine, for the
-    planet with orientation vecs (nosev, roofv, sidev), centre (cx, cy) and
-    radius r over the disc rows spans {y: (l, r)}; checked against the model
-    (6-harness/planet_analytic.py, analytic_rows_fixed) and the hook's contract.
-    Returns {y: (xs, p)} and the two calls' cycles"""
-    m = self.m
-    mem = m.mem
-    inwk = [0] * 36
-    for k, v in enumerate(vecs[0] + vecs[1] + vecs[2]):
-        inwk[9 + 2 * k], inwk[10 + 2 * k] = _smag(v)
-    for k, v in enumerate(inwk):
-        mem[MG['INWK'] + k] = v
-    for nm, v in (('K3', cx), ('K4', cy)):
-        mem[MG[nm]] = v & 255
-        mem[MG[nm] + 1] = (v >> 8) & 255
-    mem[MG['PM_R']] = r
-    mem[MG['PM_OK']] = 0
-    mem[MG['PS_VALID']] = 0x80 if valid else 0   # (the arrays hold the last rows: T_MERID's)
-    if held:                           # the orientation held: the last frame drew it
-        mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
-        _hold(m)
-    else:                              # a new orientation (PM_SPIN = 0)
-        m.page(7); mem[m.syms['PM_SPIN']] = 0; m.page(5)
-    zp = mem[0x10:0x29]
-    a0, x0, y0 = self.rnd.randrange(256), self.rnd.randrange(256), self.rnd.randrange(256)
-    m.guard = False
-    snap = mem[:]
-    c1 = m.call(m.syms['PM_HOOK'], a=a0, x=x0, y=y0, bank=7)
-    mpu = m.mpu
-    if (mpu.a, mpu.x, mpu.y, mpu.p & 0xC3) != (a0, x0, y0, 0x24 & 0xC3):
-        raise AssertionError('PM_HOOK did not keep A, X, Y and the flags')
-    if mem[0x10:0x29] != zp:
-        raise AssertionError('PM_HOOK did not restore zero page &10-&28')
-    kept = mem[MG['PM_OK']] == 0xC0
-    if mem[MG['PM_OK']] != 0x80 and not (valid and kept):
-        raise AssertionError('PM_HOOK did not set PM_OK')
-    for a in range(0x10000):           # (bank 7 is paged back out: main RAM only)
-        if mem[a] != snap[a] and not (a == MG['PM_OK'] or 0x100 <= a < 0x200 or 0x8000 <= a < 0xC000):
-            raise AssertionError('PM_HOOK wrote &%04X' % a)
-    ndt, ndb = (min(spans), max(spans)) if spans else (255, 0)
-    ndl, ndr = [255] * 192, [0] * 192
-    m.wr('R_NDT', ndt)
-    m.wr('R_NDB', ndb)
-    for y in range(ndt, ndb + 1) if spans else []:
-        ndl[y], ndr[y] = spans.get(y, (255, 0))
-        m.wr('R_NDISCL', ndl[y], y)
-        m.wr('R_NDISCR', ndr[y], y)
-    m.guard = True
-    c2 = m.call(m.syms['PM_MERID'], bank=7) if spans and not kept else 0   # (T_MERID)
-    want = PA.analytic_rows_fixed(cx, cy, r, PA.frame_normals(inwk), ndt, ndb, ndl, ndr) if spans else {}
-    out = {}
-    for y in range(ndt, ndb + 1) if spans else []:
-        n = m.rd('R_NDN', y)
-        xs = [m.rd('R_NDX%d' % k, y) for k in range(n)]
-        got = (m.rd('R_NDP', y) & 1, xs)
-        if got != (want[y][0] & 1, want[y][1]):
-            raise AssertionError('PM_MERID row %d: %s, the model %s (centre %d,%d r %d)' % (y, got, want[y], cx, cy, r))
-        out[y] = (xs, got[0])
-    return out, c1, c2
-
-
 def _game_spans(cx, cy, r, clip=(1, 254, 1, 191)):
     """the disc's rows as the frame layer has them (integer half-widths), clipped"""
     out = {}
@@ -538,20 +485,170 @@ def _game_spans(cx, cy, r, clip=(1, 254, 1, 191)):
     return out
 
 
-def _hold(m):
-    """a frame left to hold the orientation (PM_SPIN), as MERIDHOLD >= 1 leaves
-    it: the held paths are tested whatever MERIDHOLD the build has (with 0 the
-    game never takes them)"""
+def _b7(m, name, vals=None):
+    """bank 7's bytes at a label (read, or written if vals)"""
     m.page(7)
-    if m.mem[m.syms['PM_SPIN']] == 0:
-        m.mem[m.syms['PM_SPIN']] = 1
+    a = m.syms[name]
+    if vals is None:
+        out = m.mem[a]
+    else:
+        for i, v in enumerate(vals):
+            m.mem[a + i] = v & 255
+        out = None
     m.page(5)
+    return out
+
+
+def _sm(v):
+    m_ = min(abs(v), 32767)
+    return [m_ & 255, (m_ >> 8) | (0x80 if v < 0 else 0)]
+
+
+def _spans_in(m, spans):
+    """the disc's rows into the disc layer's arrays: (ndt, ndb, ndl, ndr)"""
+    ndt, ndb = (min(spans), max(spans)) if spans else (255, 0)
+    ndl, ndr = [255] * 192, [0] * 192
+    m.wr('R_NDT', ndt)
+    m.wr('R_NDB', ndb)
+    for y in range(ndt, ndb + 1) if spans else []:
+        ndl[y], ndr[y] = spans.get(y, (255, 0))
+        m.wr('R_NDISCL', ndl[y], y)
+        m.wr('R_NDISCR', ndr[y], y)
+    return ndt, ndb, ndl, ndr
+
+
+def _check_rows(m, want, ndt, ndb, what):
+    out = {}
+    for y in range(ndt, ndb + 1):
+        n = m.rd('R_NDN', y)
+        xs = [m.rd('R_NDX%d' % k, y) for k in range(n)]
+        got = (m.rd('R_NDP', y) & 1, xs)
+        if got != (want[y][0] & 1, want[y][1]):
+            raise AssertionError('%s row %d: %s, the model %s' % (what, y, got, want[y]))
+        out[y] = (xs, got[0])
+    return out
+
+
+def _body(cx, cy, r, base, circs):
+    """the model's records and base colour for circles [(vec, c8, cneg, kn)]"""
+    recs = [PCM.circ_consts(cx, cy, r, v, c8, cn, kn) for v, c8, cn, kn in circs]
+    for c in recs:
+        if c is not None:
+            base ^= PCM.rec_parity(c)
+    return base, recs
+
+
+def circ_rows(self, circs, spans, body, base=0):
+    """pc_circ for each circle (vec, c8, cneg, kn) of the body (cx, cy, r),
+    then PC_ROWS over the disc rows spans {y: (l, r)}; checked against
+    6-harness/planet_caps.py. Returns {y: (xs, p)} and the cycles"""
+    m = self.m
+    cx, cy, r = body
+    _b7(m, 'PC_N', [0])
+    _b7(m, 'pc_inv', [base])
+    m.guard = False
+    c1 = 0
+    for vec, c8, cneg, kn in circs:
+        _b7(m, 'pcv', [b for lo_hi in vec for b in lo_hi])
+        _b7(m, 'pcbx', [cx & 255, (cx >> 8) & 255, cy & 255, (cy >> 8) & 255, r])
+        _b7(m, 'pcc', [c8, 0x80 if cneg else 0, kn & 255, kn >> 8])
+        c1 += m.call(m.syms['pc_circ'], bank=7)
+    m.guard = True
+    base, recs = _body(cx, cy, r, base, circs)
+    if _b7(m, 'pc_inv') != base or _b7(m, 'PC_N') != sum(1 for c in recs if c is not None and not c['none']):
+        raise AssertionError('pc_circ: base %d PC_N %d, the model %d %d' % (_b7(m, 'pc_inv'), _b7(m, 'PC_N'), base, len(recs)))
+    ndt, ndb, ndl, ndr = _spans_in(m, spans)
+    c2 = m.call(m.syms['PC_ROWS'], bank=7) if spans else 0      # (T_CAPS)
+    want = PCM.body_rows(base, recs, ndt, ndb, ndl, ndr) if spans else {}
+    out = _check_rows(m, want, ndt, ndb, 'PC_ROWS (centre %d,%d r %d, circles %s)' % (cx, cy, r, circs)) if spans else {}
+    return out, c1, c2
+
+
+def _rand_cap(rnd):
+    v = [rnd.gauss(0, 1) for _ in range(3)]
+    n = _m.sqrt(sum(x * x for x in v)) or 1
+    sc = 12288 * rnd.uniform(0.98, 1.02)  # (a vector halved, as pf_tilt has it)
+    v = [int(round(x / n * sc)) for x in v]
+    if rnd.random() < 0.1:              # (an axis near the screen's plane, or along y)
+        v[rnd.randrange(3)] = rnd.randrange(-20, 21)
+    c8 = 0 if rnd.random() < 0.2 else rnd.randrange(256)     # (great circles too)
+    return [tuple(_sm(x)) for x in v], c8, rnd.random() < 0.3, 10923
+
+
+def test_caps(self, n):
+    """the engine alone: n random planets (radius 6..250, centre on and off
+    the screen) with one to three random circles, pc_circ then PC_ROWS, bit
+    for bit against 6-harness/planet_caps.py"""
+    rnd = self.rnd
+    self.set_clip((1, 254, 1, 191))
+    for i in range(n):
+        r = rnd.choice((rnd.randrange(6, 40), rnd.randrange(6, 251)))
+        cx = rnd.randrange(-r // 2, 256 + r // 2)
+        cy = rnd.randrange(-r // 2, 192 + r // 2)
+        caps = [_rand_cap(rnd) for _ in range(rnd.randrange(1, 4))]
+        rows, c1, c2 = self.circ_rows(caps, _game_spans(cx, cy, r), (cx, cy, r), rnd.randrange(2))
+        self.stat('caps_cap', c1 // len(caps))
+        self.stat('caps_rows', (len(rows), c2))
+    h = self.stats['caps_cap']
+    rr = self.stats['caps_rows']
+    return 'pc_circ %d..%d cycles a circle, PC_ROWS %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
+
+
+def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
+    """PF_HOOK on the machine for the planet (orientation vecs: nosev, roofv,
+    sidev; TYPE typ; radius r; centre cx, cy; seed qq2), checked: A, X, Y,
+    the flags and zero page &10-&28 kept, and PF_CLS. Returns (inwk, the
+    model's base and circles, the hook's cycles)"""
+    rnd, m, mem = self.rnd, self.m, self.m.mem
+    inwk = [0] * 36
+    for k, v in enumerate(pos or []):       # (the position: x, y, z, sign-magnitude)
+        m_ = abs(v)
+        inwk[3 * k:3 * k + 3] = [m_ & 255, (m_ >> 8) & 255, ((m_ >> 16) & 0x7F) | (0x80 if v < 0 else 0)]
+    for k, v in enumerate(vecs[0] + vecs[1] + vecs[2]):
+        inwk[9 + 2 * k], inwk[10 + 2 * k] = _smag(v)
+    for k, v in enumerate(inwk):
+        mem[MG['INWK'] + k] = v
+    for nm, v in (('K3', cx), ('K4', cy), ('K', r)):
+        mem[MG[nm]] = v & 255
+        mem[MG[nm] + 1] = (v >> 8) & 255
+    mem[MG['TYPE']] = typ
+    mem[MG['QQ2']:MG['QQ2'] + 6] = qq2
+    zp = mem[0x10:0x29]
+    a0, x0, y0 = rnd.randrange(256), rnd.randrange(256), rnd.randrange(256)
+    m.guard = False
+    cyc = m.call(m.syms['PF_HOOK'], a=a0, x=x0, y=y0, bank=7)
+    m.guard = True
+    mpu = m.mpu
+    if (mpu.a, mpu.x, mpu.y, mpu.p & 0xC3) != (a0, x0, y0, 0x24 & 0xC3) or mem[0x10:0x29] != zp:
+        raise AssertionError('PF_HOOK did not keep A, X, Y, the flags and zero page &10-&28: %s %s %s'
+                             % ((mpu.a, mpu.x, mpu.y, mpu.p), (a0, x0, y0), [(0x10 + k, a_, b_) for k, (a_, b_) in enumerate(zip(mem[0x10:0x29], zp)) if a_ != b_]))
+    on = 6 <= r < 256
+    base, circs = PCM.pf_records(inwk, qq2, typ) if on else (0, [])
+    base, recs = _body(cx, cy, r, base, circs)
+    n = sum(1 for c in recs if c is not None and not c['none'])
+    k = 0 if typ == 128 else 1
+    if mem[MG['PF_CLS']] != k | (0x80 if (n or base) else 0):
+        raise AssertionError('PF_HOOK: PF_CLS %02X (type %d r %d)' % (mem[MG['PF_CLS']], typ, r))
+    return inwk, base, recs, n or base, cyc
+
+
+def _pfrows(self, base, recs, cx, cy, r, what):
+    """PC_ROWS after PF_HOOK, against the model"""
+    spans = _game_spans(cx, cy, r)
+    if not spans:
+        return {}, 0
+    ndt, ndb, ndl, ndr = _spans_in(self.m, spans)
+    c = self.m.call(self.m.syms['PC_ROWS'], bank=7)
+    return _check_rows(self.m, PCM.body_rows(base, recs, ndt, ndb, ndl, ndr), ndt, ndb, what), c
 
 
 def test_merid(self, n):
-    """the meridian window alone: n random planets (radius 6..250, centre on
-    and off the screen, any orientation), PM_HOOK then PM_MERID, bit for bit
-    against 6-harness/planet_analytic.py"""
+    """the beach ball: n random meridian planets (radius 6..250, centre on and
+    off the screen, any orientation), PF_HOOK then PC_ROWS, bit for bit
+    against 6-harness/planet_caps.py; and the rows the same as
+    6-harness/planet_analytic.py's (the beach ball's own model before the circle
+    engine) pixel for pixel: its boundaries but for equal pairs (where both
+    of a row's crossings meet, s = 0, it gave two, and the engine none)"""
     rnd = self.rnd
     self.set_clip((1, 254, 1, 191))
     for i in range(n):
@@ -559,62 +656,50 @@ def test_merid(self, n):
         r = rnd.choice((rnd.randrange(6, 40), rnd.randrange(6, 251)))
         cx = rnd.randrange(-r // 2, 256 + r // 2)
         cy = rnd.randrange(-r // 2, 192 + r // 2)
-        rows, c1, c2 = self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r))
+        inwk, base, recs, on, c1 = self._pfhook(vecs, 128, r, cx, cy, [rnd.randrange(256) for _ in range(6)])
+        rows, c2 = self._pfrows(base, recs, cx, cy, r, 'beach ball (centre %d,%d r %d)' % (cx, cy, r))
         self.stat('merid_hook', c1)
         self.stat('merid_rows', (len(rows), c2))
-        # the same planet next frame (orientation held): a new radius and
-        # centre (the radius terms only, still exact), or the same (rows kept)
-        m, mem = self.m, self.m.mem
-        r0, cx0, cy0 = r, cx, cy
-        if rnd.random() < 0.6:
-            r = max(6, min(250, r + rnd.randrange(-3, 4)))
-            cx += rnd.randrange(-3, 4)
-            cy += rnd.randrange(-3, 4)
-        same = (r, cx, cy) == (r0, cx0, cy0)
-        mem[MG['PS_VALID']] = 0x80
-        mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
-        for nm, v in (('K3', cx), ('K4', cy)):
-            mem[MG[nm]] = v & 255
-            mem[MG[nm] + 1] = (v >> 8) & 255
-        mem[MG['PM_R']] = r
-        mem[MG['PM_OK']] = 0
-        _hold(m)
-        zp = mem[0x10:0x29]
-        m.guard = False
-        m.call(m.syms['PM_HOOK'], a=1, x=2, y=3, bank=7)
-        mpu = m.mpu
-        if (mpu.a, mpu.x, mpu.y) != (1, 2, 3) or mem[0x10:0x29] != zp:
-            raise AssertionError('PM_HOOK (held) did not keep A, X, Y and zero page')
-        if mem[MG['PM_OK']] != (0xC0 if same else 0x80):
-            raise AssertionError('PM_HOOK held: PM_OK = %02X (same %s)' % (mem[MG['PM_OK']], same))
-        if not same:                     # the held orientation's rows (moved, if the
-            self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True)   # radius is the same)
-            if rnd.random() < 0.7:           # and once more, moved again: the last rows
-                cx += rnd.randrange(-6, 7)   # moved (pm_shift), or made again
-                cy += rnd.randrange(-6, 7)
-                self.merid_rows(vecs, cx, cy, r, _game_spans(cx, cy, r), held=True, valid=True)
+        if rows and not any(abs(c) == 1 for c in vecs[1] + vecs[2]):
+            # (a component of 1 halves to 0 in pf_tilt, losing its sign: then
+            # the circle is edge-on through the centre row, which may differ)
+            ndt, ndb, ndl, ndr = _spans_in(self.m, _game_spans(cx, cy, r))
+            old = PA.analytic_rows_fixed(cx, cy, r, PA.frame_normals(inwk), ndt, ndb, ndl, ndr)
+            odd = lambda v: sorted(set(x for x in v if v.count(x) % 2))
+            for y, (xs, p) in rows.items():
+                if (p, odd(xs)) != (old[y][0] & 1, odd(old[y][1])):
+                    raise AssertionError('beach ball row %d: %s, planet_analytic %s (centre %d,%d r %d, vectors %s)'
+                                         % (y, (p, xs), old[y], cx, cy, r, vecs))
     h = self.stats['merid_hook']
     rr = self.stats['merid_rows']
-    return 'PM_HOOK %d..%d cycles, PM_MERID %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
+    return 'PF_HOOK %d..%d cycles, PC_ROWS %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
+
+
+import planet_analytic as PA                    # noqa: E402  (the beach ball's model, beside this file)
 
 
 def beach_rows(self, f, spans, cx, cy, rad):
-    """test_frames' 'beachball' scenario: this frame's boundaries from the
-    meridian window, for a planet spinning about a random axis (its
-    orientation kept between frames and, as in the game, taken one frame in
-    four: in between the window keeps or moves its last rows, or makes them
-    again for the new centre and radius), written to the disc layer's arrays"""
+    """test_frames' 'beachball' scenario: this frame's boundaries from
+    PF_HOOK and PC_ROWS, for a meridian planet spinning about a random axis,
+    written to the disc layer's arrays"""
     st = getattr(self, '_beach', None)
     if st is None or f == 0:
         st = self._beach = dict(vecs=_rand_frame(self.rnd)[:], ax=self.rnd.randrange(3),
                                 w=self.rnd.choice((-1, 1)) * self.rnd.uniform(0.01, 0.12))
-    held = f % 4 != 0
-    if not held:
-        st['vecs'] = _rotate(st['vecs'], st['ax'], 4 * st['w'])
+    st['vecs'] = _rotate(st['vecs'], st['ax'], st['w'])
     r = max(6, min(250, int(rad)))
-    rows, c1, c2 = self.merid_rows(st['vecs'], int(cx), int(cy), r, spans, held=held, valid=held)
+    inwk, base, recs, on, c1 = self._pfhook(st['vecs'], 128, r, int(cx), int(cy), [0] * 6)
+    _spans_in(self.m, spans)
+    rows = {}
+    if spans:
+        ndt, ndb = min(spans), max(spans)
+        ndl, ndr = [255] * 192, [0] * 192
+        for y, (l, r_) in spans.items():
+            ndl[y], ndr[y] = l, r_
+        self.m.call(self.m.syms['PC_ROWS'], bank=7)
+        rows = _check_rows(self.m, PCM.body_rows(base, recs, ndt, ndb, ndl, ndr), ndt, ndb, 'beachball')
     self.m.wr('R_NDF', 1)
-    return {y: v for y, v in rows.items()}, 1
+    return rows, 1
 
 
 def test_kept(self, nframes, scenario='station'):
@@ -768,15 +853,22 @@ def test_kept(self, nframes, scenario='station'):
 
 tr.Tester.test_kept = test_kept
 
-tr.Tester.merid_rows = merid_rows
+tr.Tester.circ_rows = circ_rows
+tr.Tester._pfhook = _pfhook
+tr.Tester._pfrows = _pfrows
+
 tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
+tr.Tester.test_caps = test_caps
 if os.path.exists(MERID):
     tr.EXTRA += [('merid', 'test_merid', 400, ()), ('beachball', 'test_frames', 44, ('beachball',)),
                  ('beachball', 'test_frames', 44, ('beachball',))]
 
 if KEPT:     # (after the meridian tests, which keep the random numbers they had)
     tr.EXTRA += [('kept', 'test_kept', 120, ('station',)), ('kept', 'test_kept', 120, ('sun',))] * 3
+
+if CAPS:     # (after the rest, which keep the random numbers they had)
+    tr.EXTRA += [('caps', 'test_caps', 400, ())]
 
 tr.assemble = assemble
 tr.Tester.test_lines = test_lines
