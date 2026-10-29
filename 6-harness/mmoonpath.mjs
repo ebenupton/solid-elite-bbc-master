@@ -1,7 +1,8 @@
 // The moon's path: where the port draws the moon, iteration by iteration, in a
-// long flight. Flies the gate's pilot to iteration FROM, then (once, at FROM)
-// puts the planet (slot 0) ahead of us (--x --y --r: its screen position and
-// radius) in a moon system (--qq2: the seed, six bytes hex), and from then on
+// long flight (a make moon=on build). Flies the gate's pilot to
+// iteration FROM, then (once, at FROM) puts the planet (slot 0) ahead of us
+// (--x --y --r: its screen position and radius) in a moon system (--qq2: the
+// seed, six bytes hex), and from then on
 // leaves the game to move it: the planet spins as the game spins it and moves
 // as we move. Our own flight from FROM is --fly: "still" (keys off), or
 // "turn" (a fixed cycle of roll and pitch keys and a little speed, so that our

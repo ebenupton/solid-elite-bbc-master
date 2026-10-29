@@ -23,7 +23,12 @@
 \ system without one. C set: we have crashed, and MA22 jumps to MA28 (DEATH),
 \ the planet's crash.
 \
+\ Only in a build with the moon (make moon=on, _PLANET_MOON):
+\ without it, the file assembles to nothing.
+\
 \ ******************************************************************************
+
+IF _PLANET_MOON
 
 {
 .mh_x
@@ -149,3 +154,5 @@
 .mh_v   SKIP 2
 .mh_s   SKIP 2
 }
+
+ENDIF                   \ (_PLANET_MOON)

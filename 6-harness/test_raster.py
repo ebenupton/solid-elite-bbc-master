@@ -56,7 +56,7 @@ def gfx_constants():
     src = open(os.path.join(MS, 'elite-source.asm')).read()
     out.append('NOST = %s' % re.search(r'^\s*NOST\s*=\s*(\d+)', src, re.M).group(1))
     out.append('NOSH = %s' % re.search(r'^\s*NOSH\s*=\s*(\d+)', src, re.M).group(1))
-    out.append('CODE%% = %s' % re.search(r'^\s*CODE%\s*=\s*(&[0-9A-Fa-f]+)', src, re.M).group(1))
+    out.append('CODE%% = %s' % re.search(r'^\s*CODE%\s*=\s*([^\\\n]*?)\s*(?:\\|$)', src, re.M).group(1))
     for l in open(GFX).read().split('\n'):
         if re.match(r'\s*(CLEAR|ORG)\b', l):         # (the workspace, ws_block, follows)
             break
@@ -120,6 +120,10 @@ MERID_GAME += '_PLANET_BANDS = %s\n' % ('TRUE' if BANDS else 'FALSE')
 # (off in the default build), or as RINGS=off has it; defined before the
 # shared workspace (gfx-planetv.asm's RG_ variables)
 RINGS = os.environ.get('RINGS', 'on') == 'on'
+# the moon (_PLANET_MOON, the Makefile's moon=on): likewise tested on (off in
+# the default build), or as MOON=off has it; defined before the shared
+# workspace (MN_E, MN_OK; gfx-planetv.asm's MN_ and MO_ variables)
+MOON = os.environ.get('MOON', 'on') == 'on'
 # the planet's styles (gfx-planet7.asm in the meridian window after
 # gfx-kept7.asm) and the variables the frame reads (gfx-planetv.asm: in the
 # shared workspace, ws_block, where elite-gfx.asm includes it; else here at
@@ -200,8 +204,9 @@ def assemble(org):
     d = tempfile.mkdtemp(prefix='mraster_', dir=base)
     w = os.path.join(d, 'w.asm')
     with open(w, 'w') as f:
-        f.write(gfx_constants() + '\n')
         f.write('_PLANET_RINGS = %s\n' % ('TRUE' if RINGS else 'FALSE'))
+        f.write('_PLANET_MOON = %s\n' % ('TRUE' if MOON else 'FALSE'))
+        f.write(gfx_constants() + '\n')
         f.write(ws_block() + '\n')
         if WINDOWS:
             f.write('ORG &%X\n' % tr.HZ)
@@ -802,10 +807,11 @@ def test_pfhook(self, n):
         E = None if rnd.random() < 0.1 else [rnd.randrange(-129024, 129025) for _ in range(3)]
         view = rnd.randrange(4)
         mem[MG['VIEW']] = view
-        mem[self.m.syms['MN_OK']] = 0 if E is None else 0xFF
-        for j, v in enumerate(E or [0, 0, 0]):
-            v &= 0xFFFFFF
-            mem[self.m.syms['MN_E'] + 3 * j:self.m.syms['MN_E'] + 3 * j + 3] = [v & 255, (v >> 8) & 255, v >> 16]
+        if MOON:
+            mem[self.m.syms['MN_OK']] = 0 if E is None else 0xFF
+            for j, v in enumerate(E or [0, 0, 0]):
+                v &= 0xFFFFFF
+                mem[self.m.syms['MN_E'] + 3 * j:self.m.syms['MN_E'] + 3 * j + 3] = [v & 255, (v >> 8) & 255, v >> 16]
         inwk, base, recs, on, c1 = self._pfhook(vecs, typ, r, cx, cy, qq2, pos)
         self._check_moon(inwk, qq2, typ, cx, cy, r, E, view)
         if on:
@@ -831,6 +837,10 @@ def _check_moon(self, inwk, qq2, typ, cx, cy, r, E=None, view=0):
         raise AssertionError('PF_HOOK ring: %s, the model %s (r %d)' % (got[:6], ring[:6], r))
     if ring:
         self.stat('rings', 1)
+    if not MOON:                        # (no moon assembled: MOON=off)
+        if 'MN_ON' in s:
+            raise AssertionError('PF_HOOK: moon variables in a MOON=off build')
+        return
     on = mem[s['MN_ON']]
     if want is None:
         if on & 0x80:

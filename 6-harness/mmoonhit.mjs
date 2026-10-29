@@ -1,4 +1,5 @@
-// The moon is solid (1-source-files/main-sources/elite-moon.asm, MOONHIT): fly the gate's pilot
+// The moon is solid (1-source-files/main-sources/elite-moon.asm, MOONHIT; a
+// make moon=on build): fly the gate's pilot
 // to iteration FROM, then hold the keys off and, each iteration, put the
 // planet (slot 0) where the system's moon (by --h: the seed's s0_hi, s1_hi =
 // s2_hi = 0) has its centre at (0, 0, --m) from us, in the coordinates' high

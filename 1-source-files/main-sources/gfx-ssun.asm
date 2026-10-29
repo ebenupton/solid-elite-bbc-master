@@ -40,7 +40,9 @@
 \ ******************************************************************************
 
 .S_SUN
+ IF _PLANET_MOON        \ (the moon: make moon=on)
  JSR MN_TURN            \ the moon's place, turned (once an iteration)
+ ENDIF
  LDA MJ                 \ witchspace: no planet, no sun
  BNE ss_off
  LDA FRIN               \ slot 0 the planet (128 or 130)
@@ -208,7 +210,7 @@ A_DORND = DORND         \ (the Trumbles' part, not run)
 
 \ ss_turn: D turned by our roll (ALPHA) and pitch (BETA) by MV40 itself, as
 \ it turns the planet and the sun (ss_turnx: the vector at ss_d + X, X = 0
-\ D, 9 the moon's MN_E):
+\ D, 9 the moon's MN_E with moon=on):
 \   1. K2 = y - alpha * x / 256    2. z = z + beta * K2 / 256
 \   3. y = K2 - beta * z / 256     4. x = x + alpha * y / 256
 \ The vector goes into INWK's coordinates, sign-magnitude, and MV40 runs
@@ -587,6 +589,8 @@ SS_NZP = P% - ss_zpa
 .ssq9
  RTS
 
+IF _PLANET_MOON         \ (the moon: make moon=on)
+
 \ ******************************************************************************
 \
 \ MN_TURN: the moon's place, E = moon - planet (MN_E), kept as S_SUN keeps
@@ -679,11 +683,15 @@ SS_NZP = P% - ss_zpa
 .mt_cm  EQUB 203, 254, 49, 100
 .mt_ch  EQUB 0, 0, 1, 1
 
+ENDIF                   \ (_PLANET_MOON)
+
 \ Its variables (bank 4)
 
 .ss_o   SKIP 1          \ ss_turnx's vector
+IF _PLANET_MOON
 .mt_it  SKIP 1          \ MN_TURN: the MCNT of E's last turn
 .mt_sys SKIP 6          \ the system E is of (QQ2)
+ENDIF
 .ss_s   SKIP 9          \ the sun: planet + D, in the view's axes
 ASSERT SS_NZP <= NI% AND NI% <= 37   \ (ss_zs, ss_pl and ss_su: the shared
                                      \ workspace, elite-gfx.asm)

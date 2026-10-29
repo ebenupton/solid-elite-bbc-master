@@ -21,9 +21,10 @@
 \     in a build with make bands=on, _PLANET_BANDS): two
 \     latitude circles about the spin axis, EOR'd (pf_bands), base 0.
 \
-\ Then the moon (pf_moon, with its crater's record in slot PCMAX) and the
-\ ring's dots (pf_ring: only in a build with make rings=on,
-\ _PLANET_RINGS), when the seed has them. Elite's state is not
+\ Then the moon (pf_moon, with its crater's record in slot PCMAX: only in a
+\ build with make moon=on, _PLANET_MOON) and the ring's dots (pf_ring:
+\ only in a build with make rings=on, _PLANET_RINGS), when the seed has
+\ them. Elite's state is not
 \ touched: Elite's zero page &10-&28 (the engine's workspace) is saved and
 \ restored, and A, X, Y and the flags are preserved. The frame layer makes
 \ the rows through T_CAPS and T_MCAPS (gfx-merid.asm's PC_ROWS, PC_MROWS).
@@ -37,7 +38,9 @@
  PHX
  PHY
  STZ PC_N
+ IF _PLANET_MOON        \ (the moon: make moon=on)
  STZ MN_ON
+ ENDIF
  IF _PLANET_RINGS       \ (planet rings: make rings=on)
  STZ RG_N
  ENDIF
@@ -75,7 +78,7 @@
  STA pcby
  LDA K4+1
  STA pcby+1
- LDX #4                 \ (the planet's centre and radius, kept for pf_moon)
+ LDX #4                 \ (the planet's centre and radius, kept for pf_ring)
 .pfh5
  LDA pcbx,X
  STA pf_cx,X
@@ -103,7 +106,15 @@
  LDA #&80
  TSB PF_CLS
 .pfh7
- JSR pf_moon            \ (pf_moon first: it sets mn_h)
+ IF _PLANET_MOON OR _PLANET_RINGS
+ LDA QQ2+1              \ h = s0_hi EOR s1_hi EOR s2_hi: the system's moon
+ EOR QQ2+3              \ and ring
+ EOR QQ2+5
+ STA pf_h
+ ENDIF
+ IF _PLANET_MOON
+ JSR pf_moon
+ ENDIF
  IF _PLANET_RINGS
  JSR pf_ring
  ENDIF
@@ -366,7 +377,8 @@ ENDIF
 
 \ ******************************************************************************
 \
-\ The ring's dots and the moon (game context, as PF_HOOK)
+\ The ring's dots and the moon (game context, as PF_HOOK; rings=on and
+\ moon=on)
 \
 \ ******************************************************************************
 
@@ -547,6 +559,8 @@ IF _PLANET_RINGS        \ (make rings=on)
 
 ENDIF                   \ (_PLANET_RINGS)
 
+IF _PLANET_MOON         \ (make moon=on)
+
 \ pf_moon: a moon, for the systems whose seed has one (h = s0_hi EOR s1_hi
 \ EOR s2_hi, bits 0-1 = 1: a quarter of them), and planets of radius 16 up.
 \ It is scenery: no ship slot, no random number, no saved state. It sits at
@@ -572,10 +586,7 @@ ENDIF                   \ (_PLANET_RINGS)
 .pfm9
  RTS
 .pf_moon
- LDA QQ2+1              \ h
- EOR QQ2+3
- EOR QQ2+5
- STA mn_h
+ LDA pf_h               \ h (PF_HOOK's)
  AND #3
  CMP #1
  BNE pfm9
@@ -735,7 +746,7 @@ ENDIF                   \ (_PLANET_RINGS)
 .pfm9d
  STA MN_Y+1
  STY MN_Y
- LDA mn_h               \ radius = rho 96 256 / M_z (rho / 256 of the
+ LDA pf_h               \ radius = rho 96 256 / M_z (rho / 256 of the
  LSR A                  \ planet's radius, 24576)
  LSR A
  LSR A
@@ -925,7 +936,6 @@ MOON_C8 = 196           \ the moon's crater: cos 40 degrees
 .pfm_vn EQUB 0, 0, 0, &80, 0, &80, 0, 0, &80, &80, 0, 0
 .pfm_rho EQUB 48, 56, 64, 72
 .pfm_ctr EQUB 128, 0, 0, 96
-.mn_h  EQUB 0
 .mn_v  EQUB 0
 .mn_t  EQUB 0
 .mn_s  EQUB 0
@@ -935,6 +945,8 @@ MOON_C8 = 196           \ the moon's crater: cos 40 degrees
 .mn_r  EQUW 0
 .mn_sg EQUB 0
 .mn_z  SKIP 3
+
+ENDIF                   \ (_PLANET_MOON)
 
 IF _PLANET_RINGS        \ (make rings=on)
 
@@ -953,7 +965,7 @@ IF _PLANET_RINGS        \ (make rings=on)
 .prg9
  RTS
 .pf_ring
- LDA mn_h               \ (h: pf_moon's)
+ LDA pf_h               \ (h: PF_HOOK's)
  LSR A
  LSR A
  LSR A
@@ -964,7 +976,7 @@ IF _PLANET_RINGS        \ (make rings=on)
  LDA pf_r
  CMP #8
  BCC prg9
- LDA mn_h               \ S = the ring's radius x 64 / the planet's, times r
+ LDA pf_h               \ S = the ring's radius x 64 / the planet's, times r
  LSR A
  LSR A
  AND #3
@@ -1172,6 +1184,9 @@ ENDIF                   \ (_PLANET_RINGS)
 .pf_cx EQUW 0           \ the planet's centre and radius (PF_HOOK)
 .pf_cy EQUW 0
 .pf_r  EQUB 0
+IF _PLANET_MOON OR _PLANET_RINGS
+.pf_h  EQUB 0           \ h, the system's moon and ring (PF_HOOK)
+ENDIF
 .pft_f EQUB 0           \ pf_tilt's
 .pft_x EQUB 0
 .pft_y EQUB 0

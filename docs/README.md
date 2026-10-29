@@ -51,13 +51,16 @@ Master Elite (the Acornsoft SNG47 release), in six parts:
    the game again.
 6. **Planets** ([renderer.md](renderer.md)). One circle engine draws every
    planet's surface: the beach ball, true spherical craters, and banded
-   planets and rings behind the `bands=on` and `rings=on` build options. A
-   quarter of the systems have a moon, fixed in space and solid; the sun is
-   drawn near the planet while the station has its slot; every disc is
+   planets, rings and moons behind the `bands=on`, `rings=on` and `moon=on`
+   build options (with moons, a quarter of the systems have one, fixed in
+   space and solid); the sun is drawn near the planet while the station has its slot; every disc is
    drawn incrementally; and stars go only into wholly black screen bytes.
    Flight runs at 10.29 iterations per emulated second (0.736 times SNG47),
    most of the cost in the crater system, whose two true craters cost more
-   than the original's polygon crater.
+   than the original's polygon crater. Since then the disc layer packs each
+   row's boundary count and colour into a byte, and the frame keeps records
+   of its own (it projects each ship as it draws it, and draws explosions
+   from the game's line heap): 10.42 (0.745 times SNG47).
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -75,8 +78,7 @@ line, and sets out a plan to bring it back.
     make verify                 (the gate: Node.js, jsbeeb and py65, see 6-harness)
     make bands=on               (banded planets, an option: renderer.md)
     make rings=on               (planet rings, an option: renderer.md)
-    make moon=scenery           (the moon not solid, for a lockstep comparison
-                                 with SNG47 in a moon system: renderer.md)
+    make moon=on                (moons, an option: renderer.md)
 
 `make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd`,
 copies it to `solid-elite-bbc-master.ssd` in the repository's root (the
@@ -122,6 +124,7 @@ encrypt=no`.
 | The disc layer's rows: count and colour in one byte | 10.38 | 0.743 | 192,731 |
 | Explosion clouds drawn from the ship line heap | 10.39 | 0.744 | 192,407 |
 | Ships projected by the frame | 10.40 | 0.745 | 192,237 |
+| Moons an option, off by default | 10.42 | 0.745 | 192,004 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never

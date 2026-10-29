@@ -7,9 +7,10 @@
 # frame of a short posed scene; the seeds are the systems' QQ2 (s0 lo, hi,
 # s1 lo, hi, s2 lo, hi): Leesti's for the craters, and seeds with a moon
 # (h = s0_hi ^ s1_hi ^ s2_hi, h & 3 = 1) and a ring (h bits 4-6 = 4). The
-# banded planets (bands.png, bands2.png) and the rings (ring*.png) come from
-# a copy of the repository built with "make bands=on rings=on"
-# (6-harness/work/stills/bandstree), as the default build has neither. The
+# banded planets (bands.png, bands2.png), the moons (moon*.png) and the
+# rings (ring*.png, ringmoon*.png) come from a copy of the repository built
+# with "make bands=on rings=on moon=on" (6-harness/work/stills/optionstree),
+# as the default build has none of them. The
 # sun near the planet's frames and movie (sunnear.mp4) stay in
 # 6-harness/work/stills; its sheet, spawn frame and sunnear.gif go to
 # images/sunnear.
@@ -25,9 +26,9 @@ pl() {      # pl name args...: a scene, its last frame as images/planets/name.pn
     python3 2-build-files/planetvis.py "$W/$n" "images/planets/$n.png" 305 > /dev/null
 }
 case "$what" in *planets*)
-    B=$W/bandstree; rm -rf "$B"; mkdir -p "$B/3-assembled-output" "$B/5-compiled-game-discs"
+    B=$W/optionstree; rm -rf "$B"; mkdir -p "$B/3-assembled-output" "$B/5-compiled-game-discs"
     cp -R 1-source-files 2-build-files Makefile "$B"/ &&
-        (cd "$B" && make bands=on rings=on verify=no) > "$W/bandstree.log" 2>&1 || { echo "stills: the bands=on rings=on build failed"; exit 1; }
+        (cd "$B" && make bands=on rings=on moon=on verify=no) > "$W/optionstree.log" 2>&1 || { echo "stills: the bands=on rings=on moon=on build failed"; exit 1; }
     pl beach --type 128 --x 128 --y 96 --r 70 --pose 20,30,0 &
     pl caps --type 130 --qq2 $LEESTI --x 128 --y 96 --r 70 --pose 20,30,0 &
     TREE=$B pl bands --type 130 --qq2 38,AD,9C,14,1D,15 --x 128 --y 96 --r 80 --pose 20,30,0 &
@@ -36,9 +37,9 @@ case "$what" in *planets*)
     pl caps2 --type 130 --qq2 38,BA,7C,0D,5D,41 --x 120 --y 100 --r 50 --pose 0,60,20 --spin 5 &
     pl nobands --type 130 --qq2 38,AD,9C,14,1D,15 --x 128 --y 96 --r 80 --pose 20,30,0 &
     wait
-    pl moon1 --type 128 --qq2 76,70,EB,94,0B,D5 --x 93 --y 97 --r 33 --pose 59,28,24 --spin 2 &
-    pl moon2 --type 130 --qq2 DA,1C,F6,BA,66,D3 --x 110 --y 90 --r 31 --pose 40,76,2 --spin 11 &
-    pl moon3 --type 130 --qq2 38,AD,9C,15,1D,A9 --x 70 --y 100 --r 30 --pose 0,150,30 &
+    TREE=$B pl moon1 --type 128 --qq2 76,70,EB,94,0B,D5 --x 93 --y 97 --r 33 --pose 59,28,24 --spin 2 &
+    TREE=$B pl moon2 --type 130 --qq2 DA,1C,F6,BA,66,D3 --x 110 --y 90 --r 31 --pose 40,76,2 --spin 11 &
+    TREE=$B pl moon3 --type 130 --qq2 38,AD,9C,15,1D,A9 --x 70 --y 100 --r 30 --pose 0,150,30 &
     TREE=$B pl ring --type 130 --qq2 38,AD,9C,15,1D,79 --x 128 --y 96 --r 40 --pose 20,30,0 &
     wait
     TREE=$B pl ring2 --type 128 --qq2 38,AD,9C,14,1D,78 --x 160 --y 96 --r 36 --pose 0,-60,0 &

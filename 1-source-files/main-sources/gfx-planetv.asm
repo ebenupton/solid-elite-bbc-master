@@ -5,9 +5,12 @@
 \ elite-gfx.asm), where both the meridian window (bank 7, which writes them
 \ in game context) and the frame layer (bank 6, with ACCCON X either way)
 \ see them. Variables only: F_INIT clears MN_ON and RG_N, and f_reset after
-\ every frame
+\ every frame. The moon's are only in a build with it (make
+\ moon=on, _PLANET_MOON), the ring's in one with rings (make rings=on)
 \
 \ ******************************************************************************
+
+IF _PLANET_MOON
 
 \ The moon, for the frame layer (pf_moon, gfx-planet7.asm; f_moon, bank 6)
 .MN_ON  SKIP 1          \ bit 7: a moon this frame; 6: behind the planet; 5:
@@ -19,6 +22,8 @@
 .MN_N   SKIP 1          \ its crater's slots: PCMAX .. MN_N - 1
 .MN_INV SKIP 1
 
+ENDIF
+
 \ The ring's dots (pf_ring, gfx-planet7.asm; f_ring, bank 6; rings=on)
 IF _PLANET_RINGS
 .RG_N   SKIP 1          \ dots this frame
@@ -26,6 +31,8 @@ IF _PLANET_RINGS
 .RG_Y   SKIP 64
 .RG_F   SKIP 64         \ bit 7: behind the planet
 ENDIF
+
+IF _PLANET_MOON
 
 \ The moon as each buffer last showed it (f_moon, f_moon0: gfx-frame.asm),
 \ by buffer
@@ -39,3 +46,5 @@ ENDIF
 .MO_B   SKIP 2
 .MO_CT  SKIP 2          \ its crater's rows (none: 255, 0)
 .MO_CB  SKIP 2
+
+ENDIF

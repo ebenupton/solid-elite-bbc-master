@@ -44,10 +44,9 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 
 `verify.sh` sets the mode the port's current state must meet.
 
-SNG47 has no moons, and the port's moon is solid, so in a system with a
-moon a run that flies into it diverges from SNG47 there. The gate's systems
-have none; for a lockstep comparison in a moon system, build with `make
-moon=scenery`.
+SNG47 has no moons, and nor has the default build. In a build with moons
+(`make moon=on`) the moon is solid, so a run that flies into one diverges
+from SNG47 there; the gate's systems have none.
 
 ## How the comparison works
 
@@ -105,8 +104,8 @@ moon=scenery`.
 | `mdocktime.mjs` | The docked screens' drawing times: boots the build as the gate does and, from the Status screen, presses each docked-screen key in turn (f8, f1 ... f7, f9), giving each screen's cycles from the key's scan to the next, and its busy cycles (less the wait for the vertical sync). The emulation is deterministic, so a build gives the same figures every run. |
 | `mflarevis.mjs` | The lens flare's occlusion probes: flies the gate's pilot to an iteration, then puts the sun (and optionally a ship in front of it) on a path, and dumps each frame's back buffer with the probes in sight and their cycles, for `2-build-files/flarevis.py` to render. |
 | `mplanet.mjs` | Planet scenes: flies the gate's pilot to an iteration, then poses the planet (its place, radius, type, the system's seed and its orientation, or the game's own spin) and dumps each frame's back buffer with the cycles in the planet's routines, for `2-build-files/planetvis.py` to render. |
-| `mmoonhit.mjs` | The moon is solid: flies the gate's pilot into a chosen system, puts the moon at a chosen distance dead ahead, and reports whether we crash (inside its radius we must, outside we must not, and never in a system without a moon). |
-| `mmoonpath.mjs` | A long turning flight in a moon system, recording iteration by iteration the moon's E, the planet and the station, and where the moon was drawn, for `2-build-files/moonpath.py` to check that the moon stays at a fixed place in space. |
+| `mmoonhit.mjs` | The moon is solid (a `make moon=on` build): flies the gate's pilot into a chosen system, puts the moon at a chosen distance dead ahead, and reports whether we crash (inside its radius we must, outside we must not, and never in a system without a moon). |
+| `mmoonpath.mjs` | A long turning flight in a moon system (a `make moon=on` build), recording iteration by iteration the moon's E, the planet and the station, and where the moon was drawn, for `2-build-files/moonpath.py` to check that the moon stays at a fixed place in space. |
 | `msunnear.mjs` | The sun near the planet: a posed scene (a big planet, the sun rising from behind its limb, the station crossing it; `--spawn`: the station appearing in the game's own way), each frame's back buffer dumped with the probes in sight and the cycles of the sun's routines, for `2-build-files/sunnear.py` to render (frames, a sheet and a movie). `--pose`/`--spin` put the planet's orientation, the stars, `MCNT` and the seeds, so two builds' frames compare byte for byte; `--sz1`/`--sx1` move the sun over the script (the second disc grows, crosses the window's side or becomes the bigger disc); `--watch` gives named routines' cycles per frame. |
 | `discmem/bench.sh`, `discmem/cmp.py`, `discmem/perframe.py`, `discmem/gatecmp.py` | The disc layer's bench: its scenes on a build (posed planets, including above the screen and by the window's side, and the sun near the planet, across the edge, growing and swapping; the gate's frames; a replayed session with `RUN1`), and two builds compared: pixels byte for byte, cycles by routine, frame by frame, and the gate's windows. |
 | `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: `S_SUN`, the disc layer, the second disc, the lens flare and the whole frame. |

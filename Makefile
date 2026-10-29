@@ -22,11 +22,6 @@ PYTHON?=python
 #
 #   verify=no           Do not compare the game binaries with the originals
 #
-#   moon=scenery        The moon is not solid (no MOONHIT: elite-moon.asm),
-#                       for a lockstep comparison with SNG47 in a system
-#                       with a moon (SNG47 has none, so flying into the moon
-#                       diverges from it there)
-#
 #   bands=on            Banded planets: a quarter of the crater planets, by
 #                       the system's seed, are drawn with latitude bands
 #                       (gfx-planet7.asm's pf_bands); off by default, when no
@@ -37,6 +32,14 @@ PYTHON?=python
 #                       gfx-frame.asm's f_ring); off by default, when no
 #                       planet has a ring and their code and variables are
 #                       assembled out
+#
+#   moon=on             Moons: a quarter of the systems, by the seed, have a
+#                       moon, scenery fixed in space and solid (gfx-planet7.asm's
+#                       pf_moon, gfx-frame.asm's f_moon, gfx-ssun.asm's
+#                       MN_TURN, elite-moon.asm's MOONHIT); off by default,
+#                       when no system has a moon and their code, tables and
+#                       variables are assembled out (SNG47 has no moons, so in
+#                       a moon=on build flying into one diverges from it)
 #
 # So, for example:
 #
@@ -65,10 +68,6 @@ PYTHON?=python
 #   TRUE  = Match binaries to released version (i.e. fill workspaces with noise)
 #   FALSE = Zero-fill workspaces
 #
-# _MOON_SOLID
-#   TRUE  = Flying into the moon kills us, as the planet does (the default)
-#   FALSE = The moon is scenery only (moon=scenery)
-#
 # _PLANET_BANDS
 #   TRUE  = Banded planets (bands=on)
 #   FALSE = No banded planets (the default)
@@ -76,6 +75,10 @@ PYTHON?=python
 # _PLANET_RINGS
 #   TRUE  = Planet rings (rings=on)
 #   FALSE = No planet rings (the default)
+#
+# _PLANET_MOON
+#   TRUE  = Moons (moon=on)
+#   FALSE = No moons (the default)
 #
 # The build (docs/memory-map.md):
 #
@@ -123,12 +126,6 @@ else
   match-original-binaries=TRUE
 endif
 
-ifeq ($(moon), scenery)
-  moon-solid=FALSE
-else
-  moon-solid=TRUE
-endif
-
 ifeq ($(bands), on)
   planet-bands=TRUE
 else
@@ -141,6 +138,12 @@ else
   planet-rings=FALSE
 endif
 
+ifeq ($(moon), on)
+  planet-moon=TRUE
+else
+  planet-moon=FALSE
+endif
+
 .PHONY:all
 all:
 	echo _VERSION=4 > 1-source-files/main-sources/elite-build-options.asm
@@ -148,9 +151,9 @@ all:
 	echo _REMOVE_CHECKSUMS=TRUE >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MATCH_ORIGINAL_BINARIES=$(match-original-binaries) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _MAX_COMMANDER=$(max-commander) >> 1-source-files/main-sources/elite-build-options.asm
-	echo _MOON_SOLID=$(moon-solid) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _PLANET_BANDS=$(planet-bands) >> 1-source-files/main-sources/elite-build-options.asm
 	echo _PLANET_RINGS=$(planet-rings) >> 1-source-files/main-sources/elite-build-options.asm
+	echo _PLANET_MOON=$(planet-moon) >> 1-source-files/main-sources/elite-build-options.asm
 	$(PYTHON) 2-build-files/dashboard.py 3-assembled-output
 	$(PYTHON) 2-build-files/lightpass.py
 	$(PYTHON) 2-build-files/streams.py measure > 3-assembled-output/compile.txt

@@ -136,8 +136,10 @@
  JMP gback
 
 .G_PFHOOK               \ (the planet's detail, gfx-planet7.asm, after the
- JSR MN_TURN            \ moon's place for this iteration, gfx-ssun.asm, in
- LDA #MERIDBANK         \ bank 4: H_CIRC keeps nothing in A, X, Y or the flags)
+ IF _PLANET_MOON        \ moon's place for this iteration with moon=on,
+ JSR MN_TURN            \ gfx-ssun.asm, in bank 4: H_CIRC keeps nothing in
+ ENDIF                  \ A, X, Y or the flags)
+ LDA #MERIDBANK
  STA &F4
  STA &FE30
  JSR PF_HOOK

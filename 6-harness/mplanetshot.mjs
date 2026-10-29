@@ -16,8 +16,6 @@
 //     --type 130 --qq2 38,BA,7C,0D,5E,41 --x 150 --y 100 --r 80 --pose 30,-40,10
 //   images/solid-elite-beach-ball-planet.png:
 //     --type 128 --x 120 --y 100 --r 85 --pose 20,30,0
-//   images/solid-elite-moon.png:
-//     --type 128 --qq2 76,70,EB,94,0B,D5 --x 60 --y 110 --r 90 --pose 59,28,24 --spin 2
 //   images/solid-elite-sun-near-planet.png:
 //     --type 128 --x 110 --y 190 --r 120 --pose 20,30,0 --sun 70,120,1300
 import { runElite, loadSyms, ROOT } from "./mlib.mjs";

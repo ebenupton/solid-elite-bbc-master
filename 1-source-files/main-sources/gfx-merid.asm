@@ -79,7 +79,12 @@ R_T2  = 21              \ are toggled, and from T2 those in M2 (0..192)
 R_M1  = 22
 R_M2  = 23              \ (M1 and M2 last: pr_c + RSZ follows them)
 RSZ   = 24
-PCMAX = 3               \ the planet's records (slots 0-2; the moon's in slot 3)
+PCMAX = 3               \ the planet's records (slots 0-2; the moon's in slot 3,
+IF _PLANET_MOON         \ with moon=on)
+PCSLOTS = PCMAX + 1
+ELSE
+PCSLOTS = PCMAX
+ENDIF
 
 \ ******************************************************************************
 \
@@ -94,7 +99,7 @@ PCMAX = 3               \ the planet's records (slots 0-2; the moon's in slot 3)
  RTS
 .pc_circ
  LDA PC_N
- CMP #PCMAX+1
+ CMP #PCSLOTS
  BCS pcc9
  STZ pc_t
  LDX #0                 \ the magnitudes >> 2 (pf_tilt's halved vectors: the
@@ -1121,11 +1126,13 @@ ZC  = &24               \ the row's centre, ceil(C)
 ZS  = &26               \ s = round(sqrt(D(k)))
 ZSS = &27               \ the half-chord used: s, or 0 once past
 
+IF _PLANET_MOON
 .PC_MROWS
  LDX #PCMAX
  LDY MN_N
  LDA MN_INV
  BRA pcr0
+ENDIF
 .PC_ROWS
  LDX #0
  LDY PC_N
@@ -1783,4 +1790,4 @@ pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
 .pcc    EQUB 0          \ the circle's cosine (0.8) and its sign (bit 7)
 .pcneg  EQUB 0
 .pcn    EQUW 0          \ 2^24 / the axis' nominal length (>> 3)
-.PCB    SKIP RSZ * (PCMAX + 1)  \ the records: the planet's, and the moon's crater
+.PCB    SKIP RSZ * PCSLOTS  \ the records: the planet's, and the moon's crater

@@ -116,8 +116,8 @@ back buffer, two frames old:
    extent and the new span, write the disc's colour where it is not
    already right, and black where something old is no longer covered. Then
    the second disc, the smaller and further one, where the layer leaves
-   room (see "The sun near the planet"), and the moon, if the system has
-   one (see "The moon").
+   room (see "The sun near the planet"), and the moon, if the build has
+   moons and the system one (see "The moon").
 4. Fill the ships far to near, each projected as it is drawn, each face a
    dithered polygon in its lit colour, with their details and fins. Then draw the lines and the
    particles. All of these extend this buffer's dirty extent for each row.
@@ -167,15 +167,15 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 
 | Part | Where | What |
 |---|---|---|
-| The shared workspace | main `&0E00-&1E15`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`, and what the frame reads of the moon (`gfx-planetv.asm`). Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
-| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass); then the moon's collision test, `MOONHIT` (`elite-moon.asm`), from the main flight loop |
+| The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`, and what the frame reads of the moon and the ring with `make moon=on` and `make rings=on` (`gfx-planetv.asm`). Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
+| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass); and, with `make moon=on`, the moon's place, `MN_TURN`, and its collision test, `MOONHIT` (`elite-moon.asm`), from the main flight loop |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the ship records (`F_RP`, `F_SR`, whose room holds `F_INIT` until the first frame), the zero page `F_FRAME` keeps (`f_zsv`), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles and the moon, `PF_HOOK` and `pf_moon` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK`, and the moon, `pf_moon`, with `make moon=on` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
@@ -594,8 +594,22 @@ and rings from a build with `make bands=on rings=on`).
 
 ## The moon
 
-A quarter of the systems (by the seed: `h` = `s0_hi EOR s1_hi EOR s2_hi`,
-bits 0-1 = 1) have a moon. It is scenery only: no ship slot, no random
+Moons are a build option, as the banded planets and the rings are: `make
+moon=on` (`_PLANET_MOON`). By default no system has a moon, and the moon's
+code, tables and variables are assembled out, so the game is the
+original's at every iteration in every system. Leaving them out frees
+2,677 bytes: 382 at bank 4's end (`MN_TURN` and `MOONHIT`), 56 in bank 5
+(`R_WSPAN`), 1,298 in bank 6 (`f_moon0`, `f_moon` and their rows, the
+moon's colours and variables, `f_behind`'s moon, `F_HW3`), 853 in bank 7
+(`pf_moon` and its helpers, `PC_MROWS`, the crater's record slot), 40 in
+the shared workspace, 43 in the glue area (`T_WSPAN`, `T_MCAPS`,
+`G_PFHOOK`'s call of `MN_TURN`: `CODE%` is that much higher without the
+moon, so the font stays page aligned with no padding) and 5 in the hot pass (`MA22`'s call of `MOONHIT`). The
+system's `h` is `PF_HOOK`'s (`pf_h`), read by `pf_moon` and `pf_ring`
+alike, so rings build with or without moons.
+
+With `make moon=on`, a quarter of the systems (by the seed: `h` = `s0_hi
+EOR s1_hi EOR s2_hi`, bits 0-1 = 1) have a moon. It is scenery only: no ship slot, no random
 number, no saved state. It is 0.19 to 0.28 of the planet's radius, drawn
 for planets of radius 16 or more, light grey (equal parts of the four
 inks) with a dark grey crater on `roofv`, 40 degrees across, from a moon
@@ -645,15 +659,16 @@ screen). `MOONHIT` tests on the planet's altitude iteration (`MCNT` mod 32 =
 10), in systems with a moon: with the moon's centre M = P + (E >> 8), we
 have crashed if |M|^2 < (rho 96)^2. It writes no zero page and nothing of
 the game's but by crashing, and in a system without a moon it returns at
-once. This is the port's one change to the game: SNG47 has no moons, so in
-a system with one a run that flies into the moon diverges from SNG47
-there. The gate's systems have none. For a lockstep comparison in a moon
-system, build with `make moon=scenery` (`_MOON_SOLID` FALSE: no call of
-`MOONHIT`). `6-harness/mmoonhit.mjs` puts the moon at a chosen distance
+once. SNG47 has no moons, so in a `make moon=on` build a run that flies
+into a moon diverges from SNG47 there, and nothing else differs; the
+default build has no moons. The gate's systems have none either.
+`6-harness/mmoonhit.mjs` puts the moon at a chosen distance
 dead ahead: inside its radius we crash, outside we do not, and a system
 without a moon never does.
 
-`test_raster.py`'s `pfhook` test checks the moon (`MN_ON`, `MN_X`, `MN_Y`,
+`test_raster.py` assembles the moon in (`MOON=off` in its environment for
+the default build, when `pfhook` checks that there is none). Its `pfhook`
+test checks the moon (`MN_ON`, `MN_X`, `MN_Y`,
 `MN_R`, `MN_Z` against `planet_caps.py`'s `pf_moon`, with random E, views
 and positions) and its crater's rows. `6-harness/mmoonpath.mjs` records a
 long turning flight in a moon system, and `2-build-files/moonpath.py`
@@ -778,11 +793,11 @@ what changed:
 * the planet or the sun as the disc layer (`R_DISCROWS`: each buffer's
   spans and boundaries);
 * the smaller of them, the second disc (`R_DISC2`);
-* the moon, by rows (`f_moon`).
+* the moon, by rows (`f_moon`, with `make moon=on`).
 
 A row's boundary count and its colour at the span's left end are one
 byte: `R_NDN` holds the count in bits 0-6 and the colour in bit 7
-(`PC_ROWS` and `PC_MROWS` write it so, `f_moon` reads it), and each
+(`PC_ROWS` and, with moons, `PC_MROWS` write it so, `f_moon` reads it), and each
 buffer's stored boundaries likewise (`R_BDN`). An unchanged row is then one
 compare of the two bytes, and `r_dpe` finds a changed row's count
 difference with the colours shifted out. The disc memory, in bytes:
@@ -794,7 +809,7 @@ difference with the colours shifted out. The disc memory, in bytes:
 | `R_S2L0/L1/R0/R1`, the second disc's spans by buffer | bank 5 | 768 |
 | `R_NDN` (count and colour), `R_NDX0-3`, this frame's boundaries | shared workspace | 960 |
 | `R_NDISCL/R`, this frame's spans (the polygons' edge tables between the frames' discs) | shared workspace | 384 |
-| `F_HW`, `F_HW2`, `F_HW3`, the half-widths by radius | bank 6 | 576 |
+| `F_HW`, `F_HW2`, the half-widths by radius (and `F_HW3`, 64, with `make moon=on`) | bank 6 | 512 |
 
 Measured and not taken (`6-harness/discmem`: `bench.sh` runs the disc
 layer's scenes on a build, `cmp.py` and `perframe.py` compare two builds'
@@ -902,9 +917,11 @@ tables.
 
 ## Speed
 
-The gate's run gives 10.29 flight iterations per emulated second, against
-SNG47's 13.97 (0.736 times), with the frame rate capped at 25 frames a
-second. Before the planets' circle engine it gave 11.82 (0.846 times, at
+The gate's run gives 10.42 flight iterations per emulated second, against
+SNG47's 13.97 (0.745 times), with the frame rate capped at 25 frames a
+second. With the planets' circle engine it first gave 10.29 (0.736 times);
+the disc layer's packed rows and the frame's records (see "The frame's
+records") brought it to 10.42. Before the planets' circle engine it gave 11.82 (0.846 times, at
 169,148 cycles a flight iteration); most of the difference is the crater
 system's stretch of the run (iterations 800 to 2799), where two true caps
 cost more than the polygon crater did. With the cap it first gave 11.73

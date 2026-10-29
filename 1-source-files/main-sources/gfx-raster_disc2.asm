@@ -530,7 +530,9 @@ d_t  = r_ov + 19
 
 \ R_WSPAN: R_SPAN (Y = row, R_XL .. R_XR, R_COLE/R_COLO), noting the span
 \ in R_WL/R_WR and the rows R_PRWT .. R_PRWB as written this frame, as
-\ R_DISC2 notes its own, not in DIRTY (the moon, gfx-frame.asm's f_moon)
+\ R_DISC2 notes its own, not in DIRTY (the moon, gfx-frame.asm's f_moon:
+\ make moon=on)
+IF _PLANET_MOON
 .R_WSPAN
 {
   LDA R_XR
@@ -563,3 +565,4 @@ d_t  = r_ov + 19
 .w9
   RTS
 }
+ENDIF

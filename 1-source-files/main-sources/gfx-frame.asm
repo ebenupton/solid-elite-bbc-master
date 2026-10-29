@@ -714,11 +714,14 @@ ASSERT XX0 = XX16 + 18
 .ffb0
 
  JSR T_STARERASE        \ undo last time's stars in this buffer
+ IF _PLANET_MOON
  JSR f_moon0            \ the moon: what this buffer shows of it (before
-                        \ the layer's repair)
+ ENDIF                  \ the layer's repair; moon=on)
  JSR f_discs            \ the disc layer (sun or planet), incremental
  JSR f_disc2            \ the other disc, if both are on screen (incremental)
+ IF _PLANET_MOON
  JSR f_moon             \ the moon, if any (incremental)
+ ENDIF
  IF _PLANET_RINGS
  JSR f_ring             \ the ring, if any (dots; rings=on)
  ENDIF
@@ -780,7 +783,9 @@ ASSERT XX0 = XX16 + 18
  STA F_NDOT
  STA F_PLON
  STA GSUNON
+ IF _PLANET_MOON
  STA MN_ON
+ ENDIF
  IF _PLANET_RINGS
  STA RG_N
  ENDIF
@@ -878,7 +883,9 @@ ASSERT XX0 = XX16 + 18
  LDA #1                 \ buffer 1's state: empty (TTX66 blacked it)
  STA F_BACK
  STZ F_SGS+1
+ IF _PLANET_MOON
  STZ MO_ON+1            \ (no moon in it)
+ ENDIF
  JSR T_SETBUF
  JSR T_RESETBUF
  LDA #&FF
@@ -2737,7 +2744,7 @@ IF _PLANET_RINGS        \ (make rings=on)
  STA R_COLO
  LDX #0
 .frg1
- STX fm_i
+ STX frg_i
  LDA RG_F,X
  BPL frg3
  LDA F_PLON             \ behind: inside the planet's disc?
@@ -2755,7 +2762,7 @@ IF _PLANET_RINGS        \ (make rings=on)
  BCS frg3
 .frg2
  TAY
- LDX fm_i
+ LDX frg_i
  LDA RG_X,X
  SEC
  SBC F_PLX
@@ -2768,20 +2775,23 @@ IF _PLANET_RINGS        \ (make rings=on)
  BCC frg4
  BEQ frg4
 .frg3
- LDX fm_i
+ LDX frg_i
  LDA RG_X,X
  LDY RG_Y,X
  TAX
  LDA #1
  JSR T_DOT
 .frg4
- LDX fm_i
+ LDX frg_i
  INX
  CPX RG_N
  BCC frg1
  RTS
+.frg_i EQUB 0           \ (the dot)
 
 ENDIF                   \ (_PLANET_RINGS)
+
+IF _PLANET_MOON         \ (the moon: make moon=on)
 
 \ ------------------------------------------------------------------------------
 \ The moon (gfx-planet7.asm's pf_moon makes it in game context: MN_ON, MN_X,
@@ -3391,10 +3401,13 @@ ENDIF                   \ (_PLANET_RINGS)
 .fm_wl EQUB 0           \ the row's R_WL, R_WR before the moon's writes
 .fm_wr EQUB 0
 .fm_sp SKIP 4           \ the row's old span, new span
+ENDIF                   \ (_PLANET_MOON)
+
 
 \ ------------------------------------------------------------------------------
-\ f_behind: is ship f_si behind the planet or the moon, with the first vertex
-\ of its first visible face inside its disc? C set if so (don't draw it)
+\ f_behind: is ship f_si behind the planet or the moon (moon=on), with the
+\ first vertex of its first visible face inside its disc? C set if so (don't
+\ draw it)
 \ ------------------------------------------------------------------------------
 
 .f_behind
@@ -3412,6 +3425,7 @@ ENDIF                   \ (_PLANET_RINGS)
  STA fb_zl
  LDA #LO(F_HW)
  LDX #HI(F_HW)
+ IF _PLANET_MOON
  JSR f_bdisc
  BCC fbh0
  RTS
@@ -3435,6 +3449,12 @@ ENDIF                   \ (_PLANET_RINGS)
  STA fb_zl
  LDA #LO(F_HW3)
  LDX #HI(F_HW3)
+ ELSE
+ JMP f_bdisc
+.fbh0
+ CLC
+ RTS
+ ENDIF
 
 \ f_bdisc: is ship f_si behind the disc fb_x, fb_y, fb_r (half-widths at
 \ (A, X)), z fb_zh/fb_zl, with the first vertex of its first visible face
