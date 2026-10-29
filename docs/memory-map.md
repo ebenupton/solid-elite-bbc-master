@@ -341,7 +341,7 @@ one of the hot pass's containers in main RAM), 6 at the end of bank 4,
 second disc's `R_S2R0` and `R_S2R1`; and 46 below the per-x tables, 64
 after each of `R_S2L0` and `R_S2L1`, 384 in the boundary block, at
 `&9180-&923F` and `&9480-&953F`, and 256 in the row runs' tails), 37 in
-ANDY, 1,383 in bank 6, and 48 and 236 in `WP`'s pages and the shared
+ANDY, 1,373 in bank 6, and 48 and 236 in `WP`'s pages and the shared
 workspace (192 of it at `&17F8-&18B7`), with 210 more between it and the
 main code. `CODE%` (now
 `&1EE8`) is chosen to keep the font page aligned with no padding as the

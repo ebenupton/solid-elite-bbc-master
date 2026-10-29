@@ -103,7 +103,13 @@
  JSR f_dflush           \ (the last screen's noted text given to the map)
  JSR f_direct0          \ (which clears F_DSS with R_SS: no stars noted)
  STZ f_dlog             \ nothing noted on the new screen
- RTS
+ LDA #&80               \ and nothing recorded for the frame before the screen
+ STA F_SLV+16           \ was cleared (DEATH's TT66 comes in the middle of an
+                        \ iteration, ESCAPE's too: what it had recorded is
+                        \ gone from the screen), so a frame's lists hold one
+                        \ record a ship slot at most (MAXSH, MAXLN, MAXDT);
+ STY f_ysav             \ (f_reset's lists, returning with Y kept)
+ JMP f_lists
 
 \ f_poly2: f_item's polygon detail (T_POLY), and a station's docking slot
 \ (the only unlit polygon detail: black, colour byte &80 + 4 * its fill

@@ -771,6 +771,7 @@ ASSERT XX0 = XX16 + 18
 .f_reset
  LDA #&80               \ no docking slot (f_poly2 records one, f_slot uses it)
  STA F_SLV+16
+.f_lists                \ (F_DIRECT: 6-harness/mfbcmp.mjs counts frames at f_reset)
  LDA #0                 \ empty the per-frame lists
  STA GLASV              \ (Master port: the beams show for one frame per LASLI)
  STA f_bomb             \ (and no bomb bolt yet)

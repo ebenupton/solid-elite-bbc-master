@@ -155,7 +155,9 @@ one solid span are kept from one frame to the next instead (see "Kept solid
 rows").
 
 `TTX66`, which clears the screen for a new view, enters direct mode
-(`G_DIRECT`). The first frame afterwards goes back to double buffering
+(`G_DIRECT`) and empties the frame's lists: `DEATH`'s and `ESCAPE`'s
+`TT66` come in the middle of an iteration, so what it had recorded is gone
+from the screen, and a frame's lists hold one record a ship slot at most. The first frame afterwards goes back to double buffering
 (`f_enter`). An in-system jump (`WARP`) keeps the space view on show
 (`GWARP`). A disc command stashes HAZEL in buffer 0, so it sets `GSTASH`,
 and the next frame in space mode starts buffer 0 afresh (`f_b0new`). The
