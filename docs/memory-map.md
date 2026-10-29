@@ -335,13 +335,13 @@ that does not fit goes on to the next container. `TACTICS`, whose seven
 parts branch into one another and so move as a whole, leads the second.
 `3-assembled-output/flow.txt` lists every unit.
 
-Free space: 53 bytes below `&4000` and 180 below `&8000` (each the end of
+Free space: 2 bytes below `&4000` and 180 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 6 at the end of bank 4,
 1,218 at the end of bank 7, 1,223 in HAZEL, 76 and 16 in bank 5 (before the
 second disc's `R_S2R0` and `R_S2R1`; and 46 below the per-x tables, 64
 after each of `R_S2L0` and `R_S2L1`, 384 in the boundary block, at
 `&9180-&923F` and `&9480-&953F`, and 256 in the row runs' tails), 37 in
-ANDY, 1,077 in bank 6, and 48 and 236 in `WP`'s pages and the shared
+ANDY, 1,073 in bank 6, and 48 and 236 in `WP`'s pages and the shared
 workspace (192 of it at `&17F8-&18B7`), with 210 more between it and the
 main code. `CODE%` (now
 `&1EE8`) is chosen to keep the font page aligned with no padding as the

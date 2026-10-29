@@ -30842,9 +30842,8 @@ ENDIF
                         \ instruction
 
  JSR H_PTCLSE           \ Call PTCLS to remove the existing cloud by drawing it
-                        \ (Port: with the renderer's recording off,
-                        \ gfx-hooks.asm)
-                        \ again
+                        \ again (Port: in record mode there is nothing to
+                        \ remove, gfx-hooks.asm)
 
  LDA INWK+6             \ Set T = z_lo
  STA T
@@ -30968,6 +30967,12 @@ ENDIF
  STA INWK+31
 
 .PTCLS
+
+ JSR H_PTCLS            \ Port: in record mode, note the cloud for the frame,
+                        \ which draws it, and do only what the game keeps of
+                        \ PTCLS (gfx-hooks.asm)
+
+.PTCLR
 
                         \ This part of the routine actually draws the explosion
                         \ cloud
@@ -31256,6 +31261,103 @@ ENDIF
  SBC #0
 
  RTS                    \ Return from the subroutine
+
+\ ******************************************************************************
+\
+\       Name: H_PTCLS
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: the explosion cloud in record mode: noted for the frame,
+\             which draws it from the ship line heap
+\       Area: low
+\
+\ ------------------------------------------------------------------------------
+\
+\ Called at the start of PTCLS (DOEXP falls into it to draw the cloud). In
+\ record mode the cloud is noted for the frame and what the game keeps of
+\ PTCLS is done (G_CLOUD with C set, gfx-frame.asm's F_CLOUD), returning from
+\ PTCLS; the frame draws the cloud with PTCLS itself from the ship line heap
+\ (T_CLOUD, entering at PTCLR, after this call). Outside record mode PTCLS
+\ draws the cloud itself.
+\
+\ ******************************************************************************
+
+.H_PTCLS
+
+ LDA QQ11
+ ORA GFORCE
+ BNE hpt9
+ SEC
+ JSR G_CLOUD
+ PLA
+ PLA
+
+.hpt9
+
+ RTS
+
+\ ******************************************************************************
+\
+\       Name: H_PTCLSE
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Port: DOEXP removing the old explosion cloud
+\       Area: low
+\
+\ ------------------------------------------------------------------------------
+\
+\ In record mode nothing is on the screen to remove: only what the game keeps
+\ of PTCLS is done (G_CLOUD with C clear). Outside record mode PTCLS draws the
+\ cloud again, which removes it.
+\
+\ ******************************************************************************
+
+.H_PTCLSE
+
+ LDA QQ11
+ ORA GFORCE
+ BNE P%+6
+ CLC
+ JMP G_CLOUD
+ JMP PTCLR
+
+\ ******************************************************************************
+\
+\       Name: H_DOT
+\       Type: Subroutine
+\   Category: Drawing pixels
+\    Summary: Port: PIXEL in record mode: the frame's explosion particles
+\       Area: low
+\
+\ ------------------------------------------------------------------------------
+\
+\ Called at the start of PIXEL, with X = x, A = y. In record mode only the
+\ frame's PTCLS reaches it (T_CLOUD: the game's PTCLS, H_PTCLS, plots nothing,
+\ and the stardust is recorded by H_STAR), whose particles it plots
+\ (G_PDOT, gfx-frame.asm's F_PDOT), returning from PIXEL (what PIXEL returns
+\ is not read: PTCLS goes on to the next particle).
+\
+\ ******************************************************************************
+
+.H_DOT
+
+ STA hdA
+ LDA QQ11
+ ORA GFORCE
+ BNE hdd
+ PLA
+ PLA
+ LDA hdA
+ JMP G_PDOT
+
+.hdd
+
+ LDA hdA
+ RTS
+
+.hdA
+
+ EQUB 0
 
 \ ******************************************************************************
 \

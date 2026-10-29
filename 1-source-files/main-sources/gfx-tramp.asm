@@ -179,6 +179,27 @@
  JSR R_DOT
  JMP tback
 
+\ T_CLOUD: f_dots' explosion cloud, XX19 its ship's line heap: PTCLS (after
+\ its hook) in bank 4 with ACCCON X clear, as it reads FMLTU (main RAM above
+\ &3000); its PIXEL calls plot the particles (H_DOT, G_PDOT)
+
+.T_CLOUD
+ LDA #ELITEBANK
+ STA &F4
+ STA &FE30
+ LDA P                  \ R_CT (FMLTU's P: F_PDOT puts it back; the
+ STA GPCT               \ rasteriser's zero page is assembled after this)
+ LDA &FE34              \ the back buffer's ACCCON X (set: shadow RAM), for
+ AND #4                 \ F_PDOT and back after PTCLS
+ STA GPX
+ TRB &FE34
+ JSR PTCLR
+ LDA GPCT               \ (R_CT again: the rest of the frame clips with it)
+ STA P
+ LDA GPX
+ TSB &FE34
+ JMP tback
+
 .T_STARPLOT
  STA tA
  LDA #RASTBANK

@@ -14,11 +14,13 @@
 .GFLIP   EQUB 0         \ non-zero: show buffer GPEND at the next vsync
 .GPEND   EQUB 0
 .GVLAST  EQUB 0         \ non-zero: the last vsync flipped (H_VSYNC: 25 fps cap)
-.GDRAWON EQUB &FF       \ 0: drawing primitives are erasing, ignore them
+.GPX     EQUB 0         \ ACCCON X (4) as the frame had it before running game
+                        \ code with X clear (T_CLOUD; F_PDOT puts it back)
+.GPCT    EQUB 0         \ the clip window's top, R_CT, while the frame's PTCLS
+                        \ draws a cloud (T_CLOUD; FMLTU writes P: F_PDOT)
 .GFORCE  EQUB 0         \ non-zero: draw directly even though QQ11 = 0
 .GSIGHT  EQUB 0         \ non-zero: draw the laser sights
 .GLASV   EQUB 0         \ non-zero: our laser beams are showing
-.GDCOL   EQUB 4         \ colour index for recorded dots
 .GNF     EQUB 0         \ faces / vertices of the ship being recorded
 .GNV     EQUB 0
 .GTYPE   EQUB 0         \ the type whose faces the ship being recorded uses

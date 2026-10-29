@@ -49,13 +49,20 @@
  JSR F_LINE
  JMP gback
 
-.G_DOT
+.G_PDOT                 \ (A, X passed: F_PDOT's)
  STA gA
  LDA #GFXBANK
  STA &F4
  STA &FE30
  LDA gA
- JSR F_DOT
+ JSR F_PDOT
+ JMP gback
+
+.G_CLOUD                \ (C passed: F_CLOUD's)
+ LDA #GFXBANK
+ STA &F4
+ STA &FE30
+ JSR F_CLOUD
  JMP gback
 
 

@@ -37,9 +37,8 @@ fz_u    = FZ+15
 
 \ Shared with the IRQ handler and Elite (in the glue area, gfx-gvars.asm):
 \ GMODE (bit 7 set = space mode, double buffered), GFRONT (0/1 buffer
-\ displayed), GFLIP (non-zero = flip pending to GPEND), GPEND, GDRAWON
-\ (0 = primitives are erasing, so ignore them), GFORCE (non-zero = draw
-\ directly even though QQ11 = 0), GSIGHT, GLASV.
+\ displayed), GFLIP (non-zero = flip pending to GPEND), GPEND, GFORCE
+\ (non-zero = draw directly even though QQ11 = 0), GSIGHT, GLASV.
 
 .F_BACK     EQUB 1      \ the buffer being drawn (the one not displayed)
 
@@ -62,11 +61,10 @@ fz_u    = FZ+15
 .F_BX       SKIP 10     \ the energy bomb's bolt (f_bomb), BOMBTBX and BOMBTBY
 .F_BY       SKIP 10     \ as F_BOMB found them
 
-.F_NDOT     EQUB 0      \ dots recorded this frame (particles, distant ships)
-.F_DX       SKIP MAXDT
-.F_DY       SKIP MAXDT
-.F_DS       SKIP MAXDT  \ size 1..3
-.F_DC       SKIP MAXDT  \ colour index
+.F_NDOT     EQUB 0      \ dots recorded this frame: distant ships and
+.F_DX       SKIP MAXDT  \ explosion clouds, at most one per ship slot
+.F_DY       SKIP MAXDT  \ (F_SHPPT: x, y, &80 + the ship type; F_CLOUD:
+.F_DC       SKIP MAXDT  \ INF, the slot)
 
 
 .F_PLON     EQUB 0      \ planet disc recorded this frame
@@ -89,8 +87,9 @@ FC_PART = 4             \ explosion particles
 FC_SIGHT = 5            \ laser sights
 FC_STAR = 6             \ stardust (logical colour; stars use a solid ink)
 
+FC_PARTB = &FF          \ (the particles' colour byte: F_PDOT)
 .F_CPE
- EQUB &00, &FF, &F0, &0F, &FF, &0F, &FF
+ EQUB &00, &FF, &F0, &0F, FC_PARTB, &0F, &FF
 F_CPO = F_CPE           \ (the odd rows' bytes are the even rows')
 
 \ F_INIT: one-off initialisation (called by the loader / startup) is in F_DL
@@ -641,29 +640,130 @@ RPN = 4
 .fli9
  RTS
 
-\ F_DOT: record a dot at X = x, A = y, size from ZZ as PIXEL does, colour GDCOL
+\ F_CLOUD: PTCLS on the explosion cloud at XX19 in record mode, its draw pass
+\ (DOEXP falling into it: H_PTCLS, C set) or its erase pass (H_PTCLSE, C
+\ clear). The draw pass notes the cloud for the frame: the slot, XSAV, and
+\ its data block, INF (f_dots runs PTCLS again on the ship line heap, plotting
+\ each particle: T_CLOUD). The heap is the cloud's record (bytes 0-2 its size,
+\ counter and vertex count, 3-6 its seeds, then the vertices' screen
+\ coordinates), and nothing writes it again before the frame: MA15 removes no
+\ ship whose cloud was drawn (only those whose explosion has ended, EX2, or
+\ that are docked or scooped or far away, none drawn as a cloud), KILLSHP
+\ moves only the heaps of the slots above the one it removes, not yet
+\ processed in the iteration, and NWSHP takes room below the heaps. Then
+\ both passes do what the game keeps of PTCLS (2-build-files/records/live.mjs:
+\ nothing else it leaves is read): the random numbers, which depend only on
+\ the last vertex's seeds and the particle count, as PTCLS calls DORND2 three
+\ times a particle and keeps RAND+1, and RAND+3 = the planet's z_lo; and
+\ Q, U, TGT, CNT and CNT2 as it leaves them
 
-.F_DOT
- STY f_ysav
+.F_CLOUD
+ BCC fcd1
  LDY F_NDOT
  CPY #MAXDT
- BCS fdo9
- STA F_DY,Y
- TXA
+ BCS fcd1
+ LDA INF                \ (zero page: bankcheck: ok)
  STA F_DX,Y
- LDA GDCOL
+ LDA INF+1
+ STA F_DY,Y
+ LDA XSAV
  STA F_DC,Y
- LDX #2                 \ (Master port: a dash for ZZ >= 80, a double-
- LDA ZZ                 \ height dash below, as Master's PIXEL)
- CMP #80
- BCS fdo1
- INX
-.fdo1
- TXA
- STA F_DS,Y
  INC F_NDOT
-.fdo9
- LDY f_ysav
+.fcd1
+ LDY #0                 \ Q = the cloud's size
+ LDA (XX19),Y
+ STA Q
+ INY                    \ U = the particles per vertex, less one (as PTCLS)
+ LDA (XX19),Y
+ BPL P%+4
+ EOR #&FF
+ LSR A
+ LSR A
+ LSR A
+ LSR A
+ ORA #1
+ STA U
+ INY                    \ TGT = the vertex count, 4 * n + 6
+ LDA (XX19),Y
+ STA TGT
+ LDA #10                \ CNT = the last vertex's end: 10, 14, ... up to TGT
+.fcd2
+ CMP TGT
+ BCS fcd3
+ ADC #4
+ BCC fcd2
+.fcd3
+ STA CNT
+ LDY #3                 \ its seeds RAND and RAND+2 (the bytes after them
+ LDA (XX19),Y           \ feed DORND2's RAND+1 and RAND+3, which PTCLS
+ EOR CNT                \ puts back as it found them, and as K%+6)
+ STA RAND
+ LDY #5
+ LDA (XX19),Y
+ EOR CNT
+ STA RAND+2
+ LDA U                  \ X = 3 * (U + 1): DORND2's RAND and RAND+2
+ ASL A
+ SEC
+ ADC U
+ ADC #2
+ TAX
+.fcd4
+ LDA RAND
+ ASL A
+ TAY
+ ADC RAND+2
+ STA RAND
+ STY RAND+2
+ DEX
+ BNE fcd4
+ LDA K%+6               \ (main RAM below &3000: bankcheck: ok)
+ STA RAND+3
+ DEX                    \ CNT2 = &FF
+ STX CNT2
+ RTS
+
+\ F_PDOT: a particle of the frame's PTCLS (T_CLOUD; H_DOT, G_PDOT), at
+\ X = x, A = y, its size from ZZ as PIXEL's (a dash for ZZ >= 80, a
+\ double-height dash below), in the particles' colour, with ACCCON X as the
+\ frame has it (GPX: set when the back buffer is shadow RAM) round the
+\ rasteriser's call (the cloud is drawn with it clear: PTCLS reads FMLTU,
+\ main RAM above &3000). PTCLS keeps K3, which is the rasteriser's RZ_PP ..
+\ RZ_Y (&14-&17), and FMLTU's P is R_CT
+
+.F_PDOT
+ TAY
+ LDA K3
+ PHA
+ LDA K3+1
+ PHA
+ LDA K3+2
+ PHA
+ LDA K3+3
+ PHA
+ LDA #FC_PARTB
+ STA R_COLE
+ STA R_COLO
+ LDA GPCT
+ STA R_CT
+ LDA GPX                \ the back buffer (ACCCON X as the frame had it)
+ TSB &FE34
+ LDA ZZ
+ CMP #80
+ LDA #3
+ BCC P%+3
+ DEC A
+ JSR T_DOT
+ LDA #4
+ TRB &FE34
+ PLA
+ STA K3+3
+ PLA
+ STA K3+2
+ PLA
+ STA K3+1
+ PLA
+ STA K3
  RTS
 
 \ F_PLANET: record the planet: centre (K3, K4) 16-bit, radius K, TYPE
@@ -724,8 +824,6 @@ RPN = 4
  STA F_DX,Y
  LDA K4
  STA F_DY,Y
- LDA #3
- STA F_DS,Y
  LDA TYPE
  ORA #&80               \ bit 7: ship type (bits 0-6), drawn in its dot colour
  STA F_DC,Y
@@ -2173,37 +2271,83 @@ ASSERT LT_HL1 = LT_HL0 + 17 AND LT_HL2 = LT_HL0 + 34 AND LT_HL3 = LT_HL0 + 51
 .fc_hi  EQUB 0
 .fc_row SKIP 4
 
+\ f_dots: the distant ships' dots and the explosion clouds, in the order
+\ recorded. A cloud is drawn by PTCLS itself (T_CLOUD: bank 4, ACCCON X
+\ clear), from its ship's line heap, with the game's zero page that PTCLS
+\ uses kept round it (fd_zp); a slot no longer holding an exploding ship
+\ (its data block's byte #31 bit 5) has nothing to draw
+
+FDZN = 16
+.fd_zl EQUB RAND, RAND+1, RAND+2, RAND+3, Y1, U, Q, R, S, T, ZZ, TGT, CNT, CNT2
+       EQUB XX19, XX19+1
+.fd_zs SKIP FDZN
+
 .f_dots
  LDA #0
  STA fz_i
+ STA fz_t               \ bit 7: the game's zero page is kept in fd_zs
 .fdo2
  LDX fz_i
  CPX F_NDOT
  BCS fdo8
  LDA F_DC,X
- BPL fdo3
+ BPL fdo5
  AND #&7F               \ a ship type: its dot colour
  TAY
  LDA FC_DOTE,Y
  STA R_COLE
  LDA FC_DOTO,Y
  STA R_COLO
- JMP fdo4
-.fdo3
- JSR f_setcol
-.fdo4
- LDX fz_i
- LDA F_DS,X
- PHA
- LDA F_DY,X
- TAY
+ LDY F_DY,X
  LDA F_DX,X
  TAX
- PLA
+ LDA #3
  JSR T_DOT
+.fdo4
  INC fz_i
  BNE fdo2
+.fdo5                   \ a cloud: A = its slot
+ TAY
+ LDA FRIN,Y             \ (main RAM below &3000: bankcheck: ok)
+ BEQ fdo4
+ LDA F_DX,X
+ STA fz_p
+ LDA F_DY,X
+ STA fz_p+1
+ LDY #31
+ LDA (fz_p),Y
+ AND #%00100000
+ BEQ fdo4
+ BIT fz_t
+ BMI fdo6
+ LDX #FDZN-1            \ keep the game's zero page
+.fdo7
+ LDY fd_zl,X
+ LDA 0,Y
+ STA fd_zs,X
+ DEX
+ BPL fdo7
+ DEC fz_t
+.fdo6
+ LDY #33                \ XX19 = the heap, from the data block
+ LDA (fz_p),Y
+ STA XX19
+ INY
+ LDA (fz_p),Y
+ STA XX19+1
+ JSR T_CLOUD
+ BRA fdo4
 .fdo8
+ BIT fz_t
+ BPL fdo9
+ LDX #FDZN-1            \ the game's zero page back
+.fdo10
+ LDY fd_zl,X
+ LDA fd_zs,X
+ STA 0,Y
+ DEX
+ BPL fdo10
+.fdo9
  RTS
 
 \ f_lasers: our laser beams (LASLI's four lines from LASX,LASY to the bottom

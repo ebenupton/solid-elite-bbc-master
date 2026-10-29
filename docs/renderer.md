@@ -86,9 +86,10 @@ would have drawn, then returns from the routine itself:
   ([memory-map.md](memory-map.md)): planets are never drawn outside record
   mode, as `GFORCE` is set only for the hyperspace rings, which use
   `CIRCLE2`. `SUN` records the sun's half-widths.
-* `PIXEL2` records a star and `PIXEL` an explosion particle. `PIX1` no longer
-  erases a star's old position, a choice that `pxpat` patches once per star
-  pass.
+* `PIXEL2` records a star. `PIX1` no longer erases a star's old position, a
+  choice that `pxpat` patches once per star pass. `DOEXP` notes an
+  explosion's cloud, which the frame draws from the ship line heap (see
+  "The frame's records").
 * `LASLI` (our lasers) and `SIGHT` (the laser sights) note theirs for the
   frame. `BOMBOFF` (the energy bomb's lightning) has the frame layer copy
   the bolt's ten points (`F_BOMB`: `BOMBTBX` and `BOMBTBY`, the last bolt
@@ -309,6 +310,32 @@ differ only in the countdown's cells. Against the per-cell shown state
 this map replaced, 305,743 frames are identical but for 8,688 that differ
 only in those three cells, where the space views now show the original's
 number.
+
+## The frame's records
+
+What the frame layer keeps between the game's drawing calls and the frame
+is what the frame cannot find in the game's own memory when it draws.
+
+**Explosion clouds.** A cloud's record is the exploding ship's line heap,
+which the game already keeps: its size, counter and vertex count, its seeds
+and the vertices' screen coordinates. `DOEXP`'s draw pass notes the ship's
+slot and data block (`H_PTCLS`, `F_CLOUD`) in the dot list, and the frame,
+in its order, runs `PTCLS` on the heap again (`T_CLOUD`: bank 4, ACCCON X
+clear, entering at `PTCLR`), its `PIXEL` calls plotting each particle
+(`H_DOT`, `F_PDOT`). So the frame draws every particle the original draws,
+from the same `DORND2` sequence and arithmetic, where a 64-entry dot list
+dropped some (247 of the gate's 5,533). A slot that no longer holds an
+exploding ship has nothing drawn, and the heap is not written between the
+record and the frame: `MA15` removes no ship whose cloud was drawn, `KILLSHP`
+moves only the heaps above the slot it removes, and `NWSHP` takes room
+below them. In record mode both of `DOEXP`'s passes do only what the game
+keeps of `PTCLS` (`F_CLOUD`): `DORND2` three times a particle, the seeds,
+`RAND+1` and `RAND+3`, `Q`, `U`, `TGT`, `CNT` and `CNT2`;
+`6-harness/records/live.mjs` (every byte `PTCLS` writes, watched to the
+game's next access over the gate's run) finds nothing else read. The dot
+list holds a distant ship's dot or a cloud, one per slot (`MAXDT =
+MAXSH`). `6-harness/records/particles.mjs` checks every particle of the
+gate's run against SNG47's `PTCLS` draw passes.
 
 ## Kept solid rows
 

@@ -40,7 +40,8 @@ MAXSH = NOSH            \ ships per frame: LL9 records a ship at most once an
                         \ (the planet and the sun are not recorded)
 MAXLN = MAXSH           \ lines per frame: the enemy beams, one per ship
                         \ recorded (H_EE31; the bomb's bolt is F_BX/F_BY)
-MAXDT = 64              \ dots per frame
+MAXDT = MAXSH           \ dots per frame: a distant ship's (SHPPT) or an
+                        \ explosion cloud (DOEXP), at most one per ship recorded
 RASTBANK = 5            \ the rasteriser: bank 5, its disc window (&8000-&8FFF) and
 RASTPOLY = &85          \ the shared region (&9000-&BFFF); ANDY over bank 5, its
                         \ polygon window
@@ -149,6 +150,7 @@ ASSERT HI(R_WR) = HI(R_WR + 191)
 CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables,
 ORG &9000               \ the row runs, the boundary arrays, the stars, the lens
 INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ ...), then the disc window at &8000
+ASSERT P = R_CT          \ (T_CLOUD keeps R_CT, FMLTU's P, for F_PDOT)
 INCLUDE "1-source-files/main-sources/gfx-raster_disc2.asm"   \ the second disc (R_DISC2: run with the disc
                                \ window paged in, from R_DISCROWS)
 ASSERT P% <= R_S2R1            \ (buffer 1's spans' right ends follow it)

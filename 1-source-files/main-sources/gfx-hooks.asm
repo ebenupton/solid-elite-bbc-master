@@ -250,46 +250,6 @@
  SEC
  RTS
 
-\ H_DOT: PIXEL with X = x, A = y (in record mode only DOEXP's explosion
-\ particles reach it; stars are recorded by H_STAR): the dot is recorded
-\ (unless GDRAWON is 0: PTCLS erasing the old cloud) and PIXEL returns as it
-\ would: T1 = Y, C = (ZZ >= 80), N and Z from Y
-
-.H_DOT
- STA hA
- LDA QQ11
- ORA GFORCE
- BNE hdd
- PLA
- PLA
- LDA GDRAWON
- BEQ hdz
- LDA hA
- JSR G_DOT
-.hdz
- LDA ZZ
- CMP #80
- STY T1
- LDY T1
- RTS
-.hdd
- LDA hA
- RTS
-
-\ H_PTCLSE: DOEXP removing the old explosion cloud: run PTCLS (for its random
-\ numbers) without recording anything
-
-.H_PTCLSE
- STZ GDRAWON
- JSR PTCLS
- PHP
- PHA
- LDA #&FF
- STA GDRAWON
- PLA
- PLP
- RTS
-
 \ Our laser beams: LASLI (falling into LASLI2) shows them, LASLI2 called
 \ directly (main flight loop part 16, in the same iteration) removes them. In
 \ record mode H_LAS1 (at LASLI's end) sets GLASV and returns from LASLI, so the
