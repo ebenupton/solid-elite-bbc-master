@@ -1721,8 +1721,9 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .fss4
  LDX fz_n
 .fss5
- LDA fz_t
- STA F_ORD+1,Y
+ INY                    \ the place after Y (Y = -1, &FF, when it goes first:
+ LDA fz_t               \ F_ORD+1,Y is then a page on, not F_ORD)
+ STA F_ORD,Y
  INX
  BNE fss2
 .fss6
