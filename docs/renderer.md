@@ -89,8 +89,11 @@ would have drawn, then returns from the routine itself:
 * `PIXEL2` records a star and `PIXEL` an explosion particle. `PIX1` no longer
   erases a star's old position, a choice that `pxpat` patches once per star
   pass.
-* `LASLI` (our lasers), `BOMBOFF` (the energy bomb's lightning) and `SIGHT`
-  (the laser sights) record their lines.
+* `LASLI` (our lasers) and `SIGHT` (the laser sights) note theirs for the
+  frame. `BOMBOFF` (the energy bomb's lightning) has the frame layer copy
+  the bolt's ten points (`F_BOMB`: `BOMBTBX` and `BOMBTBY`, the last bolt
+  drawn), and its nine lines record nothing. The frame's line list holds
+  only the enemy beams, one per ship recorded (`MAXLN = MAXSH = NOSH`).
 * `CHPR` and `CLYNS` keep a 32x24 **text map** of the characters the
   frames draw (see "The text map").
 

@@ -18,7 +18,6 @@
 .GFORCE  EQUB 0         \ non-zero: draw directly even though QQ11 = 0
 .GSIGHT  EQUB 0         \ non-zero: draw the laser sights
 .GLASV   EQUB 0         \ non-zero: our laser beams are showing
-.GLCOL   EQUB 3         \ colour index for recorded lines
 .GDCOL   EQUB 4         \ colour index for recorded dots
 .GNF     EQUB 0         \ faces / vertices of the ship being recorded
 .GNV     EQUB 0

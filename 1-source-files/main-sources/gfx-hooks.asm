@@ -240,11 +240,7 @@
  DEC XX15+4
  JSR CLIP
  BCS hee9
- LDA #FC_ELASER
- STA GLCOL
  JSR G_LINE
- LDA #FC_PLINE
- STA GLCOL
 .hee9
  LDY #5                 \ CNT = the blueprint's maximum heap size (as LL170)
  LDA (XX0),Y
@@ -388,9 +384,9 @@
 
 \ The energy bomb's lightning: BOMBOFF draws nine lines with LOIN (EOR), and
 \ is called again with the same coordinates to remove them. In record mode
-\ H_BOMB (at BOMBOFF, in the space view) tells the frame layer that a new bolt
-\ starts, so only the last one recorded in a frame is drawn, and H_LLINE
-\ records each line instead of drawing it (Y kept, as LOIN keeps it)
+\ H_BOMB (at BOMBOFF, in the space view) has the frame layer copy the bolt's
+\ points (F_BOMB: the frame draws the last bolt drawn), and H_LLINE draws
+\ nothing (Y kept, as LOIN keeps it; A and X are dead after BOMBOFF)
 
 .H_BOMB
  LDA QQ11
@@ -405,6 +401,4 @@
  ORA GFORCE
  BEQ P%+5
  JMP LOIN
- LDA #FC_PLINE
- STA GLCOL
- JMP G_LINE
+ RTS

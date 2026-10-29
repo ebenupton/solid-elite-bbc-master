@@ -54,12 +54,13 @@ fz_u    = FZ+15
 .F_SX4      SKIP MAXSH  \ LL9's XX4 (vertex visibility cut-off)
 .F_DLP      EQUW 0      \ next free byte in F_DL
 
-.F_NLINE    EQUB 0      \ lines recorded this frame (planet features, enemy lasers)
+.F_NLINE    EQUB 0      \ enemy laser beams recorded this frame
 .F_LX0      SKIP MAXLN
 .F_LY0      SKIP MAXLN
 .F_LX1      SKIP MAXLN
 .F_LY1      SKIP MAXLN
-.F_LC       SKIP MAXLN  \ colour index
+.F_BX       SKIP 10     \ the energy bomb's bolt (f_bomb), BOMBTBX and BOMBTBY
+.F_BY       SKIP 10     \ as F_BOMB found them
 
 .F_NDOT     EQUB 0      \ dots recorded this frame (particles, distant ships)
 .F_DX       SKIP MAXDT
@@ -603,22 +604,26 @@ RPN = 4
 
 .f_nv4 EQUB 0
 
-\ F_LINE: record a line X1,Y1 -> X2,Y2 in colour GLCOL (8-bit screen coords)
+\ F_BOMB: BOMBOFF is about to draw the energy bomb's bolt (H_BOMB): its
+\ nine lines join the ten points BOMBTBX/BOMBTBY, which BOMBON set; copy
+\ them, so the frame draws the last bolt drawn (its LOIN calls, H_LLINE,
+\ record nothing)
 
-.F_BOMB                 \ Master port: a new energy bomb bolt: drop the lines of
- BIT f_bomb             \ the bolt recorded earlier in this frame, if any
- BPL fbo1
- LDA f_bmark
- STA F_NLINE
- RTS
+.F_BOMB
+ LDX #9
 .fbo1
- LDA F_NLINE
- STA f_bmark
- LDA #&FF
- STA f_bomb
+ LDA BOMBTBX,X          \ (main RAM: G_BOMB runs in game context; bankcheck: ok)
+ STA F_BX,X
+ LDA BOMBTBY,X          \ (bankcheck: ok)
+ STA F_BY,X
+ DEX
+ BPL fbo1
+ STX f_bomb             \ (&FF)
  RTS
-.f_bomb  EQUB 0
-.f_bmark EQUB 0
+.f_bomb  EQUB 0         \ bit 7: a bolt this frame
+
+\ F_LINE: record an enemy laser beam X1,Y1 -> X2,Y2 (8-bit screen coords;
+\ at most one per ship recorded: MAXLN)
 
 .F_LINE
  LDX F_NLINE
@@ -632,8 +637,6 @@ RPN = 4
  STA F_LX1,X
  LDA Y2
  STA F_LY1,X
- LDA GLCOL
- STA F_LC,X
  INC F_NLINE
 .fli9
  RTS
@@ -1626,14 +1629,34 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  JMP T_LINE
 
 .f_lines
+ BIT f_bomb             \ the bomb's bolt, if any, first (as recorded before
+ BPL fln3               \ the beams, in the main loop's part 3)
+ LDA #FC_PLINE
+ JSR f_setcol
+ LDA #0
+ STA fz_i
+.fln2
+ LDX fz_i
+ LDA F_BX,X
+ STA fz_t
+ LDA F_BY,X
+ STA fz_u
+ LDY F_BY+1,X
+ LDA F_BX+1,X
+ TAX
+ JSR f_line8
+ INC fz_i
+ LDA fz_i
+ CMP #9
+ BCC fln2
+.fln3
+ LDA F_NLINE            \ then the enemy beams
+ BEQ fln9
+ LDA #FC_ELASER
+ JSR f_setcol
  LDA #0
  STA fz_i
 .fln1
- LDX fz_i
- CPX F_NLINE
- BCS fln9
- LDA F_LC,X
- JSR f_setcol
  LDX fz_i
  LDA F_LX0,X
  STA fz_t
@@ -1645,7 +1668,9 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  TAX
  JSR f_line8
  INC fz_i
- BNE fln1
+ LDX fz_i
+ CPX F_NLINE
+ BCC fln1
 .fln9
  RTS
 

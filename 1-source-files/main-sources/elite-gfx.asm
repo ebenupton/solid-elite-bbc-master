@@ -35,8 +35,11 @@
 \ ******************************************************************************
 
 ACCY = 8                \ ACCCON bit Y: HAZEL at &C000-&DFFF
-MAXSH = 13              \ ships per frame
-MAXLN = 48              \ lines per frame
+MAXSH = NOSH            \ ships per frame: LL9 records a ship at most once an
+                        \ iteration, and only the ships in the NOSH slots
+                        \ (the planet and the sun are not recorded)
+MAXLN = MAXSH           \ lines per frame: the enemy beams, one per ship
+                        \ recorded (H_EE31; the bomb's bolt is F_BX/F_BY)
 MAXDT = 64              \ dots per frame
 RASTBANK = 5            \ the rasteriser: bank 5, its disc window (&8000-&8FFF) and
 RASTPOLY = &85          \ the shared region (&9000-&BFFF); ANDY over bank 5, its

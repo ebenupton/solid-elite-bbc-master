@@ -51,9 +51,11 @@ def gfx_constants():
     """elite-gfx.asm's constants (MCB, banks, sizes), defined before its first ORG or CLEAR"""
     out = ['HOMEBANK = 4']
     # the shared workspace's star arrays are NDSTAR (elite-gfx.asm) long, from Elite's
-    # NOST (elite-source.asm), and it ends at the main code's start, CODE% (WS_END)
+    # NOST (elite-source.asm), the frame's ship lists MAXSH long, from its NOSH, and
+    # it ends at the main code's start, CODE% (WS_END)
     src = open(os.path.join(MS, 'elite-source.asm')).read()
     out.append('NOST = %s' % re.search(r'^\s*NOST\s*=\s*(\d+)', src, re.M).group(1))
+    out.append('NOSH = %s' % re.search(r'^\s*NOSH\s*=\s*(\d+)', src, re.M).group(1))
     out.append('CODE%% = %s' % re.search(r'^\s*CODE%\s*=\s*(&[0-9A-Fa-f]+)', src, re.M).group(1))
     for l in open(GFX).read().split('\n'):
         if re.match(r'\s*(CLEAR|ORG)\b', l):         # (the workspace, ws_block, follows)
