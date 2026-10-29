@@ -72,9 +72,11 @@ record mode, Elite's drawing routines call hooks at their start
 (`gfx-hooks.asm`, `gfx-gluehooks.asm`). Each hook records what the routine
 would have drawn, then returns from the routine itself:
 
-* `LL9` records each ship. `EE31` jumps to `H_EE31`, which records the
-  ship's projected vertices, its face visibility and its laser beam if it
-  is firing at us. `SHPPT` records a distant ship's dot.
+* `LL9` records each ship that is not exploding as its part 6 starts
+  (`H_LL42`): what part 6 on reads, and the faces' levels; the frame
+  projects it as it draws it (see "The frame's records"). `H_EE31` records
+  its laser beam if it is firing at us. `SHPPT` records a distant ship's
+  dot.
 * `CIRCLE` records the planet's disc, and `H_CIRC` hands the planet's
   orientation to the meridian window, which makes its surface detail (see
   "Planet surfaces"). A meridian planet's equator and meridian and a crater
@@ -116,8 +118,8 @@ back buffer, two frames old:
    the second disc, the smaller and further one, where the layer leaves
    room (see "The sun near the planet"), and the moon, if the system has
    one (see "The moon").
-4. Fill the ships far to near, each face a dithered polygon in its lit
-   colour, with their details and fins. Then draw the lines and the
+4. Fill the ships far to near, each projected as it is drawn, each face a
+   dithered polygon in its lit colour, with their details and fins. Then draw the lines and the
    particles. All of these extend this buffer's dirty extent for each row.
    A ship further away than the planet (or the moon), with the first vertex
    of its first visible face inside its disc, is not drawn (`f_behind`).
@@ -169,7 +171,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
-| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the display list (`F_DL`, which holds `F_INIT` until the first frame), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
+| The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the ship records (`F_RP`, `F_SR`, whose room holds `F_INIT` until the first frame), the zero page `F_FRAME` keeps (`f_zsv`), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
 | The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles and the moon, `PF_HOOK` and `pf_moon` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
 
@@ -336,6 +338,36 @@ game's next access over the gate's run) finds nothing else read. The dot
 list holds a distant ship's dot or a cloud, one per slot (`MAXDT =
 MAXSH`). `6-harness/records/particles.mjs` checks every particle of the
 gate's run against SNG47's `PTCLS` draw passes.
+
+**Ships.** A ship's record is what `LL9`'s part 6 on (`LL42`: each vertex's
+visibility, then the visible vertices' screen coordinates in `XX3`) reads,
+taken as part 6 starts (`H_LL42`, `F_SHIP`): `INWK` 0-8, `XX16` as part 3
+scaled it and `XX0` (`F_RP`, 29 bytes a ship, a field to an array of
+`MAXSH`), the faces' levels (`F_SR`, which the frame's part 6 reads as
+`XX2`), and the type, faces and `XX4`. The frame runs part 6 on itself for
+each ship as it draws it, far to near (`f_proj`, `T_GAME` at `LL42P`: bank
+4 with ACCCON X clear; `H_EE31` returns at once while `GPRJ` is set), into
+`XX3`, which `f_ship` reads in place; the first ship in the order is
+projected before the frame waits for the flip. The records take 528 bytes
+where a buffer of `XX2` and `XX3` copies took 1,536.
+
+In the game, `LL9` stops at part 6 for a ship that is not exploding:
+`6-harness/records/live.mjs` finds nothing part 6 on leaves read but
+`XX3`, by `DOEXP` (an exploding ship still projects all its vertices) and
+`H_EE31` (a ship firing at us has its gun vertex alone projected, `F_GUN`
+setting part 6's loop on it). The frame keeps the 20 zero page bytes its
+game code changes that the game reads afterwards (`f_gkeep`, `f_gback`).
+`XX3` is page 1, under the stack, so `F_FRAME` keeps the zero page it uses
+(`&06-&27` and `&D2-&E1`) in bank 6 (`f_zsv`), not on the stack. The lowest
+S while the frame projects, interrupts included, against the end of the
+largest ship's `XX3` (37 vertices, `&193`): flight and docking `&D4` (65
+bytes to spare), the escape pod `&DD`, the title screen, the docking
+tunnel, the hangar and the briefings `&C0` (44; the briefing's Constrictor
+ends at `&143`). `6-harness/records/stack.mjs` measures it over the gate by
+the pilot's phase, and `STACKWATCH=1` in `mshipshow.mjs` and `mbrief.mjs`
+on the title and docked screens. `6-harness/records/combat.mjs` flies a
+scene of up to seven hostile ships, one set exploding every 12 iterations,
+and compares two builds' game state and pixels frame by frame.
 
 ## Kept solid rows
 

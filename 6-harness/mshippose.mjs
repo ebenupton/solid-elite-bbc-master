@@ -20,10 +20,10 @@
 //   * outside: no blob of lit pixels outside the convex hull of the ship's
 //     projected vertices (grown by 4 pixels; the laser sights are left out)
 //     bigger than a speck of stardust (or two side by side: over 6 pixels or
-//     5 across). LL9's XX3 is poisoned as LL9 starts on
+//     5 across). XX3 is poisoned as the frame's LL9 part 6 starts on
 //     the posed ship (vertex i on an ellipse round the view's centre), so a
 //     vertex that is used but not projected draws far outside: the Missile's
-//     fins once did (in flight, XX3 holds whatever the ship drawn before left);
+//     fins once did (XX3 holds whatever the ship projected before left);
 //   * cover: inside the hull of the solid body's vertices (shrunk by 4 pixels,
 //     or 1.5 when LL9 projected them all and the hull is made from its XX3)
 //     every 2x2 cell of pixels has a lit pixel (the Splinter's faces were
@@ -189,16 +189,19 @@ function pose() {
 cpu.debugInstruction.add(pc => {
     if (at(pc, "MLOOP")) { atLoop = true; iters++; if (cur) pose(); }
     if (!cur) return false;
-    // LL9 for the posed ship: XX3 poisoned, vertex i on an ellipse round the
-    // view's centre at i golden angles (any three make a triangle)
-    if (at(pc, "LL9") && ram[sy.TYPE] === cur.t) SHIPS[cur.t].v.forEach((_, i) => {
+    // the frame projects the posed ship (LL9's part 6 on, from LL42P, with
+    // GPRJ set): XX3 poisoned first, vertex i on an ellipse round the view's
+    // centre at i golden angles (any three make a triangle), and the vertices
+    // it projected taken at its end (H_EE31)
+    const frameShip = () => (ram[sy.GPRJ] & 0x80) && physRead(cpu, M6, sy.F_STYP + rd6("f_si")) === cur.t;
+    if (at(pc, "LL42P") && frameShip()) SHIPS[cur.t].v.forEach((_, i) => {
         const g = i * 2.39996;
         ram.set([Math.round(128 + 100 * Math.cos(g)), 0, Math.round(96 + 75 * Math.sin(g)), 0], sy.XX3 + 4 * i);
     });
-    // LL9 records the posed ship: the vertices it projected (XX3), and whether
-    // it was drawn with the pose's matrix (sidev's high bytes)
-    if (at(pc, "H_EE31") && ram[sy.TYPE] === cur.t) {
-        xx3 = Array.from(ram.subarray(sy.XX3, sy.XX3 + 4 * SHIPS[cur.t].v.length));
+    if (at(pc, "H_EE31") && frameShip()) xx3 = Array.from(ram.subarray(sy.XX3, sy.XX3 + 4 * SHIPS[cur.t].v.length));
+    // LL9 records the posed ship: whether it was recorded with the pose's
+    // matrix (sidev's high bytes)
+    if (at(pc, "H_EE31") && !(ram[sy.GPRJ] & 0x80) && ram[sy.TYPE] === cur.t) {
         const sd = sidev(cur.p, cur.h).map(u => enc(u)[1]);
         run = [0, 1, 2].every(i => Math.abs((ram[sy.INWK + 22 + 2 * i] & 0x7f) - (sd[i] & 0x7f)) <= 2 &&
             ((ram[sy.INWK + 22 + 2 * i] ^ sd[i]) & 0x80) === 0 || (sd[i] & 0x7f) < 3) ? run + 1 : 0;

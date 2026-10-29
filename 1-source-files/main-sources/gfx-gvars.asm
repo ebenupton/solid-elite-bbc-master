@@ -15,14 +15,14 @@
 .GPEND   EQUB 0
 .GVLAST  EQUB 0         \ non-zero: the last vsync flipped (H_VSYNC: 25 fps cap)
 .GPX     EQUB 0         \ ACCCON X (4) as the frame had it before running game
-                        \ code with X clear (T_CLOUD; F_PDOT puts it back)
-.GPCT    EQUB 0         \ the clip window's top, R_CT, while the frame's PTCLS
-                        \ draws a cloud (T_CLOUD; FMLTU writes P: F_PDOT)
+                        \ code with X clear (T_GAME; F_PDOT)
+.GPCT    EQUB 0         \ the clip window's top, R_CT, while the frame runs
+                        \ game code (T_GAME; FMLTU writes P: F_PDOT)
+.GPRJ    EQUB 0         \ bit 7: the frame is running game code (T_GAME)
 .GFORCE  EQUB 0         \ non-zero: draw directly even though QQ11 = 0
 .GSIGHT  EQUB 0         \ non-zero: draw the laser sights
 .GLASV   EQUB 0         \ non-zero: our laser beams are showing
-.GNF     EQUB 0         \ faces / vertices of the ship being recorded
-.GNV     EQUB 0
+.GNF     EQUB 0         \ faces of the ship being recorded
 .GTYPE   EQUB 0         \ the type whose faces the ship being recorded uses
 .GSUNON  EQUB 0         \ non-zero: SUN drew the sun this frame (LSO, SUNX valid)
 .GSUNR   EQUB 0         \ the sun's radius this frame

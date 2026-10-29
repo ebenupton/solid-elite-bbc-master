@@ -179,22 +179,31 @@
  JSR R_DOT
  JMP tback
 
-\ T_CLOUD: f_dots' explosion cloud, XX19 its ship's line heap: PTCLS (after
-\ its hook) in bank 4 with ACCCON X clear, as it reads FMLTU (main RAM above
-\ &3000); its PIXEL calls plot the particles (H_DOT, G_PDOT)
+\ T_GAME: the frame runs game code in bank 4 at (X A), with ACCCON X clear
+\ (it reads main RAM above &3000: FMLTU, LL9's tables): PTCLS for a cloud
+\ (f_dots, at PTCLR, after its hook; its PIXEL calls plot the particles:
+\ H_DOT, F_PDOT) or LL9's part 6 on for a ship (f_proj, at LL42P, after its
+\ hook; H_EE31 returns at once while GPRJ is set). The frame's X (GPX, for
+\ F_PDOT) and R_CT (FMLTU's P: GPCT) are put back after it (the rasteriser's
+\ zero page is assembled after this)
 
-.T_CLOUD
+.T_GAME
+ STA tgm+1
+ STX tgm+2
  LDA #ELITEBANK
  STA &F4
  STA &FE30
- LDA P                  \ R_CT (FMLTU's P: F_PDOT puts it back; the
- STA GPCT               \ rasteriser's zero page is assembled after this)
- LDA &FE34              \ the back buffer's ACCCON X (set: shadow RAM), for
- AND #4                 \ F_PDOT and back after PTCLS
+ LDA P
+ STA GPCT
+ LDA &FE34
+ AND #4
  STA GPX
  TRB &FE34
- JSR PTCLR
- LDA GPCT               \ (R_CT again: the rest of the frame clips with it)
+ DEC GPRJ
+.tgm
+ JSR &FFFF              \ (patched)
+ INC GPRJ
+ LDA GPCT
  STA P
  LDA GPX
  TSB &FE34

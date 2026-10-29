@@ -31277,7 +31277,7 @@ ENDIF
 \ record mode the cloud is noted for the frame and what the game keeps of
 \ PTCLS is done (G_CLOUD with C set, gfx-frame.asm's F_CLOUD), returning from
 \ PTCLS; the frame draws the cloud with PTCLS itself from the ship line heap
-\ (T_CLOUD, entering at PTCLR, after this call). Outside record mode PTCLS
+\ (f_dots, through T_GAME, entering at PTCLR, after this call). Outside record mode PTCLS
 \ draws the cloud itself.
 \
 \ ******************************************************************************
@@ -31332,7 +31332,7 @@ ENDIF
 \ ------------------------------------------------------------------------------
 \
 \ Called at the start of PIXEL, with X = x, A = y. In record mode only the
-\ frame's PTCLS reaches it (T_CLOUD: the game's PTCLS, H_PTCLS, plots nothing,
+\ frame's PTCLS reaches it (f_dots: the game's PTCLS, H_PTCLS, plots nothing,
 \ and the stardust is recorded by H_STAR), whose particles it plots
 \ (G_PDOT, gfx-frame.asm's F_PDOT), returning from PIXEL (what PIXEL returns
 \ is not read: PTCLS goes on to the next particle).
@@ -43802,10 +43802,12 @@ ENDMACRO
 
 .LL42
 
- LDA TYPE               \ Port: the splinter's faces are shown, and put back
- CMP #SPL               \ once the renderer has them (SPLV, S_SHIP)
- BNE P%+5
- JSR SPLV
+ JSR H_LL42             \ Port: record the ship for the renderer, which runs
+                        \ the rest of LL9 from here (LL42P) when it draws the
+                        \ ship; LL9 goes on only for a ship that is exploding
+                        \ or firing at us (gfx-hooks.asm)
+
+.LL42P
 
                         \ The first task is to set up the inverse matrix, ready
                         \ for us to send to the dot product routine at LL51.
@@ -44736,18 +44738,20 @@ ENDMACRO
 \
 \ ------------------------------------------------------------------------------
 \
-\ Port: called from LL9's part 6 (LL42) for the splinter. Its blueprint's faces
+\ Port: called by S_SHIP, as LL9's part 6 starts (H_LL42), for the splinter.
+\ Its blueprint's faces
 \ data offset is 24 bytes out (SHIP_SPLINTER, as released), so part 5 tested
 \ its faces against normals read from the shuttle's header and first vertex,
 \ and part 6 would skip each vertex whose three faces those hid: the renderer
-\ was given faces it should not show, with stale vertices, and not the faces
-\ it should. Instead all four faces are shown (XX2 = 255, as for a face too
-\ far away to test), so part 6 projects all four vertices and the renderer
-\ culls the faces by their winding (gfx-faces.asm holds the splinter's own
-\ normals and windings, faces.py). Part 5's XX2 is kept in GSPLV, and S_SHIP
-\ puts it back once the renderer has its copy: the game's state is as the
-\ original leaves it. Not when the splinter is exploding: part 4 has shown
-\ every face, and DOEXP, not S_SHIP, ends LL9.
+\ would be given faces it should not show, with stale vertices, and not the
+\ faces it should. Instead all four faces are shown (XX2 = 255, as for a
+\ face too far away to test) in the ship's record, so the frame's part 6
+\ projects all four vertices and the renderer culls the faces by their
+\ winding (gfx-faces.asm holds the splinter's own normals and windings,
+\ faces.py). Part 5's XX2 is kept in GSPLV, and S_SHIP puts it back once the
+\ renderer has its copy: the game's state is as the original leaves it. Not
+\ when the splinter is exploding: part 4 has shown every face, and DOEXP ends
+\ LL9.
 \
 \ ******************************************************************************
 
@@ -44781,9 +44785,10 @@ ENDMACRO
 \
 \ ------------------------------------------------------------------------------
 \
-\ Port: called from H_EE31 (gfx-hooks.asm), at the end of LL9, in place of
-\ G_SHIP. If the ship has a face that LL9 showed without testing its normal
-\ (XX2 = 255: a face beyond its visibility distance, or the splinter's), the
+\ Port: called from H_LL42 (gfx-hooks.asm), at the start of LL9's part 6, to
+\ record the ship (G_SHIP). The splinter's faces are all shown first (SPLV).
+\ If the ship has a face that LL9 showed without testing its normal (XX2 =
+\ 255: a face beyond its visibility distance, or the splinter's), the
 \ renderer culls it by its winding on screen, and the face lists' windings
 \ are those of ZINF's handedness (sidev = nosev x roofv): first set GHAND to
 \ the ship's handedness (SHAND), as TIDY gives a ship the other one (sidev =
@@ -44793,6 +44798,11 @@ ENDMACRO
 \ ******************************************************************************
 
 .S_SHIP
+
+ LDA TYPE               \ The splinter's faces are shown, and put back once
+ CMP #SPL               \ the renderer has them (SPLV)
+ BNE P%+5
+ JSR SPLV
 
  LDA GFAR               \ No face to cull by its winding: just record the ship
  BNE ssh1

@@ -22,7 +22,7 @@ FZ = &D2                \ &D2-&E1
 fz_p    = FZ            \ general pointer (2)
 fz_q    = FZ+2          \ second pointer (2)
 fz_dl   = FZ+4          \ ship's XX2 copy (2)
-fz_v3   = FZ+6          \ ship's XX3 copy (2)
+fz_v3   = FZ+6          \ general pointer (2), used by the text overlay
 fz_ft   = FZ+8          \ face list pointer (2)
 fz_nm   = FZ+10         \ general pointer (2), used by the text overlay
 fz_dt   = FZ+10         \ ship's fin / detail list pointer (2)
@@ -41,25 +41,25 @@ fz_u    = FZ+15
 \ (non-zero = draw directly even though QQ11 = 0), GSIGHT, GLASV.
 
 .F_BACK     EQUB 1      \ the buffer being drawn (the one not displayed)
+.F_TCH      SKIP 24     \ per text row: bit b set (P) = the row changed since
+                        \ buffer b's text steps last ran on it (whole in a
+                        \ page: f_text1 reads it every frame, by row)
+ASSERT HI(F_TCH) = HI(F_TCH + 23)
 
 .F_NSHIP    EQUB 0      \ ships recorded this frame
-.F_SZH      SKIP MAXSH  \ ship z (hi, lo) for sorting
-.F_SZL      SKIP MAXSH
 .F_STYP     SKIP MAXSH  \ ship type
 .F_SNF      SKIP MAXSH  \ number of faces
-.F_SPL      SKIP MAXSH  \ pointer into F_DL: XX2 copy (nf bytes) then XX3 copy
+.F_SPL      SKIP MAXSH  \ the ship's faces' levels in F_SR (F_SHIP)
 .F_SPH      SKIP MAXSH
 .F_ORD      SKIP MAXSH  \ draw order (indices, far to near)
 .F_SX4      SKIP MAXSH  \ LL9's XX4 (vertex visibility cut-off)
-.F_DLP      EQUW 0      \ next free byte in F_DL
+.F_DLP      EQUW F_SR   \ next free byte in F_SR
 
 .F_NLINE    EQUB 0      \ enemy laser beams recorded this frame
 .F_LX0      SKIP MAXLN
 .F_LY0      SKIP MAXLN
 .F_LX1      SKIP MAXLN
 .F_LY1      SKIP MAXLN
-.F_BX       SKIP 10     \ the energy bomb's bolt (f_bomb), BOMBTBX and BOMBTBY
-.F_BY       SKIP 10     \ as F_BOMB found them
 
 .F_NDOT     EQUB 0      \ dots recorded this frame: distant ships and
 .F_DX       SKIP MAXDT  \ explosion clouds, at most one per ship slot
@@ -73,7 +73,6 @@ fz_u    = FZ+15
 .F_PLR      EQUB 0      \ radius
 .F_PLT      EQUB 0      \ planet type
 
-.F_DCOL     EQUB 0, 0   \ disc colour index currently in each buffer's disc layer
 
 \ ------------------------------------------------------------------------------
 \ Fixed colours (even-row byte, odd-row byte), by index
@@ -92,7 +91,7 @@ FC_PARTB = &FF          \ (the particles' colour byte: F_PDOT)
  EQUB &00, &FF, &F0, &0F, FC_PARTB, &0F, &FF
 F_CPO = F_CPE           \ (the odd rows' bytes are the even rows')
 
-\ F_INIT: one-off initialisation (called by the loader / startup) is in F_DL
+\ F_INIT: one-off initialisation (called by the loader / startup) is in F_SR
 \ (elite-gfx.asm), which it leaves to the ship records.
 
 \ ------------------------------------------------------------------------------
@@ -163,9 +162,6 @@ DLMAX = 3               \ (TTX66K's ee3: TT11, three digits)
  RTS
 
 .f_row  EQUB 0
-.f_tcol  EQUB 0
-.F_TCH  SKIP 24         \ per text row: bit b set (P) = the row changed since
-                        \ buffer b's text steps last ran on it
 .f_tbit EQUB 0          \ this frame's buffer's bit in F_TCH (1 or 2)
 .f_obit EQUB 0          \ and the other buffer's
 
@@ -477,10 +473,16 @@ RPN = 4
 \ are documented to read, and preserve Y)
 \ ------------------------------------------------------------------------------
 
-\ F_SHIP: record the ship being drawn by LL9. Inputs: TYPE, GNF (faces),
-\ GNV (vertices), XX2 (face visibility), XX3 (projected vertices), INWK+6/7 (z),
-\ and the orientation vectors' high bytes (L_REC: the record's XX2 copy holds
-\ each face's lighting level, see gfx-light.asm).
+\ F_SHIP: record the ship LL9 is drawing, before it projects the vertices
+\ (H_LL42, at part 6): its type (TYPE, or DOD for the Dodo station, whose
+\ slot is SST's: GTYPE), faces (GNF) and vertex cut-off
+\ (XX4), its faces' levels in F_SR (XX2 as part 5 left it, then L_REC:
+\ gfx-light.asm), and in F_RP, a field to an array of MAXSH, its place
+\ (INWK 0-8: the sort's z is INWK 6-7, F_SZL and F_SZH), its orientation as
+\ part 3 scaled it (XX16) and its blueprint (XX0): all that part 6 (LL42 on)
+\ reads, which the frame runs for it (f_proj). A ship slot is recorded at
+\ most once a frame, and a ship has at most 15 faces: F_SR holds MAXSH sets
+\ of levels.
 
 .F_SHIP
  STY f_ysav
@@ -488,29 +490,32 @@ RPN = 4
  CPX #MAXSH
  BCC P%+5
  JMP fsh9
- LDA GNV
- ASL A
- ASL A
- STA f_nv4
- CLC
- ADC GNF
- ADC F_DLP              \ room for nf + 4 * nv bytes?
- LDA F_DLP+1
- ADC #0
- CMP #HI(F_DLEND)
- BCC P%+5
- JMP fsh9
+ FOR k, 0, 8
+  LDA INWK+k
+  STA F_RP+k*MAXSH,X
+ NEXT
+ FOR k, 0, 19           \ (XX16 and XX0 are one block)
+  LDA XX16+k
+  STA F_RP+(9+k)*MAXSH,X
+ NEXT
  LDA F_DLP
  STA F_SPL,X
  STA fsh2+1
  LDA F_DLP+1
  STA F_SPH,X
  STA fsh2+2
- LDA INWK+7
- STA F_SZH,X
- LDA INWK+6
- STA F_SZL,X
- LDA GTYPE              \ (Master port: TYPE, or DOD for the Dodo station)
+ LDA TYPE               \ the faces' type: the station's slot holds the
+ CMP #SST               \ Coriolis or the Dodo (NWSPS), whose faces are
+ BNE fsh0               \ type DOD's
+ LDY XX0
+ CPY #LO(SHIP_DODO)
+ BNE fsh0
+ LDY XX0+1
+ CPY #HI(SHIP_DODO)
+ BNE fsh0
+ LDA #DOD
+.fsh0
+ STA GTYPE              \ (L_REC reads it)
  STA F_STYP,X
  LDA GNF
  STA F_SNF,X
@@ -539,191 +544,20 @@ RPN = 4
 .fsh3
  JSR L_REC              \ the faces' levels into the XX2 copy (gfx-light.asm,
                         \ main RAM: game context; Y is kept)
- TYA                    \ advance the destination past the XX2 copy
+ TYA                    \ (Y = nf)
  CLC
- ADC fsh2+1             \ d = lo0 (C = carry into hi)
- STA fsh5+1             \ patch d+0, d+1, d+2, d+3 into the unrolled loop
- INC A                  \ (INC A leaves C alone)
- STA fsh5a+1
- INC A
- STA fsh5b+1
- INC A
- STA fsh5c+1
- LDA fsh2+2
- ADC #0
- STA fsh5+2
- STA fsh5a+2
- STA fsh5b+2
- STA fsh5c+2
- LDA fsh5+1             \ rare: d+k wrapped into the next page
- CMP #&FD
- BCC fsh7
- INC fsh5c+2
- CMP #&FE
- BCC fsh7
- INC fsh5b+2
- CMP #&FF
- BCC fsh7
- INC fsh5a+2
-.fsh7
- LDA f_nv4              \ 4 * nv bytes, a multiple of 4
- BEQ fsh6
- SEC
- SBC #4
- TAY                    \ Y = f_nv4-4 .. 0 step -4, C = 1 in the loop
-.fsh4
- LDA XX3+3,Y
-.fsh5c
- STA &FFFF,Y            \ patched: d+3
- LDA XX3+2,Y
-.fsh5b
- STA &FFFF,Y            \ patched: d+2
- LDA XX3+1,Y
-.fsh5a
- STA &FFFF,Y            \ patched: d+1
- LDA XX3,Y
-.fsh5
- STA &FFFF,Y            \ patched: d
- TYA
- SBC #4
- TAY
- BCS fsh4
-.fsh6
- LDA f_nv4
- CLC
- ADC fsh5+1
+ ADC fsh2+1
  STA F_DLP
- LDA fsh5+2
+ LDA fsh2+2
  ADC #0
  STA F_DLP+1
  INC F_NSHIP
 .fsh9
  LDY f_ysav
  RTS
+ASSERT XX0 = XX16 + 18
 
-.f_nv4 EQUB 0
-
-\ F_BOMB: BOMBOFF is about to draw the energy bomb's bolt (H_BOMB): its
-\ nine lines join the ten points BOMBTBX/BOMBTBY, which BOMBON set; copy
-\ them, so the frame draws the last bolt drawn (its LOIN calls, H_LLINE,
-\ record nothing)
-
-.F_BOMB
- LDX #9
-.fbo1
- LDA BOMBTBX,X          \ (main RAM: G_BOMB runs in game context; bankcheck: ok)
- STA F_BX,X
- LDA BOMBTBY,X          \ (bankcheck: ok)
- STA F_BY,X
- DEX
- BPL fbo1
- STX f_bomb             \ (&FF)
- RTS
-.f_bomb  EQUB 0         \ bit 7: a bolt this frame
-
-\ F_LINE: record an enemy laser beam X1,Y1 -> X2,Y2 (8-bit screen coords;
-\ at most one per ship recorded: MAXLN)
-
-.F_LINE
- LDX F_NLINE
- CPX #MAXLN
- BCS fli9
- LDA X1
- STA F_LX0,X
- LDA Y1
- STA F_LY0,X
- LDA X2
- STA F_LX1,X
- LDA Y2
- STA F_LY1,X
- INC F_NLINE
-.fli9
- RTS
-
-\ F_CLOUD: PTCLS on the explosion cloud at XX19 in record mode, its draw pass
-\ (DOEXP falling into it: H_PTCLS, C set) or its erase pass (H_PTCLSE, C
-\ clear). The draw pass notes the cloud for the frame: the slot, XSAV, and
-\ its data block, INF (f_dots runs PTCLS again on the ship line heap, plotting
-\ each particle: T_CLOUD). The heap is the cloud's record (bytes 0-2 its size,
-\ counter and vertex count, 3-6 its seeds, then the vertices' screen
-\ coordinates), and nothing writes it again before the frame: MA15 removes no
-\ ship whose cloud was drawn (only those whose explosion has ended, EX2, or
-\ that are docked or scooped or far away, none drawn as a cloud), KILLSHP
-\ moves only the heaps of the slots above the one it removes, not yet
-\ processed in the iteration, and NWSHP takes room below the heaps. Then
-\ both passes do what the game keeps of PTCLS (2-build-files/records/live.mjs:
-\ nothing else it leaves is read): the random numbers, which depend only on
-\ the last vertex's seeds and the particle count, as PTCLS calls DORND2 three
-\ times a particle and keeps RAND+1, and RAND+3 = the planet's z_lo; and
-\ Q, U, TGT, CNT and CNT2 as it leaves them
-
-.F_CLOUD
- BCC fcd1
- LDY F_NDOT
- CPY #MAXDT
- BCS fcd1
- LDA INF                \ (zero page: bankcheck: ok)
- STA F_DX,Y
- LDA INF+1
- STA F_DY,Y
- LDA XSAV
- STA F_DC,Y
- INC F_NDOT
-.fcd1
- LDY #0                 \ Q = the cloud's size
- LDA (XX19),Y
- STA Q
- INY                    \ U = the particles per vertex, less one (as PTCLS)
- LDA (XX19),Y
- BPL P%+4
- EOR #&FF
- LSR A
- LSR A
- LSR A
- LSR A
- ORA #1
- STA U
- INY                    \ TGT = the vertex count, 4 * n + 6
- LDA (XX19),Y
- STA TGT
- LDA #10                \ CNT = the last vertex's end: 10, 14, ... up to TGT
-.fcd2
- CMP TGT
- BCS fcd3
- ADC #4
- BCC fcd2
-.fcd3
- STA CNT
- LDY #3                 \ its seeds RAND and RAND+2 (the bytes after them
- LDA (XX19),Y           \ feed DORND2's RAND+1 and RAND+3, which PTCLS
- EOR CNT                \ puts back as it found them, and as K%+6)
- STA RAND
- LDY #5
- LDA (XX19),Y
- EOR CNT
- STA RAND+2
- LDA U                  \ X = 3 * (U + 1): DORND2's RAND and RAND+2
- ASL A
- SEC
- ADC U
- ADC #2
- TAX
-.fcd4
- LDA RAND
- ASL A
- TAY
- ADC RAND+2
- STA RAND
- STY RAND+2
- DEX
- BNE fcd4
- LDA K%+6               \ (main RAM below &3000: bankcheck: ok)
- STA RAND+3
- DEX                    \ CNT2 = &FF
- STX CNT2
- RTS
-
-\ F_PDOT: a particle of the frame's PTCLS (T_CLOUD; H_DOT, G_PDOT), at
+\ F_PDOT: a particle of the frame's PTCLS (f_dots; H_DOT, G_PDOT), at
 \ X = x, A = y, its size from ZZ as PIXEL's (a dash for ZZ >= 80, a
 \ double-height dash below), in the particles' colour, with ACCCON X as the
 \ frame has it (GPX: set when the back buffer is shadow RAM) round the
@@ -813,25 +647,6 @@ RPN = 4
  STA GSUNON
  RTS
 
-\ F_SHPPT: record a distant ship as a 2x2 dot at (K3, K4), in its hue
-
-.F_SHPPT
- STY f_ysav
- LDY F_NDOT
- CPY #MAXDT
- BCS fsp9
- LDA K3
- STA F_DX,Y
- LDA K4
- STA F_DY,Y
- LDA TYPE
- ORA #&80               \ bit 7: ship type (bits 0-6), drawn in its dot colour
- STA F_DC,Y
- INC F_NDOT
-.fsp9
- LDY f_ysav
- RTS
-
 \ ------------------------------------------------------------------------------
 \ F_FRAME: render this frame's display list into the back buffer and queue a
 \ flip. Called once per main-loop iteration (after M%), and per title-screen
@@ -848,15 +663,17 @@ RPN = 4
 .ff1                    \ (G_FRAME has run L_SUN, the light for the next
                         \ iteration's ships, in game context)
 
- \ save the zero page the rasteriser uses (&06-&27) and the frame layer's
- \ (&D2-&E1), unrolled
- FOR z, &06, &27        \ (on the stack: LDA zp/PHA is a cycle cheaper than
-  LDA z                 \ LDA zp/STA abs; PLA/STA zp costs what LDA abs/STA zp
-  PHA                   \ did)
+ \ keep the zero page the rasteriser uses (&06-&27) and the frame layer's
+ \ (&D2-&E1), unrolled, in f_zsv, not on the stack: the frame's ship
+ \ projection puts the vertices in XX3, page 1 from &0100, under the stack
+ \ (2-build-files/records/stack.mjs)
+ FOR z, &06, &27
+  LDA z
+  STA f_zsv + z - &06
  NEXT
  FOR z, 0, 15
   LDA FZ + z
-  PHA
+  STA f_zsv + &22 + z
  NEXT
 
  BIT GMODE
@@ -880,6 +697,11 @@ RPN = 4
  JSR T_SETBUF
  JSR f_text1            \ text cells to be erased: background them (old dirty)
  JSR f_sight1           \ and the sights, if they have gone
+ LDA F_NSHIP            \ the ships in their order, the first one projected
+ BEQ P%+10              \ (f_sort, f_proj0)
+ LDA #&FF
+ STA f_pj
+ JSR f_sort
 
 .ff2
  LDA GFLIP              \ wait for the previous flip, so the back buffer is
@@ -920,12 +742,16 @@ RPN = 4
  JSR T_STARPLOT
 .ff_stars9              \ (the frame's drawing done: the harness's frame end)
 
- FOR z, 15, 0, -1        \ restore the zero page (pushed at ff1)
-  PLA
+ BIT f_gz               \ the game's zero page back, if the frame ran game
+ BPL P%+5               \ code (f_gkeep)
+ JSR f_gback
+
+ FOR z, 0, 15            \ restore the zero page (kept at ff1)
+  LDA f_zsv + &22 + z
   STA FZ + z
  NEXT
- FOR z, &27, &06, -1
-  PLA
+ FOR z, &06, &27
+  LDA f_zsv + z - &06
   STA z
  NEXT
 
@@ -957,9 +783,9 @@ RPN = 4
  IF _PLANET_RINGS
  STA RG_N
  ENDIF
- LDA #LO(F_DL)
+ LDA #LO(F_SR)
  STA F_DLP
- LDA #HI(F_DL)
+ LDA #HI(F_SR)
  STA F_DLP+1
  LDY f_ysav
  RTS
@@ -1772,12 +1598,11 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .fln9
  RTS
 
-\ f_ships: insertion-sort the ships far to near, then draw each one (f_ship).
+\ f_sort: insertion-sort the ships far to near (F_ORD), before the frame's
+\ wait for the flip; then project the first to be drawn (f_proj0), which
+\ needs no screen memory either. f_ships draws each one (f_ship) after it.
 
-.f_ships
- LDX F_NSHIP
- BNE P%+3
- RTS
+.f_sort
  LDX #0                 \ F_ORD = 0, 1, 2, ... sorted by z descending
 .fss1
  TXA
@@ -1825,7 +1650,9 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  INX
  BNE fss2
 .fss6
+ JMP f_proj0
 
+.f_ships
  LDA #0
  STA fz_i
 .fss8
@@ -1875,31 +1702,13 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  STA fz_dt
  LDA FC_DETTAB+1,Y
  STA fz_dt+1
- LDA F_SPL,X            \ XX2 copy, then XX3 copy
+ LDA F_SPL,X            \ the faces' levels
  STA fz_dl
  LDA F_SPH,X
  STA fz_dl+1
  LDA F_SNF,X
  STA f_nf
- CLC
- ADC fz_dl
- STA fz_v3
- LDA fz_dl+1
- ADC #0
- STA fz_v3+1
- LDA fz_v3              \ the vertex gather's operands: XX3 copy + 0..3
- STA fsh_x0+1
- LDA fz_v3+1
- STA fsh_x0+2
- FOR k, 1, 3
-  CLC
-  LDA fz_v3
-  ADC #k
-  STA fsh_x0+1+6*k
-  LDA fz_v3+1
-  ADC #0
-  STA fsh_x0+2+6*k
- NEXT
+ JSR f_proj             \ the vertices on the screen, into XX3
 
  JSR f_behind           \ hidden behind the planet?
  BCC P%+3
@@ -1950,19 +1759,14 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .fsh_v
 .fsh_o
  LDY &FFFF,X            \ XX3 offset (patched)
-.fsh_x0
- LDA &FFFF,Y            \ (patched: the XX3 copy + 0..3)
+ LDA XX3,Y
  STA R_PXL,X
-.fsh_x1
- LDA &FFFF,Y
+ LDA XX3+1,Y
  STA R_PXH,X
-.fsh_x2
- LDA &FFFF,Y
+ LDA XX3+2,Y
  STA R_PYL,X
-.fsh_x3
- LDA &FFFF,Y
+ LDA XX3+3,Y
  STA R_PYH,X
- ASSERT fsh_x1 = fsh_x0 + 6 AND fsh_x2 = fsh_x0 + 12 AND fsh_x3 = fsh_x0 + 18
  INX
  CPX fz_n
  BCC fsh_v
@@ -2123,16 +1927,13 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  STY fz_u
  LDA (fz_q),Y           \ XX3 offset
  TAY
- LDA (fz_v3),Y
+ LDA XX3,Y
  STA R_PXL,X
- INY
- LDA (fz_v3),Y
+ LDA XX3+1,Y
  STA R_PXH,X
- INY
- LDA (fz_v3),Y
+ LDA XX3+2,Y
  STA R_PYL,X
- INY
- LDA (fz_v3),Y
+ LDA XX3+3,Y
  STA R_PYH,X
  LDY fz_u
  INY
@@ -2272,24 +2073,18 @@ ASSERT LT_HL1 = LT_HL0 + 17 AND LT_HL2 = LT_HL0 + 34 AND LT_HL3 = LT_HL0 + 51
 .fc_row SKIP 4
 
 \ f_dots: the distant ships' dots and the explosion clouds, in the order
-\ recorded. A cloud is drawn by PTCLS itself (T_CLOUD: bank 4, ACCCON X
-\ clear), from its ship's line heap, with the game's zero page that PTCLS
-\ uses kept round it (fd_zp); a slot no longer holding an exploding ship
-\ (its data block's byte #31 bit 5) has nothing to draw
-
-FDZN = 16
-.fd_zl EQUB RAND, RAND+1, RAND+2, RAND+3, Y1, U, Q, R, S, T, ZZ, TGT, CNT, CNT2
-       EQUB XX19, XX19+1
-.fd_zs SKIP FDZN
+\ recorded. A cloud is drawn by PTCLS itself (T_GAME at PTCLR: bank 4,
+\ ACCCON X clear), from its ship's line heap, with the game's zero page kept
+\ (f_gkeep); a slot no longer holding an exploding ship (its data block's
+\ byte #31 bit 5) has nothing to draw
 
 .f_dots
  LDA #0
  STA fz_i
- STA fz_t               \ bit 7: the game's zero page is kept in fd_zs
 .fdo2
  LDX fz_i
  CPX F_NDOT
- BCS fdo8
+ BCS fdo9
  LDA F_DC,X
  BPL fdo5
  AND #&7F               \ a ship type: its dot colour
@@ -2318,35 +2113,17 @@ FDZN = 16
  LDA (fz_p),Y
  AND #%00100000
  BEQ fdo4
- BIT fz_t
- BMI fdo6
- LDX #FDZN-1            \ keep the game's zero page
-.fdo7
- LDY fd_zl,X
- LDA 0,Y
- STA fd_zs,X
- DEX
- BPL fdo7
- DEC fz_t
-.fdo6
+ JSR f_gkeep
  LDY #33                \ XX19 = the heap, from the data block
  LDA (fz_p),Y
  STA XX19
  INY
  LDA (fz_p),Y
  STA XX19+1
- JSR T_CLOUD
+ LDA #LO(PTCLR)
+ LDX #HI(PTCLR)
+ JSR T_GAME
  BRA fdo4
-.fdo8
- BIT fz_t
- BPL fdo9
- LDX #FDZN-1            \ the game's zero page back
-.fdo10
- LDY fd_zl,X
- LDA fd_zs,X
- STA 0,Y
- DEX
- BPL fdo10
 .fdo9
  RTS
 
@@ -3698,23 +3475,20 @@ ENDIF                   \ (_PLANET_RINGS)
  LDY #4                 \ XX3 offset of the vertex
  LDA (fz_p),Y
  TAY
- LDA (fz_v3),Y          \ dx = x - the disc's x (16-bit)
+ LDA XX3,Y              \ dx = x - the disc's x (16-bit)
  SEC
  SBC fb_x
  STA fz_t
- INY
- LDA (fz_v3),Y
+ LDA XX3+1,Y
  SBC fb_x+1
- JSR f_abs16            \ -> A = |dx| if < 256, else C set
+ JSR f_abs16            \ -> A = |dx| if < 256, else C set (Y kept)
  BCS fbh8
  STA f_bdx
- INY
- LDA (fz_v3),Y          \ dy = y - the disc's y
+ LDA XX3+2,Y            \ dy = y - the disc's y
  SEC
  SBC fb_y
  STA fz_t
- INY
- LDA (fz_v3),Y
+ LDA XX3+3,Y
  SBC fb_y+1
  JSR f_abs16
  BCS fbh8
@@ -3857,3 +3631,305 @@ ENDIF                   \ (_PLANET_RINGS)
 .fw_t2 EQUB 0
 .fw_h  EQUB 0
 .fw_l  EQUB 0
+
+\ f_proj: LL9's part 6 on (LL42P: each vertex's visibility, and the visible
+\ ones' screen coordinates into XX3), run for ship f_si as LL9 would have run
+\ it, from its record (F_SHIP): XX2 non-zero for the faces shown (the levels;
+\ face 15 always, as part 3 sets it), XX4, INWK 0-8, XX16 and XX0. INWK+31
+\ is 0 (LL72: not exploding), and H_EE31 returns at once (GPRJ). The game's
+\ zero page is kept round it (f_gkeep); the rasteriser's own, &06-&0F, part 6
+\ leaves alone
+
+\ f_proj0: before the wait for the flip (f_sort), project the first ship
+\ f_ships draws, unless f_ship would skip it (FC_MINVIS); f_pj notes it,
+\ and f_proj leaves its vertices for f_ship (f_pj: &FF, none)
+
+.f_pj   EQUB &FF
+.f_proj0
+ LDX F_ORD
+ LDY F_STYP,X
+ LDA F_SX4,X
+ CMP FC_MINVIS,Y
+ BEQ P%+4
+ BCS fpz9
+ STX f_si
+ LDA F_SPL,X
+ STA fz_dl
+ LDA F_SPH,X
+ STA fz_dl+1
+ LDA F_SNF,X
+ STA f_nf
+ JSR f_proj
+ LDA f_si
+ STA f_pj
+.fpz9
+ RTS
+
+.f_proj
+ LDA f_si               \ already projected (f_proj0): the vertices are in
+ CMP f_pj               \ XX3, and no other ship is
+ BNE fpj0
+ LDA #&FF
+ STA f_pj
+ RTS
+.fpj0
+ JSR f_gkeep
+ LDX f_si
+ FOR k, 0, 8
+  LDA F_RP+k*MAXSH,X
+  STA INWK+k
+ NEXT
+ FOR k, 0, 19
+  LDA F_RP+(9+k)*MAXSH,X
+  STA XX16+k
+ NEXT
+ LDA F_SX4,X
+ STA XX4
+ LDY #0
+ LDX f_nf
+ BEQ fpj2
+.fpj1
+ LDA (fz_dl),Y
+ STA XX2,Y
+ INY
+ DEX
+ BNE fpj1
+.fpj2
+ LDA #255
+ STA XX2+15
+ STZ INWK+31
+ LDA #LO(LL42P)
+ LDX #HI(LL42P)
+ JMP T_GAME
+
+\ f_gkeep: before the frame first runs game code (f_proj, f_dots' clouds),
+\ keep the game's zero page that the game reads afterwards and that game
+\ code changes (2-build-files/records/live.mjs, the frame's span, all it
+\ writes): RAND, Q, TGT, XX0, INWK 0-8, INWK+31 and XX19; the frame puts it
+\ back at its end (f_gback; f_gz bit 7: kept, until then). The rest it
+\ writes, outside the rasteriser's &06-&27 (which F_FRAME keeps), is written
+\ again before it is read
+
+FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
+.f_gzs SKIP FGZ
+.f_gz   EQUB 0
+.f_gkeep
+ BIT f_gz
+ BMI fgk9
+ FOR k, 0, 3 : LDA RAND+k : STA f_gzs+k : NEXT
+ LDA Q : STA f_gzs+4
+ LDA TGT : STA f_gzs+5
+ LDA XX0 : STA f_gzs+6
+ LDA XX0+1 : STA f_gzs+7
+ FOR k, 0, 8 : LDA INWK+k : STA f_gzs+8+k : NEXT
+ LDA INWK+31 : STA f_gzs+17
+ LDA XX19 : STA f_gzs+18
+ LDA XX19+1 : STA f_gzs+19
+ DEC f_gz
+.fgk9
+ RTS
+
+.f_gback
+ STZ f_gz
+ FOR k, 0, 3 : LDA f_gzs+k : STA RAND+k : NEXT
+ LDA f_gzs+4 : STA Q
+ LDA f_gzs+5 : STA TGT
+ LDA f_gzs+6 : STA XX0
+ LDA f_gzs+7 : STA XX0+1
+ FOR k, 0, 8 : LDA f_gzs+8+k : STA INWK+k : NEXT
+ LDA f_gzs+17 : STA INWK+31
+ LDA f_gzs+18 : STA XX19
+ LDA f_gzs+19 : STA XX19+1
+ RTS
+
+\ F_GUN: the set-up of LL9's part 6 (LL42P) for a ship firing at us, whose
+\ gun vertex alone it projects in the game (H_LL42; the frame projects the
+\ ship): A = blueprint byte #6, 4 * the vertex's number. XX16 as LL42P
+\ leaves it (transposed: LL51's matrix), XX20 = the offset after the vertex
+\ (the loop's end), V = the vertex data (XX0 + 20), CNT = A (its offset in
+\ XX3) and Y = its offset in the vertex data, 6 * the number, for part 6's
+\ loop at LL48
+
+.F_GUN
+ STA CNT
+ LSR A
+ CLC
+ ADC CNT
+ PHA
+ CLC
+ ADC #6
+ STA XX20
+ LDA XX0
+ CLC
+ ADC #20
+ STA V
+ LDA XX0+1
+ ADC #0
+ STA V+1
+ \ the transpose, as LL42P: XX16 2-3 <-> 6-7, 4-5 <-> 12-13, 10-11 <-> 14-15
+ LDY XX16+2
+ LDX XX16+3
+ LDA XX16+6
+ STA XX16+2
+ LDA XX16+7
+ STA XX16+3
+ STY XX16+6
+ STX XX16+7
+ LDY XX16+4
+ LDX XX16+5
+ LDA XX16+12
+ STA XX16+4
+ LDA XX16+13
+ STA XX16+5
+ STY XX16+12
+ STX XX16+13
+ LDY XX16+10
+ LDX XX16+11
+ LDA XX16+14
+ STA XX16+10
+ LDA XX16+15
+ STA XX16+11
+ STY XX16+14
+ STX XX16+15
+ PLA
+ TAY
+ RTS
+
+\ F_BOMB: BOMBOFF is about to draw the energy bomb's bolt (H_BOMB): its
+\ nine lines join the ten points BOMBTBX/BOMBTBY, which BOMBON set; copy
+\ them, so the frame draws the last bolt drawn (its LOIN calls, H_LLINE,
+\ record nothing)
+
+.F_BOMB
+ LDX #9
+.fbo1
+ LDA BOMBTBX,X          \ (main RAM: G_BOMB runs in game context; bankcheck: ok)
+ STA F_BX,X
+ LDA BOMBTBY,X          \ (bankcheck: ok)
+ STA F_BY,X
+ DEX
+ BPL fbo1
+ STX f_bomb             \ (&FF)
+ RTS
+.f_bomb  EQUB 0         \ bit 7: a bolt this frame
+
+\ F_LINE: record an enemy laser beam X1,Y1 -> X2,Y2 (8-bit screen coords;
+\ at most one per ship recorded: MAXLN)
+
+.F_LINE
+ LDX F_NLINE
+ CPX #MAXLN
+ BCS fli9
+ LDA X1
+ STA F_LX0,X
+ LDA Y1
+ STA F_LY0,X
+ LDA X2
+ STA F_LX1,X
+ LDA Y2
+ STA F_LY1,X
+ INC F_NLINE
+.fli9
+ RTS
+
+\ F_CLOUD: PTCLS on the explosion cloud at XX19 in record mode, its draw pass
+\ (DOEXP falling into it: H_PTCLS, C set) or its erase pass (H_PTCLSE, C
+\ clear). The draw pass notes the cloud for the frame: the slot, XSAV, and
+\ its data block, INF (f_dots runs PTCLS again on the ship line heap, plotting
+\ each particle: T_GAME, F_PDOT). The heap is the cloud's record (bytes 0-2 its size,
+\ counter and vertex count, 3-6 its seeds, then the vertices' screen
+\ coordinates), and nothing writes it again before the frame: MA15 removes no
+\ ship whose cloud was drawn (only those whose explosion has ended, EX2, or
+\ that are docked or scooped or far away, none drawn as a cloud), KILLSHP
+\ moves only the heaps of the slots above the one it removes, not yet
+\ processed in the iteration, and NWSHP takes room below the heaps. Then
+\ both passes do what the game keeps of PTCLS (2-build-files/records/live.mjs:
+\ nothing else it leaves is read): the random numbers, which depend only on
+\ the last vertex's seeds and the particle count, as PTCLS calls DORND2 three
+\ times a particle and keeps RAND+1, and RAND+3 = the planet's z_lo; and
+\ Q, U, TGT, CNT and CNT2 as it leaves them
+
+.F_CLOUD
+ BCC fcd1
+ LDY F_NDOT
+ CPY #MAXDT
+ BCS fcd1
+ LDA INF                \ (zero page: bankcheck: ok)
+ STA F_DX,Y
+ LDA INF+1
+ STA F_DY,Y
+ LDA XSAV
+ STA F_DC,Y
+ INC F_NDOT
+.fcd1
+ LDY #0                 \ Q = the cloud's size
+ LDA (XX19),Y
+ STA Q
+ INY                    \ U = the particles per vertex, less one (as PTCLS)
+ LDA (XX19),Y
+ BPL P%+4
+ EOR #&FF
+ LSR A
+ LSR A
+ LSR A
+ LSR A
+ ORA #1
+ STA U
+ INY                    \ TGT = the vertex count, 4 * n + 6
+ LDA (XX19),Y
+ STA TGT
+ LDA #10                \ CNT = the last vertex's end: 10, 14, ... up to TGT
+.fcd2
+ CMP TGT
+ BCS fcd3
+ ADC #4
+ BCC fcd2
+.fcd3
+ STA CNT
+ LDY #3                 \ its seeds RAND and RAND+2 (the bytes after them
+ LDA (XX19),Y           \ feed DORND2's RAND+1 and RAND+3, which PTCLS
+ EOR CNT                \ puts back as it found them, and as K%+6)
+ STA RAND
+ LDY #5
+ LDA (XX19),Y
+ EOR CNT
+ STA RAND+2
+ LDA U                  \ X = 3 * (U + 1): DORND2's RAND and RAND+2
+ ASL A
+ SEC
+ ADC U
+ ADC #2
+ TAX
+.fcd4
+ LDA RAND
+ ASL A
+ TAY
+ ADC RAND+2
+ STA RAND
+ STY RAND+2
+ DEX
+ BNE fcd4
+ LDA K%+6               \ (main RAM below &3000: bankcheck: ok)
+ STA RAND+3
+ DEX                    \ CNT2 = &FF
+ STX CNT2
+ RTS
+
+\ F_SHPPT: record a distant ship as a 2x2 dot at (K3, K4), in its hue
+
+.F_SHPPT
+ STY f_ysav
+ LDY F_NDOT
+ CPY #MAXDT
+ BCS fsp9
+ LDA K3
+ STA F_DX,Y
+ LDA K4
+ STA F_DY,Y
+ LDA TYPE
+ ORA #&80               \ bit 7: ship type (bits 0-6), drawn in its dot colour
+ STA F_DC,Y
+ INC F_NDOT
+.fsp9
+ LDY f_ysav
+ RTS

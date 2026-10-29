@@ -2,24 +2,24 @@
 \
 \ gfx-finit.asm - the frame layer's one-off initialisation, F_INIT
 \
-\ Master port: INCLUDEd by elite-gfx.asm in bank 6's F_DL (the ship records),
+\ Master port: INCLUDEd by elite-gfx.asm in bank 6's F_SR (the ship records),
 \ after the 34 bytes where F_INIT keeps Elite's &06-&27 while the rasteriser's
 \ R_INIT uses them: the loader calls it once (G_INIT) before the first frame,
-\ and from the first frame on F_DL holds the ship records.
+\ and from the first frame on F_SR holds the ship records.
 \
 \ ******************************************************************************
 
 .F_INIT
- LDX #&21               \ R_INIT uses &06-&27: keep Elite's values (in F_DL,
+ LDX #&21               \ R_INIT uses &06-&27: keep Elite's values (in F_SR,
 .fin0                   \ before this code)
  LDA &06,X
- STA F_DL,X
+ STA F_SR,X
  DEX
  BPL fin0
  JSR T_INIT
  LDX #&21
 .fin4
- LDA F_DL,X
+ LDA F_SR,X
  STA &06,X
  DEX
  BPL fin4

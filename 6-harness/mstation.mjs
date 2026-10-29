@@ -38,12 +38,20 @@ await secs(28); await key("N"); await secs(3); await key("SPACE"); await secs(4)
 await key("F0", 0.2, 12);
 // at MLOOP: the scene in
 let atLoop = false, phase = 0, iters = 0, recorded = 0, drawn = 0, frames = 0;
+// (jsbeeb calls no hook for an execute slice's first instruction: f_ship's
+// second, after its TAX, and fsh_nf0's, after its LDA #0, stand in for a
+// missed first)
+let last = -1;
+const at2 = (pc, name, k) => at(pc, name) || (pc === sy[name] + k && last !== sy[name] && (cpu.romsel & 15) === 6);
 cpu.debugInstruction.add(pc => {
+    const was = last; last = pc;
     if (phase === 0) { if (at(pc, "MLOOP")) atLoop = true; return false; }
     if (at(pc, "MLOOP")) iters++;
     if (at(pc, "f_ships")) frames++;
-    if (at(pc, "f_ship") && physRead(cpu, M6, sy.F_STYP + cpu.a) === 2) recorded++;
-    if (at(pc, "fsh_nf0") && physRead(cpu, M6, sy.F_STYP + physRead(cpu, M6, sy.f_si)) === 2) drawn++;
+    last = was;
+    if (at2(pc, "f_ship", 1) && physRead(cpu, M6, sy.F_STYP + cpu.a) === 2) recorded++;
+    if (at2(pc, "fsh_nf0", 2) && physRead(cpu, M6, sy.F_STYP + physRead(cpu, M6, sy.f_si)) === 2) drawn++;
+    last = pc;
     return false;
 });
 for (let k = 0; k < 200 && !atLoop; k++) await s.runFor(20000);

@@ -163,51 +163,61 @@
 .hso8
  CLC                    \ outside record mode: star Y is no longer drawn
  JMP G_DSTAR            \ (returns C set, X and Y kept)
-\ H_EE31: LL9 has projected the ship (part 9, EE31, which jumps here: every
-\ LL9 records, as nothing draws a ship directly, docs/renderer.md, "The
-\ briefings"): record it (and its laser beam if it is firing at us) and
-\ return from LL9. What LL9's parts 9 to 12 left that the game reads is set
-\ as they would: bit 3 of byte #31 (on screen), bit 6 cleared if it fired,
-\ XX20 (edges) and CNT (the blueprint's heap size, which LL170 leaves there);
-\ and it returns as LSCLR does (A = 1, Y = 0, C set). The ship line heap is
-\ not written (only the explosion clouds use it, DOEXP)
+\ H_LL42: LL9's part 6 (LL42, which calls this first) is about to work out
+\ which vertices are visible and project them. Every LL9 records its ship (nothing draws a ship
+\ directly, docs/renderer.md, "The briefings"), and a ship that is not
+\ exploding is recorded here, before its vertices are projected: the frame
+\ projects them (gfx-frame.asm's f_proj runs part 6 on, from LL42P, when it
+\ draws the ship, after those further away), so LL9 goes on to H_EE31 at
+\ once, or, if the ship is firing at us, after part 6 has projected just
+\ the gun vertex for the beam (F_GUN sets part 6's loop on that one vertex,
+\ LL48). Part 6 on changes nothing the game reads but XX3
+\ (2-build-files/records/live.mjs), which only DOEXP (an exploding ship: its
+\ cloud's vertices, all projected) and H_EE31 (the beam: the gun vertex)
+\ read
+
+.H_LL42
+ LDA XX1+31             \ exploding: DOEXP takes the vertices
+ AND #%00100000
+ BNE hll9
+ LDY #12                \ faces = byte #12 / 4
+ LDA (XX0),Y
+ LSR A
+ LSR A
+ STA GNF
+ JSR S_SHIP             \ record it (G_SHIP), with its handedness (and the
+                        \ splinter's faces all shown: SPLV)
+ PLA                    \ (LL9 goes on from here, not LL42)
+ PLA
+ BIT XX1+31             \ not firing at us: on to H_EE31 (as LL72)
+ BVC H_EE31
+ LDY #6                 \ firing: its gun vertex (byte #6: 4 * its number)
+ LDA (XX0),Y            \ alone, through part 6's loop (G_GUN: LL42P's matrix
+ JSR G_GUN              \ and the loop's set-up for it, returning Y = its
+ JMP LL48               \ offset in the vertex data)
+.hll9
+ RTS
+
+\ H_EE31: LL9 is done (part 9, EE31, which jumps here; at once from H_LL42
+\ for a ship it has recorded and not projected): the ship's laser beam, if
+\ it is firing at us, and return from LL9. What LL9's parts 9 to 12 left
+\ that the game reads is set as they would: bit 3 of byte #31 (on screen),
+\ bit 6 cleared if it fired, XX20 (edges) and CNT (the blueprint's heap
+\ size, which LL170 leaves there); and it returns as LSCLR does (A = 1,
+\ Y = 0, C set). The ship line heap is not written (only the explosion
+\ clouds use it, DOEXP). Run by the frame (f_proj, GPRJ set), it returns
+\ at once
 
 .H_EE31
+ BIT GPRJ
+ BPL P%+3
+ RTS
  LDY #9                 \ XX20 = the number of edges (as EE31)
  LDA (XX0),Y
  STA XX20
  LDA #%00001000         \ the ship is now on screen (as EE31)
  ORA XX1+31
  STA XX1+31
- LDY #12                \ faces = byte #12 / 4
- LDA (XX0),Y
- LSR A
- LSR A
- STA GNF
- LDY #8                 \ vertices = byte #8 / 6
- LDA (XX0),Y
- LDX #0
-.hee1
- CMP #6
- BCC hee2
- SBC #6
- INX
- BNE hee1
-.hee2
- STX GNV
- LDX TYPE               \ the faces' type: the station's slot holds the
- CPX #SST               \ Coriolis or the Dodo (NWSPS), whose faces are
- BNE hee3               \ type DOD's
- LDA XX0
- CMP XX21+2*(DOD-1)
- BNE hee3
- LDA XX0+1
- CMP XX21+2*(DOD-1)+1
- BNE hee3
- LDX #DOD
-.hee3
- STX GTYPE
- JSR S_SHIP             \ record it (G_SHIP), with its handedness
 
  BIT XX1+31             \ firing its lasers at us? (as EE31)
  BVC hee9

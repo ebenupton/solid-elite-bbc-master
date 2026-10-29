@@ -49,6 +49,15 @@
  JSR F_LINE
  JMP gback
 
+.G_GUN                  \ (A passed, Y returned: F_GUN's)
+ STA gA
+ LDA #GFXBANK
+ STA &F4
+ STA &FE30
+ LDA gA
+ JSR F_GUN
+ JMP gback
+
 .G_PDOT                 \ (A, X passed: F_PDOT's)
  STA gA
  LDA #GFXBANK

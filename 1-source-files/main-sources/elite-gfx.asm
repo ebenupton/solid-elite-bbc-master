@@ -150,7 +150,7 @@ ASSERT HI(R_WR) = HI(R_WR + 191)
 CLEAR &8000, &C000      \ bank 5: the shared region from &9000 (the per-x tables,
 ORG &9000               \ the row runs, the boundary arrays, the stars, the lens
 INCLUDE "1-source-files/main-sources/gfx-raster.asm"   \ ...), then the disc window at &8000
-ASSERT P = R_CT          \ (T_CLOUD keeps R_CT, FMLTU's P, for F_PDOT)
+ASSERT P = R_CT          \ (f_dots keeps R_CT, FMLTU's P, for F_PDOT)
 INCLUDE "1-source-files/main-sources/gfx-raster_disc2.asm"   \ the second disc (R_DISC2: run with the disc
                                \ window paged in, from R_DISCROWS)
 ASSERT P% <= R_S2R1            \ (buffer 1's spans' right ends follow it)
@@ -206,16 +206,25 @@ INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
 INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 7)
 INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are at bank 6's end)
 .B6_CODE_END
-.F_HW   SKIP 256        \ planet half-widths
-.F_HW2  SKIP 256        \ sun half-widths
-.F_HW3  SKIP 64         \ moon half-widths (its radius is at most 63)
-.F_DL                   \ ship records: XX2 then XX3 copies (1536 bytes)
+.F_RP   SKIP 29 * MAXSH \ the ship records (F_SHIP): INWK 0-8, XX16, XX0
+F_SZL = F_RP + 6 * MAXSH  \ (the ship's z, INWK 6-7: the sort's, T_KFRAME's)
+F_SZH = F_RP + 7 * MAXSH
+.F_TMR  SKIP 24         \ the text map's non-empty cells per row
+.F_BX   SKIP 10         \ the energy bomb's bolt (f_bomb), BOMBTBX and BOMBTBY
+.F_BY   SKIP 10         \ as F_BOMB found them
+.F_DCOL SKIP 2          \ disc colour index currently in each buffer's disc layer
+                        \ (F_INIT: 0, as loaded)
+.f_tcol SKIP 1          \ (f_char1's column)
+.F_HW   SKIP 256        \ planet half-widths (the disc rows read F_HW,X: a
+.F_HW2  SKIP 256        \ sun half-widths      low byte near 0 crosses no page;
+.F_HW3  SKIP 64         \ moon half-widths     the data above sets it)
+.f_zsv  SKIP &22 + 16   \ F_FRAME's keep of &06-&27 and FZ's &D2-&E1
+F_SRN = MAXSH * 15      \ (the most faces is 15)
+.F_SR                   \ the ships' faces' levels (F_SHIP)
  SKIP &22
  INCLUDE "1-source-files/main-sources/gfx-finit.asm"   \ F_INIT, run once before the first frame
- SKIP F_DL + 1536 - P%
-.F_DLEND
+ SKIP F_SR + F_SRN - P%
 .F_TM   SKIP 768        \ text map: desired characters, 24 rows of 32
-.F_TMR  SKIP 24         \ non-empty cells per row
 .F_DSX  SKIP NDSTAR     \ the stars drawn directly (gfx-frame_cold.asm's F_DSTAR,
 .F_DSY  SKIP NDSTAR     \ f_unstar): x and y (their sizes, F_DSS, in the shared
                         \ workspace)
