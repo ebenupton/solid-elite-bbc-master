@@ -32,7 +32,7 @@
 \ s = round(sqrt(D)), stepped incrementally (no multiplies per row); past the
 \ ellipse (D < 0) only rows between the nodes, with one crossing, have a
 \ boundary, at the centre line. A circle's crossings are inserted in order
-\ into the disc layer's boundaries (R_NDN, R_NDX0-3, R_NDP; gfx-raster.asm's
+\ into the disc layer's boundaries (R_NDN, R_NDX0-3; gfx-raster.asm's
 \ header); with a fifth in a row the two rightmost are dropped.
 \ 6-harness/planet_caps.py models this code bit for bit; for a great circle it
 \ gives the beach ball's rows exactly as 6-harness/planet_analytic.py has them
@@ -1133,6 +1133,9 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
 .pcr0
  STX pr_n
  STY pr_end
+ LSR A                  \ (the base colour, bit 0, to bit 7: R_NDN's)
+ LDA #0
+ ROR A
  PHA
  LDY #0                 \ the records' left limb toggles: the start colour of
 .pcr1                   \ the rows from T on flipped (pr_lt, pr_lc of them)
@@ -1162,8 +1165,7 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  LDX R_NDT              \ toggles so far
  JSR pr_nx
 .pcr5
- STA R_NDP,X
- STZ R_NDN,X
+ STA R_NDN,X
  CPX R_NDB
  BCS pcr2
  INX
@@ -1172,8 +1174,8 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  JSR pr_nx
  BRA pcr5
 
-\ pr_nx: A = the colour A EOR a toggle for each of pr_lt <= X (each then
-\ taken out); ZT2 = the least left, or 255
+\ pr_nx: A = the colour A EOR a toggle (bit 7) for each of pr_lt <= X (each
+\ then taken out); ZT2 = the least left, or 255
 
 .pr_nx
  STA ZT0
@@ -1192,7 +1194,7 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  LDA #255
  STA pr_lt,Y
  LDA ZT0
- EOR #1
+ EOR #&80
  STA ZT0
  BRA pnx1
 .pnx3
@@ -1618,20 +1620,32 @@ ASSERT prk1 = prk0 + 6 AND prk3 = prk0 + 18 AND pra3 = pra0 + 18
  CMP R_NDISCR,X
  BEQ P%+4
  BCS prw9
- LDY R_NDN,X
+ LDY R_NDN,X            \ the count (bit 7: the colour)
+ BMI pp1
  BEQ prp0
  CPY #4
  BCS pr_over
  INC R_NDN,X
  BRA mpi
+.pp1                    \ (colour B at the left end: the count is Y - &80)
+ CPY #&81
+ BCC prp0
+ CPY #&84
+ BCS pr_over
+ INC R_NDN,X
+ STA mt_x
+ CPY #&82
+ BEQ mpi2
+ BCC mpi1
+ BRA mpi3
 .prp0                   \ (the row's first)
  STA R_NDX0,X
  INC R_NDN,X
  RTS
 .pr_flipx               \ row X's starting colour flipped
- LDA R_NDP,X
- EOR #1
- STA R_NDP,X
+ LDA R_NDN,X
+ EOR #&80
+ STA R_NDN,X
 .prw9
  RTS
 
@@ -1683,7 +1697,7 @@ ASSERT prk1 = prk0 + 6 AND prk3 = prk0 + 18 AND pra3 = pra0 + 18
  DEC R_NDN,X
  CMP R_NDX3,X
  BCS prw9
- DEY
+ LDY #3
  BRA mpi
 
 \ The engine's variables (bank 7: pc_circ writes the records in game

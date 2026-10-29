@@ -16,6 +16,15 @@
 // node 6-harness/msunnear.mjs [--disc d] [--syms s] [--out dir] [--rise 64]
 //      [--fly 56] [--hold 12] [--pz --psx --psy] [--sz --sx --sy0 --sy1]
 // (the planet's z and centre on the screen; the sun's z, x and its rise)
+// --pose "ax,ay,az" [--spin d]: the planet's orientation is put each
+// iteration too (as 6-harness/mplanet.mjs puts it: roofv, nosev and sidev
+// rotated from facing us, then spun d degrees an iteration about the game's
+// spin axis), and the stars, the main loop's counter and the random seeds
+// are put at the start, so that
+// the scene does not depend on how long the build took to boot (two builds'
+// frames can then be compared byte for byte).
+// --watch r1,r2,...: each frame's cycles in those routines (from an entry,
+// in the label's bank, until the stack is back above it), as frames[].w.
 // --spawn: no script. The game's own sun is put in slot 1, in view beside the
 // planet, with the planet placed so that part 15 spawns the station 40000
 // ahead within 32 iterations; then the game runs untouched (speed 0, no
@@ -27,7 +36,7 @@ import { MachineSession, BBC } from "./jsbeeb.mjs";
 import { loadSyms, mapOfLabel, physRead, CAND_SYMS, CAND_DISC, WORK } from "./mlib.mjs";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { parseArgs } from "./args.mjs";
-const a = parseArgs({ disc: "value", syms: "value", out: "value", rise: "value", fly: "value", hold: "value",
+const a = parseArgs({ disc: "value", syms: "value", out: "value", rise: "value", fly: "value", hold: "value", pose: "value", spin: "value", watch: "value", sz1: "value", sx1: "value",
     pz: "value", psx: "value", psy: "value", sz: "value", sx: "value", sy0: "value", sy1: "value", spawn: "flag" });
 const SYMS = a.syms || CAND_SYMS;
 const sy = loadSyms(SYMS);
@@ -103,6 +112,39 @@ function doSpawn() {
     ram[sy.DELTA] = 0; ram[sy.VIEW] = 0;
     log.push(`spawn scene in; MCNT ${ram[sy.MCNT]}`);
 }
+function rot(v, ax, ang) {
+    const c = Math.cos(ang), s_ = Math.sin(ang), [x, y, z] = v;
+    if (ax === 0) return [x, y * c - z * s_, y * s_ + z * c];
+    if (ax === 1) return [x * c + z * s_, y, -x * s_ + z * c];
+    return [x * c - y * s_, x * s_ + y * c, z];
+}
+function rotAxis(v, u, ang) {
+    const c = Math.cos(ang), s_ = Math.sin(ang), d = v[0] * u[0] + v[1] * u[1] + v[2] * u[2];
+    const cr = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    return [0, 1, 2].map(i => v[i] * c + cr[i] * s_ + u[i] * d * (1 - c));
+}
+function orient(k) {
+    const [ax, ay, az] = String(a.pose).split(",").map(x => (+x) * Math.PI / 180);
+    let vs = [[0, 0, -1], [0, 1, 0], [1, 0, 0]];
+    vs = vs.map(v => rot(rot(rot(v, 0, ax), 1, ay), 2, az));
+    const sp = (+(a.spin || 0)) * Math.PI / 180 * k;
+    if (sp) {
+        let u = [0, 1, 2].map(i => vs[0][i] - vs[2][i]); const n = Math.hypot(...u); u = u.map(x => x / n);
+        vs = vs.map(v => rotAxis(v, u, sp));
+    }
+    const w = (o, v) => { const m = Math.min(32767, Math.round(Math.abs(v) * 24576)); ram[sy["K%"] + o] = m & 255; ram[sy["K%"] + o + 1] = (m >> 8) | (v < 0 ? 128 : 0); };
+    [9, 15, 21].forEach((o, j) => { w(o, vs[j][0]); w(o + 2, vs[j][1]); w(o + 4, vs[j][2]); });
+    if (k === 0) {                                      // (and the main loop's counter
+        ram[sy.MCNT] = 0;                               // and the random seeds)
+        for (let j = 0; j < 4; j++) ram[sy.RAND + j] = 0x5a ^ (j * 0x31);
+        let r = 12345;
+        const nx = () => { r = (r * 1103515245 + 12345) & 0x7fffffff; return (r >> 8) & 255; };
+        for (let i = 1; i <= ram[sy.NOSTM]; i++) {
+            ram[sy.SX + i] = nx(); ram[sy.SXL + i] = nx(); ram[sy.SY + i] = nx(); ram[sy.SYL + i] = nx();
+            ram[sy.SZ + i] = 0x90 | (nx() & 0x6f); ram[sy.SZL + i] = nx();
+        }
+    }
+}
 function doPose() {
     if (a.spawn) {                                      // (the planet spins: its
         if (k === 0) doSpawn();                         // orientation is put back
@@ -115,7 +157,11 @@ function doPose() {
     }
     const { sun, st } = pose(k);
     put(sy["K%"], 0, P[0]); put(sy["K%"], 3, P[1]); put(sy["K%"], 6, P[2]);
-    const S = [Math.round((sun[0] - 128) * SZ / 256), Math.round((96 - sun[1]) * SZ / 256), SZ];
+    // (--sz1, --sx1: the sun's z and x at the script's end, from --sz and --sx at
+    // its start: the sun grows or shrinks, or crosses the screen, as it rises)
+    const t = Math.min(1, k / (N - 1)), SZk = a.sz1 ? Math.round(SZ + (+a.sz1 - SZ) * t) : SZ;
+    if (a.sx1) sun[0] = SX + (+a.sx1 - SX) * t;
+    const S = [Math.round((sun[0] - 128) * SZk / 256), Math.round((96 - sun[1]) * SZk / 256), SZk];
     if (sy.ss_d !== undefined) {                        // (a build without S_SUN: no sun)
         for (let j = 0; j < 3; j++) putTc(sy.ss_d + 3 * j, S[j] - P[j]);
         ram[sy.SS_OK] = 0xff;
@@ -129,10 +175,17 @@ function doPose() {
         ram[K1 + 27] = 0;
     }
     ram[sy.DELTA] = 0; ram[sy.VIEW] = 0;
+    if (a.pose !== undefined) orient(k);
     for (let j = 2; j < 12; j++) if (ram[sy.FRIN + j]) { ram[sy.FRIN + j] = 0; log.push(`frame ${k}: slot ${j} emptied`); }
 }
+const WATCH = a.watch ? String(a.watch).split(",").filter(n => sy[n] !== undefined) : [];
+const wopen = []; let wacc = {};
 cpu.debugInstruction.add(pc => {
     if (phase === 0) { if (at(pc, "MLOOP")) atLoop = true; return false; }
+    if (WATCH.length) {
+        for (let q = wopen.length - 1; q >= 0; q--) if (cpu.s > wopen[q].sp) { wacc[wopen[q].n] = (wacc[wopen[q].n] || 0) + Math.round(cyc() - wopen[q].t); wopen.splice(q, 1); }
+        for (const n of WATCH) if (pc === sy[n] && at(pc, n) && !wopen.some(o => o.n === n)) wopen.push({ n, t: cyc(), sp: cpu.s });
+    }
     if (at(pc, "MLOOP")) { loopAt.push(cyc()); k++; if (k < N) doPose(); return false; }
     const bank = cpu.romsel & 15;
     if (bank === SSB && pc === sy.S_SUN) tss = cyc();
@@ -151,7 +204,8 @@ cpu.debugInstruction.add(pc => {
         const pal = Array.from(s._machine.processor.video.ulaPal.slice(0, 16));
         frames.push({ k, back, sun: [w16m(sy.F_SUX), w16m(sy.F_SUY), ram[sy.GSUNR], ram[sy.GSUNON]],
             planet: [w16(sy.F_PLX), w16(sy.F_PLY), b6(sy.F_PLR), b6(sy.F_PLON)], seen, ssun: tssd, frame: Math.round(cyc() - tff), ...cy,
-            slot1: ram[sy.FRIN + 1], pal });
+            slot1: ram[sy.FRIN + 1], pal, ...(WATCH.length ? { w: wacc } : {}) });
+        wacc = {};
         writeFileSync(`${OUT}/frame-${String(k).padStart(6, "0")}.bin`, buf);
     }
     return false;

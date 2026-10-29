@@ -22,7 +22,7 @@
 .R_NDF      SKIP 1          \ 0: no boundaries this frame (disc all colour A)
 .R_DBE      SKIP 1          \ colour B pair (even, odd rows)
 .R_DBO      SKIP 1
-.R_NDP      SKIP 192        \ bit 0: colour (0 = A, 1 = B) at the span's left end
+.r_nfree    SKIP 192        \ (free)
 .R_NDX0     SKIP 192        \ boundary x, ascending: pixels >= x take the other
 .R_NDX1     SKIP 192        \ colour; values <= NDISCL or > NDISCR are allowed
 .R_NDX2     SKIP 192

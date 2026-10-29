@@ -119,6 +119,7 @@ encrypt=no`.
 | Lessons from the Tube | 11.82 | 0.846 | 169,148 |
 | Part 6: planets | 10.29 | 0.736 | 194,288 |
 | The text map's footprint, the countdown | 10.30 | 0.737 | 194,178 |
+| The disc layer's rows: count and colour in one byte | 10.38 | 0.743 | 192,731 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never

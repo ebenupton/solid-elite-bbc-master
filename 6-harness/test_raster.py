@@ -303,6 +303,22 @@ class Machine(tr.Machine):
                 self.mem[s[k]] = v
             self.mem[s['KF']:s['KF'] + 192] = [0] * 192
 
+    # the demo's tests write a row's start colour as R_NDP (bit 0; its other
+    # bits random): here it is R_NDN's bit 7 (the count in bits 0-6)
+    def wr(self, name, val, off=0):
+        if name == 'R_NDP' and 'R_NDP' not in self.syms:
+            a = self.syms['R_NDN'] + off
+            self.mem[a] = (self.mem[a] & 0x7F) | ((val & 1) << 7)
+            return
+        super().wr(name, val, off)
+
+    def rd(self, name, off=0):
+        if name == 'R_NDP' and 'R_NDP' not in self.syms:
+            return self.mem[self.syms['R_NDN'] + off] >> 7
+        if name == 'R_NDN' and 'R_NDP' not in self.syms:
+            return self.mem[self.syms['R_NDN'] + off] & 0x7F
+        return super().rd(name, off)
+
     def check_writes(self, snap, name):
         mem, s = self.mem, self.syms
         allowed = sorted([(0x06, 0x28), (tr.ROMSELCOPY, tr.ROMSELCOPY + 1), (0x100, 0x200),

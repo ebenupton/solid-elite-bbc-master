@@ -2724,7 +2724,7 @@ SGOUT = 20
 
 \ ------------------------------------------------------------------------------
 \ Planet surface detail, filled: per-row colour boundaries for the disc layer
-\ (R_NDN, R_NDX0-3, R_NDP: the disc alternates between colour A and colour B
+\ (R_NDN, R_NDX0-3: the disc alternates between colour A and colour B
 \ at each boundary): circles on the planet's sphere, the beach ball's, the
 \ craters' or the bands' (PF_HOOK, gfx-planet7.asm, makes them in game
 \ context; PC_ROWS, gfx-merid.asm's circle engine, the rows), both in the
@@ -2737,7 +2737,7 @@ SGOUT = 20
  STZ R_NDF
  RTS
 
-\ f_bounds: the planet's detail -> R_NDN/R_NDX0-3/R_NDP for rows R_NDT..R_NDB
+\ f_bounds: the planet's detail -> R_NDN/R_NDX0-3 for rows R_NDT..R_NDB
 \ (which f_plrows has just set), and colour B (f_bcol)
 
 .f_bounds
@@ -3030,12 +3030,8 @@ ENDIF                   \ (_PLANET_RINGS)
  JSR T_MCAPS            \ (its crater's boundaries, as the planet's)
  LDY R_NDT
 .fmn3
- LDA R_NDN,Y
- BNE fmn3a
- LDA R_NDP,Y
- LSR A
- BCC fmn3b
-.fmn3a
+ LDA R_NDN,Y            \ (boundaries, or colour B at the left end)
+ BEQ fmn3b
  CPY fm_ct
  BCS P%+5
  STY fm_ct
@@ -3358,11 +3354,13 @@ ENDIF                   \ (_PLANET_RINGS)
  LDA fm_pb,X
  STA fm_b
  LDY fm_y
- LDA R_NDP,Y
- AND #1
- STA fm_c
- LDA R_NDN,Y
+ LDA R_NDN,Y            \ the count and, in bit 7, the start colour
+ AND #&7F
  STA fm_k
+ EOR R_NDN,Y
+ ASL A
+ ROL A
+ STA fm_c
  LDA R_NDX0,Y
  STA fm_x
  LDA R_NDX1,Y

@@ -53,12 +53,13 @@
 \   R_WL, R_WR         this frame's written extents (see R_DISCROWS) [192]
 \   R_NDF              0: this frame's disc is plain colour A (the arrays
 \                      below are ignored); else each disc row has:
-\   R_NDN              boundaries in the row, 0..4                 [192]
+\   R_NDN              bits 0-6: boundaries in the row, 0..4; bit 7: the
+\                      colour at the span's left end before any flip
+\                      (0 = A = R_DCE/R_DCO, 1 = B = R_DBE/R_DBO)    [192]
 \   R_NDX0..R_NDX3     their x, ascending, inside (NDISCL, NDISCR]: pixels
 \                      >= x take the other colour (flips at or left of
-\                      NDISCL are folded into R_NDP by the caller)   [192]
-\   R_NDP              bit 0: colour at the span's left end before any
-\                      flip (0 = A = R_DCE/R_DCO, 1 = B = R_DBE/R_DBO) [192]
+\                      NDISCL are folded into R_NDN's bit 7 by the
+\                      caller)                                       [192]
 \   R_DBE, R_DBO       colour B pair
 \   (R_PTA/R_PTB, R_PYS..R_PCR1, R_BD*: private to the rasteriser.)
 \ Coordinates passed to R_POLY / R_LINE must lie in -16384..16383.
@@ -140,15 +141,15 @@
 \ frame is R_WL/R_WR[y] union DIRTY[b][y].
 \ Rows of R_NDISCL/R in NDT..NDB with NDISCL = 255 (or L > R) are empty;
 \ spans are clamped to the clip window.
-\ Two-colour discs (R_NDF <> 0): pixel x of a disc row has colour R_NDP
-\ EOR (the number of its boundaries <= x).  Each buffer remembers its rows'
+\ Two-colour discs (R_NDF <> 0): pixel x of a disc row has colour R_NDN's
+\ bit 7 EOR (the number of its boundaries <= x).  Each buffer remembers its rows'
 \ boundaries.  A changed row with no dirty extent is a list of edges (span
 \ start, flips, span end + 1), each with an old and a new position; a flip
 \ that crossed an end is matched by a virtual one there.  When the strips
 \ between each edge's positions are in order, only they are written (r_dq
 \ if only boundaries moved, else r_dpe); otherwise, and for rows with a
 \ dirty extent, the row is repainted whole (r_drg).  New spans are clamped to the clip window; pass
-\ them already clamped (with flips at or left of NDISCL folded into R_NDP)
+\ them already clamped (with flips at or left of NDISCL folded into R_NDN)
 \ so unchanged rows are recognised by the cheap comparison.  A change of
 \ the colours A/B must be handled by the caller as now: fold the old disc
 \ into DIRTY (R_MARKDIRTY) first.
@@ -210,21 +211,22 @@ r_opRTS = &60
 \ ============================================================================
 \ The boundary arrays of two-colour discs (R_DISCROWS, r_dbm): each buffer's
 \ last boundaries per row, up to two (a row with more is stored as count
-\ &80, unknown: its next change is a full repaint; the gate's beach balls
-\ have three in 3-5% of their rows, four in none).  Each buffer's four
-\ arrays are contiguous, buffer 1's &300 after buffer 0's, so that the two
-\ arrays of a pair share their low byte (r_dbm patches only operands' high
-\ bytes, from r_sbh_bd*).  The most read, R_BDN and R_BDX0, are at low
-\ bytes &00 and &40: reading them ,X never crosses a page (R_BDP, at &80,
-\ does for rows 128 on).
+\ &40, unknown: its next change is a full repaint; the gate's beach balls
+\ have three in 3-5% of their rows, four in none).  R_BDN holds the count
+\ and, in bit 7, the colour at the span's left end, as R_NDN does.  Each
+\ buffer's arrays are buffer 0's + &300, so that the two arrays of a pair
+\ share their low byte (r_dbm patches only operands' high bytes, from
+\ r_sbh_bd*).  The most read, R_BDN and R_BDX0, are at low bytes &00 and
+\ &40: reading them ,X never crosses a page.
 \ ============================================================================
-.R_BDN0  SKIP 192       \ boundaries per row, 0..2, or &80: more (unknown)
+.R_BDN0  SKIP 192       \ boundaries per row, 0..2, or &40: more (unknown);
+                        \ bit 7: the colour at the span's left end
 .R_BDX10 SKIP 192       \ their x (raw), the second ...
-.R_BDP0  SKIP 192       \ bit 0: the colour at the span's left end
+.r_bfree0 SKIP 192      \ (free)
 .R_BDX00 SKIP 192       \ ... and the first
 .R_BDN1  SKIP 192       \ buffer 1's (= buffer 0's + &300)
 .R_BDX11 SKIP 192
-.R_BDP1  SKIP 192
+.r_bfree1 SKIP 192      \ (free)
 .R_BDX01 SKIP 192
 ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
 \ Row set-up.  Y = row (0..191; kept).  Sets RZ_Y, RZ_PA, RZ_PB, the run page
@@ -268,23 +270,22 @@ ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
   LDX R_XL
   JMP r_spc
 }
-\ r_bstore: Y = row: remember the row's new boundaries (raw) in this buffer;
-\ a row with more than two is stored as unknown (count &80)
+\ r_bstore: Y = row: remember the row's new boundaries (raw) and colour in
+\ this buffer; a row with more than two is stored as unknown (count &40)
 .r_bstore
   LDA R_NDN,Y
-  CMP #3
+  ASL A                   \ (2 count)
+  CMP #6
   BCS bsu
+  LDA R_NDN,Y
 .^r_pt98 STA r_bdn,Y
-  LDA R_NDP,Y
-  AND #1
-.^r_pt99 STA r_bdp,Y
   LDA R_NDX0,Y
 .^r_pt100 STA r_bdx0,Y
   LDA R_NDX1,Y
 .^r_pt101 STA r_bdx1,Y
   RTS
 .bsu
-  LDA #&80
+  LDA #&40
 .^r_pt102 STA r_bdn,Y
   RTS
 
@@ -319,7 +320,6 @@ r_dr1 = R_DIRTYR1
 r_sl1 = R_DISCL1
 r_sr1 = R_DISCR1
 r_bdn = R_BDN0          \ per-buffer boundary rows (patched like r_dl)
-r_bdp = R_BDP0
 r_bdx0 = R_BDX00
 r_bdx1 = R_BDX10
 r_s2l = R_S2L0           \ the second disc's spans (R_DISC2: bank 5, elite-gfx.asm)
@@ -1062,8 +1062,6 @@ R_ENDPAGE 17
 ASSERT LO(R_BDX10) = LO(R_BDX11)
 .r_sbh_bdx0 EQUB HI(R_BDX00), HI(R_BDX01)
 ASSERT LO(R_BDX00) = LO(R_BDX01)
-.r_sbh_bdp EQUB HI(R_BDP0), HI(R_BDP1)
-ASSERT LO(R_BDP0) = LO(R_BDP1)
 .r_sbh_bdn EQUB HI(R_BDN0), HI(R_BDN1)
 ASSERT LO(R_BDN0) = LO(R_BDN1)
 ASSERT LO(R_DISCL0) = LO(R_DISCL1)

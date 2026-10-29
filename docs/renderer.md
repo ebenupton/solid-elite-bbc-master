@@ -446,9 +446,9 @@ parallels can put four crossings in a row, which the disc layer holds.
 environment for the default), and `planet_caps.py`'s `BANDS` follows it.
 
 The disc layer already draws up to four boundaries a row. It keeps two of
-them a row for each buffer (`R_BDN`, `R_BDP`, `R_BDX0`, `R_BDX1`), so that
-the row's next change can be drawn as strips; a row with three or four is
-stored as unknown (count `&80`), and its next change is repainted segment
+them a row for each buffer (`R_BDN`, `R_BDX0`, `R_BDX1`), so that the
+row's next change can be drawn as strips; a row with three or four is
+stored as unknown (count `&40`), and its next change is repainted segment
 by segment. Over the gate's run 2.5% of the beach ball's rows have three
 boundaries and almost none four, and keeping only two is quicker (the rows'
 cycles fall 1.8%) and frees 1,039 bytes of bank 5. What the surface needs
@@ -715,6 +715,42 @@ what changed:
   spans and boundaries);
 * the smaller of them, the second disc (`R_DISC2`);
 * the moon, by rows (`f_moon`).
+
+A row's boundary count and its colour at the span's left end are one
+byte: `R_NDN` holds the count in bits 0-6 and the colour in bit 7
+(`PC_ROWS` and `PC_MROWS` write it so, `f_moon` reads it), and each
+buffer's stored boundaries likewise (`R_BDN`). An unchanged row is then one
+compare of the two bytes, and `r_dpe` finds a changed row's count
+difference with the colours shifted out. The disc memory, in bytes:
+
+| Structure | Where | Bytes |
+|---|---|---:|
+| `R_DISCL0/R0/L1/R1`, the layer's spans by buffer | shared workspace | 768 |
+| `R_BDN`, `R_BDX0`, `R_BDX1` by buffer, its boundaries | bank 5 | 1,152 |
+| `R_S2L0/L1/R0/R1`, the second disc's spans by buffer | bank 5 | 768 |
+| `R_NDN` (count and colour), `R_NDX0-3`, this frame's boundaries | shared workspace | 960 |
+| `R_NDISCL/R`, this frame's spans (the polygons' edge tables between the frames' discs) | shared workspace | 384 |
+| `F_HW`, `F_HW2`, `F_HW3`, the half-widths by radius | bank 6 | 576 |
+
+Measured and not taken (`6-harness/discmem`: `bench.sh` runs the disc
+layer's scenes on a build, `cmp.py` and `perframe.py` compare two builds'
+pixels byte for byte and their cycles frame by frame; a candidate had to
+leave every frame of every scene no slower):
+
+* The second disc's spans made again from its place and radius as each
+  buffer drew it, instead of kept: 768 bytes of bank 5 for about 330 of
+  bank 6's code, but frames where the second disc moves were 1,100 to 2,500
+  cycles slower.
+* The layer's spans made again the same way: 768 bytes, at about 25 cycles
+  a row whenever the planet moves and a half-width table whenever its
+  radius changes.
+* One heap for all the discs' kept state: a close planet alone needs 1,920
+  bytes in both buffers, and only the second disc could share it.
+* Rows made as `R_DISCROWS` reads them: `PC_ROWS` walks each circle out from
+  its centre row, so rows in order would need a rewrite of the circle
+  engine, to save `R_NDN` and `R_NDX0-3` (960 bytes).
+* The third and fourth boundaries only for the rows that have them: two
+  craters side by side give such rows over a cap's height.
 
 The ring is dots, explosions are particles, the hangar is rectangles and
 lines, and the hyperspace and launch rings and the charts' circles are
