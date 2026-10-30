@@ -47,11 +47,13 @@ async function run(disc, sy, kind, seedBoot) {
         } else {
             const TP = [sy.F_PDOT, 6];
             // (jsbeeb calls no hook for an execute slice's first instruction:
-            // F_PDOT's second, TAY's next, stands in for a missed first)
-            let last = -1;
+            // F_PDOT's second, TAY's next, stands in for a missed first; an
+            // interrupt between the two is not a second particle)
+            let seen = false;
             cpu.debugInstruction.add(pc => {
-                if ((cpu.romsel & 0x8f) === 6 && cur && (pc === TP[0] || (pc === TP[0] + 1 && last !== TP[0]))) add(cpu.x, cpu.a);
-                last = pc;
+                if ((cpu.romsel & 0x8f) !== 6 || !cur) return false;
+                if (pc === TP[0]) { add(cpu.x, cpu.a); seen = true; }
+                else if (pc === TP[0] + 1) { if (!seen) add(cpu.x, cpu.a); seen = false; }
                 return false;
             });
         }
