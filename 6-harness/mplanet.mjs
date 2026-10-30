@@ -75,7 +75,9 @@ let cur = -1, armed = false;
 const seed = a.seedfile ? JSON.parse(readFileSync(a.seedfile, "utf8")) : null;
 // the routines whose cycles are counted: entry address (and bank, for the
 // banked ones), until the stack pointer is back above its entry value
-const WATCH = ["PL9", "f_bounds", "G_PFHOOK", "T_CAPS", "T_DISCROWS", "T_MOON", "T_RING", "f_moon", "f_ring", "T_MCAPS", "F_FRAME", "G_MERHOOK", "T_MERID"].filter(n => sy[n] !== undefined);
+// (MPWATCH=name,name...: more routines, for a profile of the disc layer)
+const WATCH = ["PL9", "f_bounds", "G_PFHOOK", "T_CAPS", "T_DISCROWS", "T_MOON", "T_RING", "f_moon", "f_ring", "T_MCAPS", "F_FRAME", "G_MERHOOK", "T_MERID",
+    ...(process.env.MPWATCH ? process.env.MPWATCH.split(",") : [])].filter(n => sy[n] !== undefined);
 const res = await runElite({ disc: `${TREE}/5-compiled-game-discs/elite-master-sng47.ssd`, syms: sy, pilot, iters: FROM + N + 2, patch: patchCommander, seed,
     onIter: (i, s, r) => {
         const cpu = r.cpu;

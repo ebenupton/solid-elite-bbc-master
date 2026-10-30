@@ -325,7 +325,7 @@ line.
 | Bank 7, the cold pass | `&8000-&A3A8` | the cold blocks of `elite-source.asm` in its order (the start-up, the extended token printer `DETOK`, the docked screens, the charts and the market, hyperspace, the equipment, the title, save and load, `DOSCLI` ...), then the extended tokens, `TKN1` |
 | Bank 7, the meridian window | `&A3A9-&B7E8` (its own image, `MERID`) | the planet's surface detail (`gfx-merid.asm`, the circle engine: `pc_circ`, a circle's record, `PC_ROWS`, the rows (and `PC_MROWS`, the moon's crater's, with `make moon=on`), and the records; `gfx-planet7.asm`, the styles, `PF_HOOK`: the beach ball, the craters and, with `make bands=on`, the bands; the moon, `pf_moon`, with `make moon=on`; the ring's dots, `pf_ring`, with `make rings=on`), then the kept solid rows' polygon part (`gfx-kept7.asm`: `k_pre`, `k_settle`), then the lens flare (`gfx-flare.asm`: `R_FLARE`, its tables, its half-width table `fl_htab`, kept whole in a page, and its variables) |
 | ANDY, the rasteriser's polygon window | `&8000-&8FDA` (ROMSEL `&85`) | `R_POLY` and `R_LINE` (`gfx-raster_poly.asm`, `gfx-raster_line.asm`) |
-| Bank 5, the rasteriser | `&8000-&8EF3` (ROMSEL 5), `&9000-&BEF7` | the disc window (`gfx-raster_disc.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`, then the second disc's right ends for buffer 0, `R_S2R0`, at `&8F40`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; then the second disc, `R_DISC2`, `gfx-raster_disc2.asm`, with the moon's writes, `R_WSPAN`, with `make moon=on`, and the second disc's right ends for buffer 1, `R_S2R1`, at `&BF40`); in the room below the per-x tables, from `r_tfree` (`&9916`), R_LINE's cold part (`gfx-raster_lcold.asm`) and then the rasteriser's private state, `R_PRBUF` to `R_PRCWB`, then the second disc's left ends, `R_S2L0` and `R_S2L1`, at `&9A00` and `&9B00` |
+| Bank 5, the rasteriser | `&8000-&8F22` (ROMSEL 5), `&9000-&BF3D` | the disc window (`gfx-raster_disc.asm`, with the strip encoder's core, `gfx-raster_strips.asm`, then the kept solid rows' part, `gfx-raster_kept.asm`, then the second disc's right ends for buffer 0, `R_S2R0`, at `&8F40`); the shared region (`gfx-raster.asm`: the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000`, the stars; then the second disc, `R_DISC2`, `gfx-raster_disc2.asm`, then `R_INIT`, `gfx-raster_init.asm`, and the second disc's right ends for buffer 1, `R_S2R1`, at `&BF40`); in the room below the per-x tables, from `r_tfree` (`&990A`), R_LINE's cold part (`gfx-raster_lcold.asm`), the rasteriser's private state, `R_PRBUF` to `R_PRCWB`, and `R_RESETBUF` (`gfx-raster_reset.asm`), then the second disc's left ends, `R_S2L0` and `R_S2L1`, at `&9A40` and `&9B40`, with the moon's writes, `R_WSPAN` (`gfx-raster_wspan.asm`), between them with `make moon=on` |
 | Bank 6, the frame layer | `&8000-&B590` | `gfx-frame.asm` (with the moon's `f_moon0` and `f_moon` with `make moon=on`, and `f_ring` with `make rings=on`), `gfx-faces.asm`, `gfx-light6.asm`, `gfx-light.asm` (its second pass, `L_REC`), `gfx-frame_cold.asm` (with `f_slot`, the stars beside a docking slot), `gfx-flare6.asm`, `gfx-hangar.asm`; then its state: the ship records (`F_RP`; `F_SR`, with `F_INIT`, `gfx-finit.asm`, in its room), the half-widths, `f_zsv`, the text map (`F_TM`, `F_TMR`, `F_TCH`, renderer.md's "The text map"), the directly drawn stars and the docking slot's vertices for the stars, `F_SLV`; then the hangar's tables (`gfx-hangar6.asm`), which only `f_hback` reads |
 | HAZEL | `&C000-&DA38` | the game data only: the hot data in the original's order, `XX21`, `E%`, `KWL%`, `KWH%`, the blueprints (without their edge lists), `QQ18`, `SNE`, `ACT`, then `RUPLA`, `RUGAL` and `RUTOK` (`&D781-&DA38`). `&DF00-&DFFF` is the MOS's, off limits |
 | Shadow `&3000-&3FFF` | `&3090-&30FF` | the zero-page save (`setzp`, `getzp`), as in the original; nothing else |
@@ -338,13 +338,12 @@ parts branch into one another and so move as a whole, leads the second.
 
 Free space: 7 bytes below `&4000` and 180 below `&8000` (each the end of
 one of the hot pass's containers in main RAM), 382 at the end of bank 4,
-2,071 at the end of bank 7, 1,223 in HAZEL, 76 and 72 in bank 5 (before the
-second disc's `R_S2R0` and `R_S2R1`; and 46 below the per-x tables, 64
-after each of `R_S2L0` and `R_S2L1`, 384 in the boundary block, at
-`&9180-&923F` and `&9480-&953F`, and 256 in the row runs' tails), 37 in
-ANDY, 2,671 in bank 6, and 48 and 236 in `WP`'s pages and the shared
-workspace (192 of it at `&17F8-&18B7`), with 293 more between it and the
-main code. `CODE%` (`&1F13`) is chosen to keep the font page aligned with
+2,071 at the end of bank 7, 1,223 in HAZEL, 29 and 2 in bank 5 (before the
+second disc's `R_S2R0` and `R_S2R1`; and 29 below the second disc's left
+ends, 64 between `R_S2L0` and `R_S2L1`, 8 with `make moon=on`, and 256 in
+the row runs' tails), 37 in ANDY, 2,671 in bank 6, and 48 and 236 in
+`WP`'s pages and the shared workspace (192 of it at `&17F8-&18B7`), with
+293 more between it and the main code. `CODE%` (`&1F13`) is chosen to keep the font page aligned with
 no padding; with `make moon=on` the glue area is 43 bytes longer, and
 `CODE%` that much lower. The options take room of their own: `make
 bands=on` 81 bytes of bank 7; `make rings=on` 1,024 of bank 7, 169 of bank

@@ -30,11 +30,11 @@ pl() {
 }
 for w in $what; do case $w in
 run1)
-    : "${RUN1:?run1 needs RUN1, an agentplay session's inputs.jsonl}"
+    : "${RUN1:?run1 needs RUN1, the inputs.jsonl of an agentplay session}"
     node "$R/6-harness/solidspan/fbhash.mjs" --log "$RUN1" --cand "$DISC" --csyms "$SYMS" \
         --from 0 --to 3600 --out "$OUT/run1-fb.json" > "$OUT/run1-fb.log" 2>&1
     node "$R/6-harness/solidspan/mspeed.mjs" --log "$RUN1" --cand "$DISC" --csyms "$SYMS" \
-        --windows 0-3550,1000-1400,2000-2400,3000-3400,3420-3550,3484-3530 > "$OUT/run1-speed.txt" 2>&1 ;;
+        --windows 0-3550,1000-1400,2000-2400,3000-3400,3420-3550,3484-3530,300-403,5355-5457 > "$OUT/run1-speed.txt" 2>&1 ;;
 gatefb)
     node "$R/6-harness/mfbcmp.mjs" --frames --disc "$DISC" --syms "$SYMS" --iters 3000 \
         --out "$OUT/gate-fb.json" > "$OUT/gate-fb.log" 2>&1 ;;

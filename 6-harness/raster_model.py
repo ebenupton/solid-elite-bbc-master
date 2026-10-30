@@ -777,12 +777,13 @@ class Tester:
             if sc == 'jumpy':
                 cx, cy, rad = rnd.uniform(-50, 300), rnd.uniform(-50, 250), rnd.uniform(0, 120)
             has_disc = sc != 'none' and (sc != 'mixed' or (f // 7) % 2 == 0)
-            spans = {}
+            spans = {}                  # (clamped to the window, as the frame layer
+            cl_, cr_ = self.clip[0], self.clip[1]   # clamps them)
             if has_disc and beach:      # the game's disc: the integer circle the
                 ir = max(6, min(250, int(rad)))     # meridian window is given (the
                 for y in range(max(int(cy) - ir, 1), min(int(cy) + ir, 191) + 1):   # frame
                     h = math.isqrt(ir * ir - (y - int(cy)) ** 2)   # layer's half-widths)
-                    l, r = max(int(cx) - h, 1), min(int(cx) + h, 254)
+                    l, r = max(int(cx) - h, cl_), min(int(cx) + h, cr_)
                     if l <= r:
                         spans[y] = (l, r)
             elif has_disc:
@@ -791,7 +792,7 @@ class Tester:
                     if abs(dy) < rad:
                         h = math.sqrt(rad * rad - dy * dy)
                         l, r = int(math.floor(cx - h)), int(math.floor(cx + h))
-                        l, r = max(l, 1), min(r, 254)
+                        l, r = max(l, cl_), min(r, cr_)
                         if l <= r and 1 <= y <= 191:
                             spans[y] = (l, r)
             if spans:

@@ -84,13 +84,18 @@ def raster_files():
     """the rasteriser's bank 5 / ANDY sources (those that exist): the shared region
     and its two windows"""
     return [p for p in (os.path.join(MS, f) for f in ('gfx-raster.asm', 'gfx-raster_lcold.asm', 'gfx-raster_disc2.asm',
-                                                      'gfx-raster_disc.asm', 'gfx-raster_poly.asm', 'gfx-raster_line.asm'))
+                                                      'gfx-raster_init.asm', 'gfx-raster_reset.asm', 'gfx-raster_wspan.asm',
+                                                      'gfx-raster_disc.asm', 'gfx-raster_strips.asm',
+                                                      'gfx-raster_poly.asm', 'gfx-raster_line.asm'))
             if os.path.exists(p)]
 
 
 LINEA = os.path.join(MS, 'gfx-raster_line.asm')    # R_LINE in the polygon window (ANDY) ...
 LINE5 = os.path.join(MS, 'gfx-raster_lcold.asm')   # ... and its cold part in the shared region
 LINE7 = not os.path.exists(LINEA)                  # (before: R_LINE in bank 7, gfx-raster7.asm)
+INIT5 = os.path.join(MS, 'gfx-raster_init.asm')    # R_INIT, after the second disc, and
+RESET5 = os.path.join(MS, 'gfx-raster_reset.asm')  # R_RESETBUF, after R_LINE's cold part, and
+WSPAN5 = os.path.join(MS, 'gfx-raster_wspan.asm')  # R_WSPAN, between R_S2L0 and R_S2L1
 DISC2 = os.path.join(MS, 'gfx-raster_disc2.asm')   # the second disc (R_DISC2): after the shared
 HASD2 = os.path.exists(DISC2)                      # region, with R_LINE's cold part in the room
                                                    # below the per-x tables, as elite-gfx.asm
@@ -202,6 +207,8 @@ def assemble(org):
     base = os.path.join(REPO, '6-harness', 'work', 'raster')
     os.makedirs(base, exist_ok=True)
     d = tempfile.mkdtemp(prefix='mraster_', dir=base)
+    # (the sources' own INCLUDEs name their files from the repository's root)
+    os.symlink(os.path.join(TREE, '1-source-files'), os.path.join(d, '1-source-files'))
     w = os.path.join(d, 'w.asm')
     with open(w, 'w') as f:
         f.write('_PLANET_RINGS = %s\n' % ('TRUE' if RINGS else 'FALSE'))
@@ -218,9 +225,15 @@ def assemble(org):
             f.write('CLEAR &8000, &C000\nORG &9000\nINCLUDE "%s"\n' % tr.SRC)
             if HASD2:
                 f.write('INCLUDE "%s"\n' % DISC2)
+                if os.path.exists(INIT5):
+                    f.write('INCLUDE "%s"\n' % INIT5)
                 f.write('.t_b5end\n')
                 if not LINE7:
                     f.write('CLEAR r_tfree, r_tables\nORG r_tfree\nINCLUDE "%s"\n' % LINE5)
+                    if os.path.exists(RESET5):
+                        f.write('INCLUDE "%s"\n' % RESET5)
+                    if os.path.exists(WSPAN5):
+                        f.write('ORG R_S2L0 + 192\nINCLUDE "%s"\n' % WSPAN5)
             else:
                 if not LINE7:
                     f.write('INCLUDE "%s"\n' % LINE5)

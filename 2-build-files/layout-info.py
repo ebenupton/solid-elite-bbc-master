@@ -56,6 +56,8 @@ BANKED = [(OUT + "elite-source-hot3.asm", "4"), (OUT + "elite-data-hot4.asm", "4
           (SRC + "gfx-raster.asm", "5"), (SRC + "gfx-raster_disc.asm", "5"), (SRC + "gfx-raster_poly.asm", "85"),
           (SRC + "gfx-raster_line.asm", "85"), (SRC + "gfx-raster_lcold.asm", "5"),
           (SRC + "gfx-raster_disc2.asm", "5"), (SRC + "gfx-raster_kept.asm", "5"),
+          (SRC + "gfx-raster_strips.asm", "5"), (SRC + "gfx-raster_init.asm", "5"),
+          (SRC + "gfx-raster_reset.asm", "5"), (SRC + "gfx-raster_wspan.asm", "5"),
           (SRC + "gfx-frame.asm", "6"), (SRC + "gfx-flare6.asm", "6"),
           (SRC + "gfx-hangar.asm", "6"), (SRC + "gfx-faces.asm", "6"), (SRC + "gfx-frame_cold.asm", "6"),
           (SRC + "gfx-merid.asm", "7"), (SRC + "gfx-kept7.asm", "7"), (SRC + "gfx-planet7.asm", "7"),

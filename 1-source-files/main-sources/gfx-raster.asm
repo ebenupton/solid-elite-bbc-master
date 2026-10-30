@@ -11,7 +11,8 @@
 \     boundary arrays, R_SETBUF, r_spc, the 24 row runs and their tails, the
 \     stars), seen with either window below;
 \   raster_disc.asm, the disc window: bank 5 &8000-&8FFF, paged with ROMSEL 5
-\     (RASTBANK): R_DISCROWS, the dirty repair, R_INIT and R_RESETBUF;
+\     (RASTBANK): R_DISCROWS and the dirty repair (R_INIT and R_RESETBUF
+\     are in the shared region, raster_init.asm and raster_reset.asm);
 \   raster_poly.asm and raster_line.asm, the polygon window: ANDY, paged with
 \     ROMSEL &85 (RASTPOLY, ANDY over bank 5): R_POLY and R_LINE (R_LINE's
 \     cold part, raster_lcold.asm, and R_POLY's arithmetic are here, for room).
@@ -139,18 +140,21 @@
 \ they hold, per row, the extent of the disc-layer writes (and of the
 \ dirty repair).  Shapes are NOT added to R_WL/R_WR: what was written this
 \ frame is R_WL/R_WR[y] union DIRTY[b][y].
-\ Rows of R_NDISCL/R in NDT..NDB with NDISCL = 255 (or L > R) are empty;
-\ spans are clamped to the clip window.
+\ Rows of R_NDISCL/R in NDT..NDB with NDISCL = 255 are empty; spans are
+\ within the clip window (the frame layer clamps them to it).
 \ Two-colour discs (R_NDF <> 0): pixel x of a disc row has colour R_NDN's
-\ bit 7 EOR (the number of its boundaries <= x).  Each buffer remembers its rows'
-\ boundaries.  A changed row with no dirty extent is a list of edges (span
-\ start, flips, span end + 1), each with an old and a new position; a flip
-\ that crossed an end is matched by a virtual one there.  When the strips
-\ between each edge's positions are in order, only they are written (r_dq
-\ if only boundaries moved, else r_dpe); otherwise, and for rows with a
-\ dirty extent, the row is repainted whole (r_drg).  New spans are clamped to the clip window; pass
-\ them already clamped (with flips at or left of NDISCL folded into R_NDN)
-\ so unchanged rows are recognised by the cheap comparison.  A change of
+\ bit 7 EOR (the number of its boundaries <= x).  Each buffer remembers its
+\ rows' boundaries, up to three.  A changed row with no dirty extent is a
+\ list of edges (span start, flips, span end + 1), each with an old and a
+\ new position; old and new are made the same length with virtual flips (at
+\ the left end if the colours there differ, then at the end), and each
+\ edge's strip between its positions is written, cut short where a
+\ neighbour's new position has passed into it: only the pixels whose
+\ colour changed (r_dq if only boundaries moved, else r_dpe).  Rows with a
+\ dirty extent, an unknown old count or more than three flips are repainted
+\ whole (r_drg).  Pass new spans already clamped (with flips at or left of
+\ NDISCL folded into R_NDN) so unchanged rows are recognised by the cheap
+\ comparison.  A change of
 \ the colours A/B must be handled by the caller as now: fold the old disc
 \ into DIRTY (R_MARKDIRTY) first.
 \ ============================================================================
@@ -210,7 +214,7 @@ r_opRTS = &60
 
 \ ============================================================================
 \ The boundary arrays of two-colour discs (R_DISCROWS, r_dbm): each buffer's
-\ last boundaries per row, up to two (a row with more is stored as count
+\ last boundaries per row, up to three (a row with more is stored as count
 \ &40, unknown: its next change is a full repaint; the gate's beach balls
 \ have three in 3-5% of their rows, four in none).  R_BDN holds the count
 \ and, in bit 7, the colour at the span's left end, as R_NDN does.  Each
@@ -219,16 +223,16 @@ r_opRTS = &60
 \ r_sbh_bd*).  The most read, R_BDN and R_BDX0, are at low bytes &00 and
 \ &40: reading them ,X never crosses a page.
 \ ============================================================================
-.R_BDN0  SKIP 192       \ boundaries per row, 0..2, or &40: more (unknown);
+.R_BDN0  SKIP 192       \ boundaries per row, 0..3, or &40: more (unknown);
                         \ bit 7: the colour at the span's left end
 .R_BDX10 SKIP 192       \ their x (raw), the second ...
-.r_bfree0 SKIP 192      \ (free)
+.R_BDX20 SKIP 192       \ ... the third ...
 .R_BDX00 SKIP 192       \ ... and the first
 .R_BDN1  SKIP 192       \ buffer 1's (= buffer 0's + &300)
 .R_BDX11 SKIP 192
-.r_bfree1 SKIP 192      \ (free)
+.R_BDX21 SKIP 192
 .R_BDX01 SKIP 192
-ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
+ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300 AND R_BDX21 = R_BDX20 + &300
 \ Row set-up.  Y = row (0..191; kept).  Sets RZ_Y, RZ_PA, RZ_PB, the run page
 \ (RZ_PP+1 and r_jsr+2).  Clobbers A.
 .r_rowset
@@ -271,11 +275,11 @@ ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
   JMP r_spc
 }
 \ r_bstore: Y = row: remember the row's new boundaries (raw) and colour in
-\ this buffer; a row with more than two is stored as unknown (count &40)
+\ this buffer; a row with more than three is stored as unknown (count &40)
 .r_bstore
   LDA R_NDN,Y
   ASL A                   \ (2 count)
-  CMP #6
+  CMP #8
   BCS bsu
   LDA R_NDN,Y
 .^r_pt98 STA r_bdn,Y
@@ -283,6 +287,8 @@ ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300
 .^r_pt100 STA r_bdx0,Y
   LDA R_NDX1,Y
 .^r_pt101 STA r_bdx1,Y
+  LDA R_NDX2,Y
+.^r_pt103 STA r_bdx2,Y
   RTS
 .bsu
   LDA #&40
@@ -322,6 +328,7 @@ r_sr1 = R_DISCR1
 r_bdn = R_BDN0          \ per-buffer boundary rows (patched like r_dl)
 r_bdx0 = R_BDX00
 r_bdx1 = R_BDX10
+r_bdx2 = R_BDX20
 r_s2l = R_S2L0           \ the second disc's spans (R_DISC2: bank 5, elite-gfx.asm)
 r_s2r = R_S2R0
 
@@ -385,12 +392,9 @@ r_s2r = R_S2R0
   STA r_pt54+2
   STA r_pt89+2
   STA r_pt97+2
-  STA r_pt131+2
   STA r_pt132+2
-  STA r_pt144+2
-  STA r_pt150+2
-  STA r_pt152+2
-  STA r_pt399+2
+  STA r_pt149+2
+  STA r_pt157+2
   STA r_pt506+2           \ (R_DISC2's: gfx-raster_disc2.asm)
   STA r_pt508+2
   STA r_pt510+2
@@ -403,11 +407,8 @@ r_s2r = R_S2R0
   STA r_pt52+2
   STA r_pt55+2
   STA r_pt90+2
+  STA r_pt130+2
   STA r_pt133+2
-  STA r_pt140+2
-  STA r_pt145+2
-  STA r_pt151+2
-  STA r_pt153+2
   STA r_pt507+2
   STA r_pt509+2
   STA r_pt511+2
@@ -851,22 +852,27 @@ r_dcol = r_ov + 14
 r_ba = r_ov + 15
 r_bb = r_ov + 16
 r_tl = r_ov + 17
-r_fe = r_ov + 20
-r_fo = r_ov + 21
 r_bv = r_ov + 22        \ r_segw: the new boundaries (4)
-r_ev = r_ov + 45        \ r_dpe: edges new (7), then old (7) at r_ev+7
-r_nn = r_ov + 30        \ new count / colour; old count / colour
+r_nn = r_ov + 30        \ r_segw: the boundary count; the colour now
 r_np = r_ov + 31
-r_on = r_ov + 32
-r_op = r_ov + 33
-r_ns = r_ov + 34        \ strips to write (r_dp2)
-r_cA = r_ov + 35        \ this row's colour A, B bytes
+r_cA = r_ov + 35        \ this row's colour A, B bytes (r_bcols)
 r_cB = r_ov + 36
-r_dcr = r_ov + 37       \ r_dp2: right end colour
+r_c0 = r_cA             \ rs_cols: the colour at the left end, the other
+r_c1 = r_cB
 r_segs = r_ov + 38      \ r_drg: repaint the new span segment by segment
-r_cl = r_ov + 39        \ r_canon: span, count in
-r_cr = r_ov + 40
-r_cn = r_ov + 41
+r_cn = r_ov + 41        \ r_dq: 2 count
+r_oe = r_ov + 42        \ raster_strips.asm: the ends after the right ends, old, new
+r_ne = r_ov + 43
+r_ok = r_ov + 32        \ raster_strips.asm: the boundary counts, old, new
+r_nk = r_ov + 33
+r_ol = r_ov + 44        \ raster_strips.asm: the left ends, old, new
+r_nl = r_ov + 45
+rs_t0 = RZ_T0           \ raster_strips.asm: the boundaries, old, then new
+rs_t1 = RZ_T1
+rs_t2 = RZ_T2
+rs_t3 = RZ_T3
+rs_t4 = RZ_T4
+rs_t5 = RZ_T5
 .r_run13 R_RUN 13
 .r_s0k SKIP 48          \ buffer 0: star's first pixel
 R_ENDPAGE 13
@@ -1060,6 +1066,7 @@ R_ENDPAGE 17
 }
 .r_sbh_bdx1 EQUB HI(R_BDX10), HI(R_BDX11)
 ASSERT LO(R_BDX10) = LO(R_BDX11)
+.r_sbh_bdx2 EQUB HI(R_BDX20), HI(R_BDX21)
 .r_sbh_bdx0 EQUB HI(R_BDX00), HI(R_BDX01)
 ASSERT LO(R_BDX00) = LO(R_BDX01)
 .r_sbh_bdn EQUB HI(R_BDN0), HI(R_BDN1)
@@ -1149,22 +1156,6 @@ R_ENDPAGE 22
   BCC c5
   STA R_PRWB
 .c5
-  RTS
-\ r_bcols: Y = row: r_cA, r_cB = colour A, B bytes of the row (keeps X, Y)
-.r_bcols
-  TYA
-  LSR A
-  BCS bc1
-  LDA R_DCE
-  STA r_cA
-  LDA R_DBE
-  STA r_cB
-  RTS
-.bc1
-  LDA R_DCO
-  STA r_cA
-  LDA R_DBO
-  STA r_cB
   RTS
 R_ENDPAGE 23
 ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR HI(r_run0))

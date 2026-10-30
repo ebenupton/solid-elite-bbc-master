@@ -55,12 +55,13 @@ Master Elite (the Acornsoft SNG47 release), in six parts:
    build options (with moons, a quarter of the systems have one, fixed in
    space and solid); the sun is drawn near the planet while the station has its slot; every disc is
    drawn incrementally; and stars go only into wholly black screen bytes.
-   Flight runs at 10.29 iterations per emulated second (0.736 times SNG47),
-   most of the cost in the crater system, whose two true craters cost more
-   than the original's polygon crater. Since then the disc layer packs each
-   row's boundary count and colour into a byte, and the frame keeps records
-   of its own (it projects each ship as it draws it, and draws explosions
-   from the game's line heap): 10.42 (0.745 times SNG47).
+   The disc layer packs each row's boundary count and colour into a byte
+   and writes a changed row as strips between its old and new boundaries
+   (up to three a row), and the frame keeps records of its own (it projects
+   each ship as it draws it, and draws explosions from the game's line
+   heap). Flight runs at 11.13 iterations per emulated second (0.796 times
+   SNG47), most of the cost in the crater system, whose two true craters
+   cost more than the original's polygon crater.
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -125,6 +126,7 @@ encrypt=no`.
 | Explosion clouds drawn from the ship line heap | 10.39 | 0.744 | 192,407 |
 | Ships projected by the frame | 10.40 | 0.745 | 192,237 |
 | Moons an option, off by default | 10.42 | 0.745 | 192,004 |
+| The disc layer's changed rows as clipped strips, three boundaries kept | 11.13 | 0.796 | 179,751 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
 the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never

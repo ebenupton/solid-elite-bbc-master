@@ -170,9 +170,9 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`, and what the frame reads of the moon and the ring with `make moon=on` and `make rings=on` (`gfx-planetv.asm`). Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass); and, with `make moon=on`, the moon's place, `MN_TURN`, and its collision test, `MOONHIT` (`elite-moon.asm`), from the main flight loop |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
-| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window |
+| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window (`R_LINE`'s cold part, `R_INIT`, `R_RESETBUF`, and `R_WSPAN` with `make moon=on`) |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
-| The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows, the dirty repair, `R_INIT`, `R_RESETBUF` |
+| The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows (with the strip encoder's core, `gfx-raster_strips.asm`), the dirty repair |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the ship records (`F_RP`, `F_SR`, whose room holds `F_INIT` until the first frame), the zero page `F_FRAME` keeps (`f_zsv`), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
 | The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK`, and the moon, `pf_moon`, with `make moon=on` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
@@ -509,13 +509,11 @@ parallels can put four crossings in a row, which the disc layer holds.
 `test_raster.py` tests the planet code with bands on (`BANDS=off` in its
 environment for the default), and `planet_caps.py`'s `BANDS` follows it.
 
-The disc layer already draws up to four boundaries a row. It keeps two of
-them a row for each buffer (`R_BDN`, `R_BDX0`, `R_BDX1`), so that the
-row's next change can be drawn as strips; a row with three or four is
-stored as unknown (count `&40`), and its next change is repainted segment
-by segment. Over the gate's run 2.5% of the beach ball's rows have three
-boundaries and almost none four, and keeping only two is quicker (the rows'
-cycles fall 1.8%) and frees 1,039 bytes of bank 5. What the surface needs
+The disc layer already draws up to four boundaries a row. It keeps three
+of them a row for each buffer (`R_BDN`, `R_BDX0-2`), so that the row's next
+change can be drawn as strips ("Every disc, incremental"); a row with four
+is stored as unknown (count `&40`), and its next change is repainted segment
+by segment. What the surface needs
 is the geometry, which has its own window: the meridian window, in bank 7
 after the cold pass, with the circle engine (`gfx-merid.asm`) and the
 styles (`gfx-planet7.asm`). It has two entry points, each behind one stub
@@ -799,13 +797,36 @@ A row's boundary count and its colour at the span's left end are one
 byte: `R_NDN` holds the count in bits 0-6 and the colour in bit 7
 (`PC_ROWS` and, with moons, `PC_MROWS` write it so, `f_moon` reads it), and each
 buffer's stored boundaries likewise (`R_BDN`). An unchanged row is then one
-compare of the two bytes, and `r_dpe` finds a changed row's count
-difference with the colours shifted out. The disc memory, in bytes:
+compare of the two bytes and of its stored boundaries.
+
+A changed row with no dirty extent (`r_dq` when only its boundaries moved,
+`r_dpe` otherwise) is written as the difference of its old and new edge
+lists: the span's left end, its boundaries, and the end after its right
+end. The two lists are made alike, three boundaries each and the same
+colour at the left end, by virtual boundaries of no width (one at the left
+end of the list with fewer when the colours there differ, then at the end
+after the right end); then each edge's strip, old .. new, is written in the
+colour on the side it moved from, cut short where the edge before's new
+place (moving right) or the edge after's (moving left) has passed into it.
+As the old edges are in order and so are the new, every pixel whose colour
+changed lies in exactly one strip and no other pixel is written: no order
+test, no partial writes and no fallback, whatever the counts (up to three)
+and colours. The core is `gfx-raster_strips.asm`, which `r_dpe` includes
+between loading the edges and storing the row's state (`r_dpst`). A row
+with no old span is painted segment by segment (`r_segw`); with no new
+span, `r_dp2` blacks the old; with the old count unknown, the row is
+repainted (`r_drg`). `6-harness/discmem/mdprof.mjs` profiles the encoders
+over a replayed session's windows (their calls, what they were given, how
+they ended, their cycles before the first write and in the pixels), and
+`6-harness/discmem/pagex.py` lists the disc window's branches whose taken
+path crosses a page.
+
+The disc memory, in bytes:
 
 | Structure | Where | Bytes |
 |---|---|---:|
 | `R_DISCL0/R0/L1/R1`, the layer's spans by buffer | shared workspace | 768 |
-| `R_BDN`, `R_BDX0`, `R_BDX1` by buffer, its boundaries | bank 5 | 1,152 |
+| `R_BDN`, `R_BDX0-2` by buffer, its boundaries | bank 5 | 1,536 |
 | `R_S2L0/L1/R0/R1`, the second disc's spans by buffer | bank 5 | 768 |
 | `R_NDN` (count and colour), `R_NDX0-3`, this frame's boundaries | shared workspace | 960 |
 | `R_NDISCL/R`, this frame's spans (the polygons' edge tables between the frames' discs) | shared workspace | 384 |
@@ -813,8 +834,9 @@ difference with the colours shifted out. The disc memory, in bytes:
 
 Measured and not taken (`6-harness/discmem`: `bench.sh` runs the disc
 layer's scenes on a build, `cmp.py` and `perframe.py` compare two builds'
-pixels byte for byte and their cycles frame by frame; a candidate had to
-leave every frame of every scene no slower):
+pixels byte for byte and their cycles frame by frame, `gatespeed.py` two
+gates' speed tables; a candidate had to leave every frame of every scene
+no slower):
 
 * The second disc's spans made again from its place and radius as each
   buffer drew it, instead of kept: 768 bytes of bank 5 for about 330 of
@@ -917,23 +939,17 @@ tables.
 
 ## Speed
 
-The gate's run gives 10.42 flight iterations per emulated second, against
-SNG47's 13.97 (0.745 times), with the frame rate capped at 25 frames a
-second. With the planets' circle engine it first gave 10.29 (0.736 times);
-the disc layer's packed rows and the frame's records (see "The frame's
-records") brought it to 10.42. Before the planets' circle engine it gave 11.82 (0.846 times, at
-169,148 cycles a flight iteration); most of the difference is the crater
+The gate's run gives 11.13 flight iterations per emulated second, against
+SNG47's 13.97 (0.796 times, at 179,751 cycles a flight iteration), with the
+frame rate capped at 25 frames a second; without the cap about a tenth of
+the frames would be shown for a single field. With the speed-ups of the
+port's second part and the original's wireframe drawing the port is 17.86,
+and with plain disc planets in place of the beach ball the renderer ran at
+17.24 (115,992 cycles). So most of the cost is the planets: the crater
 system's stretch of the run (iterations 800 to 2799), where two true caps
-cost more than the polygon crater did. With the cap it first gave 11.73
-(170,540 cycles); the disc layer's two boundaries a row and its short paths
-for one-colour and emptied rows brought it to 11.82. Without the cap it gave
-11.99 (0.858 times, 166,791 cycles), with a tenth of its frames shown for a
-single field. With the speed-ups of the port's second part and the original's
-wireframe drawing it is 17.86, and with plain disc planets in place of the
-beach ball the renderer ran at 17.24 (115,992 cycles). So most of the cost
-is the beach ball: its geometry and its two-colour disc rows, every frame
-that a meridian planet is on screen, which is about half the gate's run, as
-the pilot starts at Lave. Flight with no beach ball on screen runs as fast
-as before. The big planet and the space station close up are the slowest
+cost more than the original's polygon crater, and the beach ball, its
+geometry and its two-colour disc rows, every frame that a meridian planet
+is on screen, which is about half the gate's run, as the pilot starts at
+Lave. Flight with no beach ball on screen runs as fast as before. The big planet and the space station close up are the slowest
 views, as their discs and faces cover most of the screen; the kept solid
 rows speed up the station's last seconds.
