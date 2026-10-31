@@ -1682,13 +1682,16 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 \ z_hi = FC_DOTZ[type] out (gfx-faces.asm: nearer, the faces cover the dot)
 \ the dot is drawn too; and a ship f_ship does not fill (FC_MINVIS) is drawn
 \ as the dot alone. LL10 has left |x| and |y| less than z. The rasteriser's
-\ temporaries RZ_T0-T5 are free here
+\ temporaries RZ_T0-T5 are free here (named here: the Tube's build assembles
+\ this before them)
+
+fsd_zl = &20 : fsd_zh = &21 : fsd_rl = &22 : fsd_q = &24 : fsd_x = &25
 
 .f_sdot
- LDA F_SZL,X            \ RZ_T0/1 = z
- STA RZ_T0
+ LDA F_SZL,X            \ (fsd_zh fsd_zl) = z
+ STA fsd_zl
  LDA F_SZH,X
- STA RZ_T1
+ STA fsd_zh
  LDA F_RP+0*MAXSH,X     \ x
  LDY F_RP+1*MAXSH,X
  JSR fsd_div
@@ -1703,7 +1706,7 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  ADC #128
  BCC fsq9
 .fsq2
- STA RZ_T5
+ STA fsd_x
  LDA F_RP+3*MAXSH,X     \ y
  LDY F_RP+4*MAXSH,X
  JSR fsd_div
@@ -1721,50 +1724,51 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  CMP #2*96-2
  BCS fsq9
 .fsq4
- STA RZ_T4
+ STA fsd_q
  LDY F_STYP,X
  LDA FC_DOTE,Y
  STA R_COLE
  LDA FC_DOTO,Y
  STA R_COLO
- LDX RZ_T5
- LDY RZ_T4
+ LDX fsd_x
+ LDY fsd_q
  LDA #3
  JMP T_DOT
 .fsq9
  RTS
 
-\ fsd_div: A = 256 * (Y A) / z (RZ_T0/1), rounded down, for (Y A) < z; X kept.
-\ The remainder's high byte is in A; RZ_T4's first 1 marks the eighth step
+\ fsd_div: A = 256 * (Y A) / z (fsd_zh fsd_zl), rounded down, for (Y A) < z; X kept.
+\ The remainder's high byte is in A; fsd_q's first 1 marks the eighth step
 
 .fsd_div
- STA RZ_T2
+ STA fsd_rl
  TYA
  LDY #1
- STY RZ_T4
+ STY fsd_q
 .fqv1
- ASL RZ_T2
+ ASL fsd_rl
  ROL A
  BCS fqv2               \ (a 17-bit remainder: more than z)
- CMP RZ_T1
+ CMP fsd_zh
  BCC fqv3
  BNE fqv2
- LDY RZ_T2              \ (high bytes equal: the low bytes decide)
- CPY RZ_T0
+ LDY fsd_rl              \ (high bytes equal: the low bytes decide)
+ CPY fsd_zl
  BCC fqv3
 .fqv2
  TAY                    \ remainder - z (C set)
- LDA RZ_T2
- SBC RZ_T0
- STA RZ_T2
+ LDA fsd_rl
+ SBC fsd_zl
+ STA fsd_rl
  TYA
- SBC RZ_T1
+ SBC fsd_zh
  SEC
 .fqv3
- ROL RZ_T4
+ ROL fsd_q
  BCC fqv1
- LDA RZ_T4
+ LDA fsd_q
  RTS
+ASSERT fsd_zl = RZ_T0 AND fsd_x = RZ_T5
 
 .f_si   EQUB 0          \ ship index being drawn
 .f_nf   EQUB 0
