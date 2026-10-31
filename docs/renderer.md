@@ -427,6 +427,15 @@ and fins the brighter of their two faces. Lines, the stations' docking slots
 and distant dots are unlit. The docking slot is filled, then outlined in
 yellow, so it shows from as far away as the original's wireframe slot does.
 
+A ship far away is filled from its blueprint's dot distance in, where its
+faces are slivers narrower than a pixel that the rasteriser draws as
+nothing. So `f_ship` draws the ship's distant dot under its faces (`f_sdot`,
+at the original's dot position, 128 + 256x/z and 96 - 256y/z) from z_hi =
+`FC_DOTZ[type]` out, where the ship's thinnest half-extent is under three
+pixels, and draws a ship it cannot fill (`FC_MINVIS`) as the dot alone.
+Nearer, the faces cover the dot. A ship is never missing from a frame:
+`6-harness/mdotgap.mjs` checks it frame by frame as a ship comes in.
+
 ## Lens flare
 
 When the sun is on screen in the front view, the frame draws eight ghosts along the line from the screen's centre through

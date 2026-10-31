@@ -1674,6 +1674,98 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .fss9
  RTS
 
+\ f_sdot: ship X's distant dot, where SHPPT would draw it (128 + 256 * x / z,
+\ 96 - 256 * y / z: on the screen if within 0-255 and 0-189), in its dot
+\ colour, drawn under its faces. LL9 fills a ship from the dot's range (its
+\ blueprint's byte #13) in, and the faces of one so far away project to
+\ slivers less than a pixel wide, which the rasteriser does not draw: so from
+\ z_hi = FC_DOTZ[type] out (gfx-faces.asm: nearer, the faces cover the dot)
+\ the dot is drawn too; and a ship f_ship does not fill (FC_MINVIS) is drawn
+\ as the dot alone. LL10 has left |x| and |y| less than z. The rasteriser's
+\ temporaries RZ_T0-T5 are free here
+
+.f_sdot
+ LDA F_SZL,X            \ RZ_T0/1 = z
+ STA RZ_T0
+ LDA F_SZH,X
+ STA RZ_T1
+ LDA F_RP+0*MAXSH,X     \ x
+ LDY F_RP+1*MAXSH,X
+ JSR fsd_div
+ LDY F_RP+2*MAXSH,X     \ x_sign
+ BMI fsq1
+ EOR #&80               \ 128 + q, q < 128
+ BPL fsq9
+ BMI fsq2
+.fsq1
+ EOR #&FF               \ 128 - q, q <= 128
+ SEC
+ ADC #128
+ BCC fsq9
+.fsq2
+ STA RZ_T5
+ LDA F_RP+3*MAXSH,X     \ y
+ LDY F_RP+4*MAXSH,X
+ JSR fsd_div
+ LDY F_RP+5*MAXSH,X     \ y_sign
+ BMI fsq3
+ EOR #&FF               \ 96 - q, q <= 96
+ SEC
+ ADC #96
+ BCC fsq9
+ BCS fsq4
+.fsq3
+ CLC                    \ 96 + q < 190
+ ADC #96
+ BCS fsq9
+ CMP #2*96-2
+ BCS fsq9
+.fsq4
+ STA RZ_T4
+ LDY F_STYP,X
+ LDA FC_DOTE,Y
+ STA R_COLE
+ LDA FC_DOTO,Y
+ STA R_COLO
+ LDX RZ_T5
+ LDY RZ_T4
+ LDA #3
+ JMP T_DOT
+.fsq9
+ RTS
+
+\ fsd_div: A = 256 * (Y A) / z (RZ_T0/1), rounded down, for (Y A) < z; X kept.
+\ The remainder's high byte is in A; RZ_T4's first 1 marks the eighth step
+
+.fsd_div
+ STA RZ_T2
+ TYA
+ LDY #1
+ STY RZ_T4
+.fqv1
+ ASL RZ_T2
+ ROL A
+ BCS fqv2               \ (a 17-bit remainder: more than z)
+ CMP RZ_T1
+ BCC fqv3
+ BNE fqv2
+ LDY RZ_T2              \ (high bytes equal: the low bytes decide)
+ CPY RZ_T0
+ BCC fqv3
+.fqv2
+ TAY                    \ remainder - z (C set)
+ LDA RZ_T2
+ SBC RZ_T0
+ STA RZ_T2
+ TYA
+ SBC RZ_T1
+ SEC
+.fqv3
+ ROL RZ_T4
+ BCC fqv1
+ LDA RZ_T4
+ RTS
+
 .f_si   EQUB 0          \ ship index being drawn
 .f_nf   EQUB 0
 .f_f    EQUB 0          \ face number
@@ -1693,12 +1785,12 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  TAX
  STX f_si
  LDY F_STYP,X
- LDA F_SX4,X            \ skip ships whose polygon vertices may be stale
- STA f_x4
+ LDA F_SX4,X            \ ships whose polygon vertices may be stale: the
+ STA f_x4               \ dot alone
  CMP FC_MINVIS,Y
- BEQ P%+5
- BCC P%+3
- RTS
+ BEQ P%+7
+ BCC P%+5
+ JMP f_sdot
  TYA
  ASL A
  TAY
@@ -1722,6 +1814,13 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  BCC P%+3
  RTS
 .fsh_nf0                \ (past f_behind: harness/mstation.mjs)
+
+ LDX f_si               \ a small ship: its distant dot under its faces
+ LDY F_STYP,X
+ LDA F_SZH,X
+ CMP FC_DOTZ,Y
+ BCC P%+5
+ JSR f_sdot
 
  LDA #0
  STA f_f

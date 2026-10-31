@@ -1118,6 +1118,10 @@ def emit(ships, path):
           '\\   are unprojected, and f_poly2 draws only its side from vertex 0 to 1.',
           '\\ FC_MINVIS[type]: if XX4 > it, a polygon vertex may not have been',
           '\\   projected (vertex visibility distance < XX4): do not fill that ship.',
+          '\\ FC_DOTZ[type]: from z_hi = it out, the distant dot is drawn under the',
+          '\\   faces (f_sdot): nearer, the polygon vertices\' thinnest half-extent',
+          '\\   (of their bounding box, x, y or z) is 3 pixels or more (z_hi <',
+          '\\   half-extent / 3), and the faces cover the dot; at least 4.',
           '\\ FC_DOTE/FC_DOTO[type]: colour of the ship drawn as a distant dot.',
           '']
     L.append('FC_NTYPES = %d' % NTYPES)
@@ -1176,6 +1180,12 @@ def emit(ships, path):
     L.append('                              \\ if XX4 > this, some polygon vertex may be unprojected (stale)')
     mv = [31] + [min([s['verts'][v]['vis'] for p in s['polys'] for v in p] + [31]) for t, s in ships]
     eb(mv)
+    L.append('.FC_DOTZ                       \\ by type: z_hi from which the dot is drawn under the faces')
+    def dotz(s):
+        pv = {v for p in s['polys'] for v in p}
+        he = min((max(s['verts'][v][c] for v in pv) - min(s['verts'][v][c] for v in pv)) / 2 for c in 'xyz')
+        return max(4, int(he // 3))
+    eb([4] + [dotz(s) for t, s in ships])
     dots = [dither_bytes(BLACK)] + [dither_bytes(s['dot']) for t, s in ships]
     L.append('.FC_DOTE                      \\ by type: distant-dot colour, even rows')
     eb([e for e, o in dots])

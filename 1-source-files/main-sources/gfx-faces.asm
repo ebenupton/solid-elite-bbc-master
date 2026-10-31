@@ -31,6 +31,10 @@
 \   are unprojected, and f_poly2 draws only its side from vertex 0 to 1.
 \ FC_MINVIS[type]: if XX4 > it, a polygon vertex may not have been
 \   projected (vertex visibility distance < XX4): do not fill that ship.
+\ FC_DOTZ[type]: from z_hi = it out, the distant dot is drawn under the
+\   faces (f_sdot): nearer, the polygon vertices' thinnest half-extent
+\   (of their bounding box, x, y or z) is 3 pixels or more (z_hi <
+\   half-extent / 3), and the faces cover the dot; at least 4.
 \ FC_DOTE/FC_DOTO[type]: colour of the ship drawn as a distant dot.
 
 FC_NTYPES = 33
@@ -717,6 +721,10 @@ FC_PLANE = &05 : FC_PLANO = &5A
  EQUB &1F, &1F, &1F, &1F, &14, &1F, &1F, &1F, &1F, &10, &13, &1F, &1F, &16, &1E, &1F
  EQUB &1E, &1F, &1E, &1F, &1F, &1F, &14, &1F, &1F, &16, &1F, &0F, &11, &1F, &1F, &1F
  EQUB &1E, &1F
+.FC_DOTZ                       \ by type: z_hi from which the dot is drawn under the faces
+ EQUB &04, &04, &35, &04, &04, &04, &07, &18, &04, &06, &04, &08, &10, &11, &10, &18
+ EQUB &05, &05, &04, &06, &04, &04, &04, &04, &08, &05, &10, &05, &07, &09, &04, &04
+ EQUB &04, &41
 .FC_DOTE                      \ by type: distant-dot colour, even rows
  EQUB &00, &50, &AF, &AF, &AF, &FF, &5F, &5F, &5F, &A5, &0F, &5F, &F0, &5F, &A5, &5F
  EQUB &0F, &50, &5F, &50, &FF, &5F, &A5, &50, &50, &F0, &50, &FF, &0F, &5F, &5F, &50
@@ -726,4 +734,4 @@ FC_PLANE = &05 : FC_PLANO = &5A
  EQUB &0F, &FA, &AF, &FA, &FF, &AF, &5A, &FA, &FA, &5A, &FA, &FF, &0F, &AF, &AF, &FA
  EQUB &5A, &5A
 
-\ 3304 bytes in all
+\ 3338 bytes in all
