@@ -59,6 +59,9 @@ pm_a  = &10             \ zero page workspace (Elite's, saved and restored):
 pm_b  = &14             \ multiplicand, dividend; multiplier, divisor;
 pm_p  = &18             \ product, quotient; temporary
 pm_tt = &20
+pm_ql = &1C             \ PMQ's pointers into QSL and QSH (&1C-&1F)
+pm_qh = &1E
+pm_t8 = &22             \ its product's low byte
 pmi_n = &23             \ pm_isqrt's: n' (&23-&24) and a square (&25-&26)
 pmi_c = &25
 
@@ -228,9 +231,7 @@ ENDIF
  BIT pc_dnz
  BPL pcl5
  LDX #O_D               \ d^2 >> 16
- TXA
- TAY
- JSR pc_mul
+ JSR pc_sq
 .pcl5
  LDA pm_p+2             \ (d^2 >> 16, or 0)
  STA pv_dd
@@ -640,6 +641,15 @@ ENDIF
  STA pm_b+1
  JMP pm_mul16
 
+\ pc_sq: pm_p (4) = pv+X (2) squared
+
+.pc_sq
+ LDA pv,X
+ STA pm_a
+ LDA pv+1,X
+ STA pm_a+1
+ JMP pm_sq16
+
 \ pms_core: from the magnitudes and signs in pv_m, pm_sg and pm_nz, the
 \ circle's orientation terms: pm_sx, pm_sy, pm_inv, t (pm_tq), v (pm_v), a
 \ (pm_a32) and K2 (pm_K2)
@@ -663,18 +673,15 @@ ENDIF
  STA pm_sy
 .pms3
  LDX #0                 \ X2 = mx^2, Y2 = my^2, Z2 = mz^2, XY = mx my
- LDY #0
- JSR pc_mul
+ JSR pc_sq
  LDX #pm_X2-pm_P
  JSR pms_stp
  LDX #2
- LDY #2
- JSR pc_mul
+ JSR pc_sq
  LDX #pm_Y2-pm_P
  JSR pms_stp
  LDX #4
- LDY #4
- JSR pc_mul
+ JSR pc_sq
  LDX #pm_Z2-pm_P
  JSR pms_stp
  LDX #0
@@ -789,14 +796,14 @@ ENDIF
  RTS
 
 .pms_stp                 \ pm_P+X (4 bytes) = pm_p
- LDY #0
-.pmst1
- LDA pm_p,Y
+ LDA pm_p
  STA pm_P,X
- INX
- INY
- CPY #4
- BNE pmst1
+ LDA pm_p+1
+ STA pm_P+1,X
+ LDA pm_p+2
+ STA pm_P+2,X
+ LDA pm_p+3
+ STA pm_P+3,X
  RTS
 
 \ pm_fdiv: pm_p = U / V as 16.16 with a 12-bit mantissa (U = pm_P+X, V =
@@ -978,35 +985,109 @@ ENDIF
  RTS
 
 \ pm_mul16: pm_p (4) = pm_a (2) * pm_b (2), unsigned, from four 8 x 8
-\ products (Elite's quarter-square tables)
+\ products (Elite's quarter-square tables); pm_sq16: pm_p (4) = pm_a (2)
+\ squared, from two squares and one product. Each product is PMQ's: the
+\ multiplier b's byte is the low byte of the pointers pm_ql and pm_qh (QSL + b
+\ and QSH + b: the tables are page aligned), so that (pm_ql),Y is QS(Y + b)
+
+MACRO PMQ               \ (pm_t8 A) = Y * b, Y kept: QS(Y + b) - QS(|Y - b|)
+ TYA
+ SEC
+ SBC pm_ql
+ BCS pq1
+ EOR #&FF
+ ADC #1
+ SEC
+.pq1
+ TAX                    \ X = |Y - b|
+ LDA (pm_ql),Y          \ (bankcheck: ok: game context)
+ SBC QSL,X              \ (bankcheck: ok)
+ STA pm_t8
+ LDA (pm_qh),Y          \ (bankcheck: ok)
+ SBC QSH,X              \ (bankcheck: ok)
+ENDMACRO
+
+MACRO PMQB b            \ b, a byte at zero page address b, as the multiplier
+ LDA b
+ STA pm_ql
+ STA pm_qh
+ENDMACRO
+
+MACRO PMQH              \ the pointers' high bytes
+ LDA #HI(QSL)
+ STA pm_ql+1
+ LDA #HI(QSH)
+ STA pm_qh+1
+ENDMACRO
 
 .pm_mul16
- LDA pm_a
- LDX pm_b
- JSR pm_mul8
+ PMQH
+ PMQB pm_b              \ al bl
+ LDY pm_a
+ PMQ
  STA pm_p+1
- LDA pm_m8
+ LDA pm_t8
  STA pm_p
- LDA pm_a+1
- LDX pm_b+1
- JSR pm_mul8
- STA pm_p+3
- LDA pm_m8
- STA pm_p+2
- LDA pm_a
- LDX pm_b+1
- JSR pm_mul8
- JSR pmm_add
- LDA pm_a+1
- LDX pm_b
- JSR pm_mul8
-.pmm_add                \ pm_p += (A pm_m8) << 8
- TAY
- LDA pm_m8
+ LDY pm_a+1             \ ah bl
+ PMQ
+ TAX
+ LDA pm_t8
  CLC
  ADC pm_p+1
  STA pm_p+1
- TYA
+ TXA
+ ADC #0
+ STA pm_p+2
+ PMQB pm_b+1            \ ah bh
+ PMQ
+ TAX
+ LDA pm_t8
+ CLC
+ ADC pm_p+2
+ STA pm_p+2
+ TXA
+ ADC #0
+ STA pm_p+3
+ LDY pm_a               \ al bh
+ PMQ
+ TAX
+ LDA pm_t8
+ CLC
+ ADC pm_p+1
+ STA pm_p+1
+ TXA
+ ADC pm_p+2
+ STA pm_p+2
+ BCC P%+4
+ INC pm_p+3
+ RTS
+
+.pm_sq16
+ PMQH
+ PMQB pm_a              \ al^2 = QS(2 al)
+ LDY pm_a
+ LDA (pm_ql),Y          \ (bankcheck: ok: game context)
+ STA pm_p
+ LDA (pm_qh),Y          \ (bankcheck: ok)
+ STA pm_p+1
+ PMQB pm_a+1            \ ah^2
+ LDY pm_a+1
+ LDA (pm_ql),Y          \ (bankcheck: ok)
+ STA pm_p+2
+ LDA (pm_qh),Y          \ (bankcheck: ok)
+ STA pm_p+3
+ LDY pm_a               \ 2 al ah
+ PMQ
+ ASL pm_t8
+ ROL A
+ TAX
+ BCC P%+4
+ INC pm_p+3
+ LDA pm_t8
+ CLC
+ ADC pm_p+1
+ STA pm_p+1
+ TXA
  ADC pm_p+2
  STA pm_p+2
  BCC P%+4

@@ -704,8 +704,10 @@ def _run7(m, addr, a=0, x=0, y=0):
 def test_pmath(self, n):
     """the circle engine's arithmetic against exact models: pm_isqrt for every
     16-bit n (every 5th with --quick) against math.isqrt, pm_fdiv against
-    planet_caps.fdiv and pm_mul16 against the product, for 40 n random
-    operands of every bit length (0 to 32 bits; 0 to 16 for pm_mul16)"""
+    planet_caps.fdiv, pm_mul16 against the product and pm_sq16 (once the
+    engine has it) against the square, for 40 n (10 n) random
+    operands of every bit length (0 to 32 bits; 0 to 16 for pm_mul16 and
+    pm_sq16)"""
     rnd, m = self.rnd, self.m
     s, mem = m.syms, m.mem
     m.page(7)
@@ -740,10 +742,21 @@ def test_pmath(self, n):
             if got != u * v:
                 raise AssertionError('pm_mul16(%d, %d) = %d' % (u, v, got))
         self.stat('pm_mul16', sum(cy) / len(cy))
+        cy = []
+        for i in range(10 * n if 'pm_sq16' in s else 0):
+            u = rb(rnd.randrange(17))
+            mem[0x10], mem[0x11] = u & 255, u >> 8
+            cy.append(_run7(m, s['pm_sq16']))
+            got = sum(mem[0x18 + k] << 8 * k for k in range(4))
+            if got != u * u:
+                raise AssertionError('pm_sq16(%d) = %d' % (u, got))
+        if cy:
+            self.stat('pm_sq16', sum(cy) / len(cy))
     finally:
         m.page(5)
     st = self.stats
-    return 'pm_isqrt %.0f, pm_fdiv %.0f, pm_mul16 %.0f cycles' % (st['pm_isqrt'][-1], st['pm_fdiv'][-1], st['pm_mul16'][-1])
+    return 'pm_isqrt %.0f, pm_fdiv %.0f, pm_mul16 %.0f%s cycles' % (st['pm_isqrt'][-1], st['pm_fdiv'][-1], st['pm_mul16'][-1],
+                                                                   ', pm_sq16 %.0f' % st['pm_sq16'][-1] if 'pm_sq16' in st else '')
 
 
 def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
