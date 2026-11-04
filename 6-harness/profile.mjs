@@ -4,6 +4,7 @@
 // node 6-harness/profile.mjs [--disc d] [--syms s]
 //                                     [--iters 10000] [--seed boot|none]
 //                            [--out 6-harness/work/profile.json] [--pagex]
+//                            [--scenes SCENES.json]
 //
 // The run: mlib.mjs runElite with mpilot.mjs's pilot and its commander
 // patch, the candidate's boot leftovers seeded from the reference disc at TT170 exactly
@@ -34,6 +35,10 @@
 //              countdown and the jump, escape, ...)
 //   "other"    every other cycle from the first MLOOP on (docked screens, title,
 //              launch, death); iterations = MLOOP iterations that are not flight ones
+//   "scene:<s>" with --scenes (an mscenes.mjs run of the same build, seeded as
+//              the gate's run: --seedfile), the front-view flight iterations by
+//              scenes.py's scene (open space, ships about, planet close, big
+//              planet, sun close, station close, other)
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -50,6 +55,19 @@ const REF = REF_DISC, RSYMS = REF_SYMS;
 const OUT = resolve(args.out || `${WORK}profile.json`);
 const ITERS = +(args.iters || 10000);
 const SEED = args.seed || "boot";
+// scenes.py's scene of a front-view flight iteration, from an mscenes.mjs row
+const sceneOf = a => {
+    if (!a || a.qq11 !== 0 || a.view !== 0) return null;
+    const pz = a.p.z, st = a.f1 === 2, sz = st ? a.s1.z : 1 << 20, sun = a.f1 === 129;
+    if (st && sz < 16 && a.s1.zs === 0) return "station close";
+    if (sun && a.s1.z < 1024 && a.s1.zs === 0) return "sun close";
+    if (pz < 128 && a.p.zs === 0) return "planet close";
+    if (pz < 512 && a.p.zs === 0) return "big planet";
+    if (pz >= 512 && !(st && sz < 64) && a.ships === 0) return "open space";
+    if (a.ships > 0) return "ships about";
+    return "other";
+};
+const SCENES = args.scenes ? JSON.parse(readFileSync(resolve(args.scenes), "utf8")) : null;
 for (const f of [DISC, SYMS]) if (!existsSync(f)) throw new Error(`${f} missing (build first)`);
 
 const sy = loadSyms(SYMS);
@@ -113,14 +131,12 @@ const close = dest => {
     }
     touched = []; gen++; curTotal = 0; curPXT = 0;
 };
-const closeFlight = phase => {
-    const ph = (scen["phase:" + phase] ||= mk());
-    ph.iterations++; scen.flight.iterations++;
-    ph.total_cycles += curTotal; scen.flight.total_cycles += curTotal;
-    ph.pxt += curPXT; scen.flight.pxt += curPXT;
+const closeFlight = (phase, sc) => {
+    const ds = [scen.flight, (scen["phase:" + phase] ||= mk())].concat(sc ? [(scen["scene:" + sc] ||= mk())] : []);
+    for (const d of ds) { d.iterations++; d.total_cycles += curTotal; d.pxt += curPXT; }
     for (const k of touched) {
-        const v = cur[k]; ph.c[k] += v; scen.flight.c[k] += v; cur[k] = 0;
-        if (PAGEX) { ph.px[k] += curPX[k]; scen.flight.px[k] += curPX[k]; curPX[k] = 0; }
+        const v = cur[k]; for (const d of ds) d.c[k] += v; cur[k] = 0;
+        if (PAGEX) { for (const d of ds) d.px[k] += curPX[k]; curPX[k] = 0; }
     }
     touched = []; gen++; curTotal = 0; curPXT = 0;
 };
@@ -165,7 +181,7 @@ const r = await runElite({
             }
             if (pc === sw && (swm === "m" || mapAt(cpu.romsel, pc) === swm)) {
                 // a TT100 entry: close the interval since the previous one
-                if (prevTT >= 0 && myIter === prevTT + 1) closeFlight(pilot.P.phase);
+                if (prevTT >= 0 && myIter === prevTT + 1) closeFlight(pilot.P.phase, SCENES && sceneOf(SCENES[myIter - 1]));
                 else close(scen.other);
                 prevTT = myIter;
             }

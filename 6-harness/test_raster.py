@@ -683,6 +683,69 @@ def test_caps(self, n):
     return 'pc_circ %d..%d cycles a circle, PC_ROWS %.0f cycles a row' % (min(h), max(h), sum(c for _, c in rr) / max(1, sum(k for k, _ in rr)))
 
 
+def _run7(m, addr, a=0, x=0, y=0):
+    """a routine of the meridian window (bank 7, already paged in, the guard
+    off) called with A, X, Y: its cycles"""
+    mpu, mem = m.mpu, m.mem
+    mpu.a, mpu.x, mpu.y, mpu.p = a, x, y, 0x24
+    ret = tr.RET - 1
+    mem[0x1FF], mem[0x1FE] = ret >> 8, ret & 0xFF
+    mpu.sp = 0xFD
+    mpu.pc = addr
+    c0 = mpu.processorCycles
+    step = mpu.step
+    while mpu.pc != tr.RET:
+        step()
+        if mpu.processorCycles - c0 > 100000:
+            raise RuntimeError('runaway at &%04X' % mpu.pc)
+    return mpu.processorCycles - c0
+
+
+def test_pmath(self, n):
+    """the circle engine's arithmetic against exact models: pm_isqrt for every
+    16-bit n (every 5th with --quick) against math.isqrt, pm_fdiv against
+    planet_caps.fdiv and pm_mul16 against the product, for 40 n random
+    operands of every bit length (0 to 32 bits; 0 to 16 for pm_mul16)"""
+    rnd, m = self.rnd, self.m
+    s, mem = m.syms, m.mem
+    m.page(7)
+    try:
+        cy = []
+        for v in range(0, 65536, 1 if n >= 400 else 5):
+            mem[0x20], mem[0x21] = v & 255, v >> 8
+            cy.append(_run7(m, s['pm_isqrt']))
+            f = _m.isqrt(v)
+            got = (m.mpu.a, mem[0x20] | mem[0x21] << 8)
+            if got != (f, v - f * f):
+                raise AssertionError('pm_isqrt(%d) = %s, want %s' % (v, got, (f, v - f * f)))
+        self.stat('pm_isqrt', sum(cy) / len(cy))
+        rb = lambda b: rnd.getrandbits(b) | (1 << (b - 1)) if b else 0
+        cy = []
+        P = s['pm_P']
+        for i in range(40 * n):
+            u, v = rb(rnd.randrange(33)), rb(rnd.randrange(33))
+            for k in range(4):
+                mem[P + k], mem[P + 4 + k] = (u >> 8 * k) & 255, (v >> 8 * k) & 255
+            cy.append(_run7(m, s['pm_fdiv'], x=0, y=4))
+            got = sum(mem[0x18 + k] << 8 * k for k in range(4))
+            if got != PCM.fdiv(u, v):
+                raise AssertionError('pm_fdiv(%d, %d) = %d, want %d' % (u, v, got, PCM.fdiv(u, v)))
+        self.stat('pm_fdiv', sum(cy) / len(cy))
+        cy = []
+        for i in range(40 * n):
+            u, v = rb(rnd.randrange(17)), rb(rnd.randrange(17))
+            mem[0x10], mem[0x11], mem[0x14], mem[0x15] = u & 255, u >> 8, v & 255, v >> 8
+            cy.append(_run7(m, s['pm_mul16']))
+            got = sum(mem[0x18 + k] << 8 * k for k in range(4))
+            if got != u * v:
+                raise AssertionError('pm_mul16(%d, %d) = %d' % (u, v, got))
+        self.stat('pm_mul16', sum(cy) / len(cy))
+    finally:
+        m.page(5)
+    st = self.stats
+    return 'pm_isqrt %.0f, pm_fdiv %.0f, pm_mul16 %.0f cycles' % (st['pm_isqrt'][-1], st['pm_fdiv'][-1], st['pm_mul16'][-1])
+
+
 def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
     """PF_HOOK on the machine for the planet (orientation vecs: nosev, roofv,
     sidev; TYPE typ; radius r; centre cx, cy; seed qq2), checked: A, X, Y,
@@ -1317,6 +1380,7 @@ tr.Tester.test_disc2 = test_disc2
 tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
 tr.Tester.test_caps = test_caps
+tr.Tester.test_pmath = test_pmath
 tr.Tester.test_pfhook = test_pfhook
 tr.Tester._check_moon = _check_moon
 tr.Tester.cap_rows = cap_rows
@@ -1333,6 +1397,9 @@ if CAPS:     # (after the rest, which keep the random numbers they had)
 
 if HASD2:    # (after the others, which keep the random numbers they had)
     tr.EXTRA += [('disc2', 'test_disc2', 80, ('both',)), ('disc2', 'test_disc2', 80, ('kept',))] * 3
+
+if CAPS:     # (last: it uses random numbers of its own)
+    tr.EXTRA += [('pmath', 'test_pmath', 400, ())]
 
 tr.assemble = assemble
 tr.Tester.test_lines = test_lines
