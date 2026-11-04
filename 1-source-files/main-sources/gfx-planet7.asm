@@ -25,7 +25,7 @@
 \ build with make moon=on, _PLANET_MOON) and the ring's dots (pf_ring:
 \ only in a build with make rings=on, _PLANET_RINGS), when the seed has
 \ them. Elite's state is not
-\ touched: Elite's zero page &10-&28 (the engine's workspace) is saved and
+\ touched: Elite's zero page &10-&26 (the engine's workspace) is saved and
 \ restored, and A, X, Y and the flags are preserved. The frame layer makes
 \ the rows through T_CAPS and T_MCAPS (gfx-merid.asm's PC_ROWS, PC_MROWS).
 \ 6-harness/planet_caps.py models it all bit for bit.
@@ -64,7 +64,7 @@
  BCC pfh9
  STA pcr
  STA pf_r
- LDX #24                \ (Elite's &10-&28: the engine's workspace)
+ LDX #22                \ (Elite's &10-&26: the engine's workspace)
 .pfh0
  LDA &10,X
  STA pm_zsave,X
@@ -118,7 +118,7 @@
  IF _PLANET_RINGS
  JSR pf_ring
  ENDIF
- LDX #24
+ LDX #22
 .pfh1
  LDA pm_zsave,X
  STA &10,X

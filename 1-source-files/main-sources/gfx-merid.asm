@@ -44,7 +44,7 @@
 \     circle's record into the next slot of PCB, from the axis pcv (pf_tilt's
 \     sign-magnitude words), its scale pcn, the cosine pcc and its sign
 \     pcneg and the body pcbx, pcby, pcr; its part of the base colour into
-\     pc_inv. It uses Elite's zero page &10-&28, which PF_HOOK saves, and
+\     pc_inv. It uses Elite's zero page &10-&26, which PF_HOOK saves, and
 \     reads main RAM only for the quarter squares (QSL, QSH);
 \
 \   * PC_ROWS (the planet's records) and PC_MROWS (the moon's), in the frame
@@ -1044,7 +1044,8 @@ ENDIF
  RTS
 
 \ pm_mul16: pm_p (4) = pm_a (2) * pm_b (2), unsigned, from four 8 x 8
-\ products (Elite's quarter-square tables); pm_sq16: pm_p (4) = pm_a (2)
+\ products (Elite's quarter-square tables), or two or one when a high byte is
+\ zero; pm_sq16: pm_p (4) = pm_a (2)
 \ squared, from two squares and one product. Each product is PMQ's: the
 \ multiplier b's byte is the low byte of the pointers pm_ql and pm_qh (QSL + b
 \ and QSH + b: the tables are page aligned), so that (pm_ql),Y is QS(Y + b)
@@ -1079,6 +1080,24 @@ MACRO PMQH              \ the pointers' high bytes
  STA pm_qh+1
 ENDMACRO
 
+.pmb0                   \ b < 256: al bl + ah bl << 8
+ STZ pm_p+3
+ LDY pm_a+1
+ BEQ pmb1
+ PMQ
+ TAX
+ LDA pm_t8
+ CLC
+ ADC pm_p+1
+ STA pm_p+1
+ TXA
+ ADC #0
+ STA pm_p+2
+ RTS
+.pmb1
+ STZ pm_p+2
+ RTS
+
 .pm_mul16
  PMQH
  PMQB pm_b              \ al bl
@@ -1087,7 +1106,10 @@ ENDMACRO
  STA pm_p+1
  LDA pm_t8
  STA pm_p
+ LDA pm_b+1
+ BEQ pmb0
  LDY pm_a+1             \ ah bl
+ BEQ pma0
  PMQ
  TAX
  LDA pm_t8
@@ -1119,6 +1141,20 @@ ENDMACRO
  STA pm_p+2
  BCC P%+4
  INC pm_p+3
+ RTS
+.pma0                   \ a < 256: al bl + al bh << 8
+ PMQB pm_b+1
+ LDY pm_a
+ PMQ
+ TAX
+ LDA pm_t8
+ CLC
+ ADC pm_p+1
+ STA pm_p+1
+ TXA
+ ADC #0
+ STA pm_p+2
+ STZ pm_p+3
  RTS
 
 .pm_sq16
@@ -1922,7 +1958,7 @@ O_RC = pv_rc - pv
 .pm_R2  SKIP 4
 .pm_Q2  SKIP 4
 .pm_m8  EQUB 0
-.pm_zsave SKIP 25       \ Elite's &10-&28 while PF_HOOK uses them
+.pm_zsave SKIP 23       \ Elite's &10-&26 while PF_HOOK uses them
 
 .pc_t   EQUB 0
 .pc_dnz EQUB 0          \ bit 7: d is not 0
