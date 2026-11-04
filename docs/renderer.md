@@ -175,7 +175,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows (with the strip encoder's core, `gfx-raster_strips.asm`), the dirty repair |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the ship records (`F_RP`, `F_SR`, whose room holds `F_INIT` until the first frame), the zero page `F_FRAME` keeps (`f_zsv`), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
 | The hangar's tables | bank 6, at the end of its image | the floor's rows and the tans (`gfx-hangar6.asm`) |
-| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK`, and the moon, `pf_moon`, with `make moon=on` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`); then the lens flare, `R_FLARE` and its tables (`gfx-flare.asm`) |
+| The meridian window | bank 7 after the cold pass, ROMSEL 7 (`MERID.bin`) | the planet's surface: the circle engine, `pc_circ` and `PC_ROWS` (`gfx-merid.asm`), and the styles, `PF_HOOK`, and the moon, `pf_moon`, with `make moon=on` (`gfx-planet7.asm`); then the kept solid rows' polygon part, `k_pre` and `k_settle` (`gfx-kept7.asm`) |
 
 The two windows of bank 5 never call each other. The shared region refers to
 neither, except where a line is marked. `bankcheck.py` checks this at every
@@ -443,8 +443,9 @@ the sun: six dithered discs and two dotted rings. They are ORed in their
 inks, so the light adds up. Three levels of brightness depend on how far the
 sun is from the centre. The flare extends each row's dirty extent, so the
 next frame on the buffer repairs it like any other shape. It never touches
-game state. `f_flt` (bank 6) makes the tests and `R_FLARE` (in the
-meridian window, bank 7) draws. `T_FLARE` pages bank 7 for it, then makes
+game state. `f_flt` makes the tests and `R_FLARE` draws, both in bank 6 (the flare was
+in the meridian window until the planet's spin and holds needed the room).
+`T_FLARE` pages bank 6 for it, then makes
 the flare's two bank 5 calls: `R_MARKDIRTY` for the rows written, which
 `R_FLARE` returns (C set if the sun was in sight, the rows in Y to X), and
 in K mode `k_clear`.

@@ -188,8 +188,6 @@ ORG COLD_END%           \ meridian window, the beach ball planet's boundaries
 INCLUDE "1-source-files/main-sources/gfx-merid.asm"
 INCLUDE "1-source-files/main-sources/gfx-kept7.asm"    \ kept solid rows: the polygons' part (docs/renderer.md)
 INCLUDE "1-source-files/main-sources/gfx-planet7.asm"  \ the planet's caps: craters (PF_HOOK, PC_ROWS)
-INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (T_FLARE; its step in bank 6:
-                               \ gfx-flare6.asm)
 .MERID_END
 ASSERT MERID_END <= &C000
 PRINT "Bank 7: meridian window ", ~MERID_START, "-", ~MERID_END-1, ", bank 7 free ", &C000-MERID_END
@@ -212,7 +210,8 @@ INCLUDE "1-source-files/main-sources/gfx-light6.asm"   \ the lighting tables (an
 INCLUDE "3-assembled-output/gfx-light-6.asm"   \ the lighting's L_REC (gfx-light.asm's second
                                \ pass; L_SUN, its first, is at bank 4's end)
 INCLUDE "1-source-files/main-sources/gfx-frame_cold.asm"
-INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ the lens flare's step (the flare: gfx-flare.asm, bank 7)
+INCLUDE "1-source-files/main-sources/gfx-flare.asm"    \ the lens flare (T_FLARE)
+INCLUDE "1-source-files/main-sources/gfx-flare6.asm"   \ its step in F_FRAME
 INCLUDE "1-source-files/main-sources/gfx-hangar.asm"   \ the hangar's frame (HALL; its tables are at bank 6's end)
 .B6_CODE_END
 .F_RP   SKIP 29 * MAXSH \ the ship records (F_SHIP): INWK 0-8, XX16, XX0

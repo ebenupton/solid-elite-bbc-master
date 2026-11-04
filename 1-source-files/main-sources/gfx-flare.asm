@@ -33,9 +33,10 @@
 \ after any shape (the disc rows repainted, the rest blacked, the text and
 \ sights redrawn over it): the flare keeps no state on the screen.
 \
-\ Memory: this file is in bank 7, in the meridian window (ROMSEL MERIDBANK,
-\ as T_FLARE pages it), with its half-width table fl_htab and its variables
-\ (it was in bank 5, after the rasteriser, until R_DISC2 needed the room).
+\ Memory: this file is in bank 6, with the frame layer (T_FLARE pages it),
+\ with its half-width table fl_htab and its variables (it was in bank 5,
+\ after the rasteriser, until R_DISC2 needed the room, then in bank 7's
+\ meridian window until the planet's spin and holds needed that).
 \ It writes only the screen, the dirty extents (main RAM) and its own
 \ state; T_FLARE does the rest in bank 5 when R_FLARE returns with C set
 \ (the sun in sight): k_clear in K mode, and the rows written (Y .. X, if
@@ -44,7 +45,7 @@
 \ bank 6's state (the view, the sun's centre on the screen, not behind the
 \ planet: F_HW) and enters R_FLARE through T_FLARE. ACCCON X is as the frame
 \ layer has it, mapping the back buffer at &4000-&7FFF, so fl_or writes
-\ either buffer with no switching. Everything this code reads is in bank 7,
+\ either buffer with no switching. Everything this code reads is in bank 6,
 \ the zero page or main RAM below &3000. (It was in shadow RAM, run
 \ with ACCCON X set, until it moved here.)
 \

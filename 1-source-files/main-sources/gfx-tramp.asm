@@ -82,8 +82,8 @@ IF _PLANET_MOON         \ (the moon's: make moon=on)
  JMP tback
 ENDIF
 
-.T_FLARE                \ (the lens flare, gfx-flare.asm: bank 7; X and Y
- LDA #MERIDBANK         \ passed)
+.T_FLARE                \ (the lens flare, gfx-flare.asm: bank 6; X and Y
+ LDA #GFXBANK           \ passed)
  STA &F4
  STA &FE30
  JSR R_FLARE            \ (C set: the sun was in sight, and Y .. X the rows

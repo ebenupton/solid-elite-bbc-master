@@ -25,7 +25,7 @@ Screens are 192 x 256 arrays of logical colours (0 K, 1 C, 2 M, 3 Y).
                                         gfx-flare.asm's literal tables and,
                                         if built, the assembled bytes
                                         (3-assembled-output: symbols.txt,
-                                        MERID.bin); exit status 1 if not
+                                        BANK6.bin); exit status 1 if not
     python3 2-build-files/flare.py --check A B SX SY SR [OUT]
                                         A: emulator screenshot without the
                                         flare, B: the same frame with it, SX SY
@@ -449,7 +449,8 @@ def asm_literals(src):
 
 def verify(src, build):
     """Exit status 0 if every table matches: the literals in src, and fl_htab
-    (FLHW, a BeebAsm macro) as assembled into build's MERID.bin."""
+    (FLHW, a BeebAsm macro) as assembled into build's BANK6.bin (bank 6, from
+    &8000)."""
     want, bad = tables(), 0
     lit = asm_literals(src)
     for name, b in want.items():
@@ -459,10 +460,10 @@ def verify(src, build):
         ok = got == b
         bad += not ok
         print('%-8s %s' % (name, 'identical' if ok else 'DIFFERS: source %s, model %s' % (got, b)))
-    sym, merid = os.path.join(build, 'symbols.txt'), os.path.join(build, 'MERID.bin')
+    sym, merid = os.path.join(build, 'symbols.txt'), os.path.join(build, 'BANK6.bin')
     if os.path.exists(sym) and os.path.exists(merid):
         sy = dict((k, int(v)) for k, v in re.findall(r"'([^']+)':(\d+)", open(sym).read()))
-        at = sy['fl_htab'] - sy['MERID_START']
+        at = sy['fl_htab'] - 0x8000
         got = list(open(merid, 'rb').read()[at:at + len(want['fl_htab'])])
         ok = got == want['fl_htab']
         bad += not ok
