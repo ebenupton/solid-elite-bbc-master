@@ -11,7 +11,10 @@
 //
 // Boots the build as mredock.mjs does (SHIFT+BREAK, a new commander,
 // launch with f0); at the next MLOOP the scene's ship slots (K%'s first three,
-// FRIN to JUNK) are put in and the speed set to 0. Over the next 8 main-loop
+// FRIN to JUNK) are put in and the speed set to 0, from the instruction hook at
+// MLOOP itself, so that the scene lands between iterations in any build (put
+// in after an emulator slice, it could land mid-iteration, and a build whose
+// timing differed saw the station moved behind us). Over the next 8 main-loop
 // iterations every frame that records the station (F_STYP 2) must draw it
 // (f_ship gets past f_behind to fsh_nf0). Prints the counts and
 // "STATION PASS" or "STATION FAIL"; exit status 0 only on PASS; a screenshot
@@ -43,9 +46,18 @@ let atLoop = false, phase = 0, iters = 0, recorded = 0, drawn = 0, frames = 0;
 // missed first)
 let last = -1;
 const at2 = (pc, name, k) => at(pc, name) || (pc === sy[name] + k && last !== sy[name] && (cpu.romsel & 15) === 6);
+// the scene, put in at MLOOP itself (from the instruction hook: so it lands
+// between two iterations however fast the build runs, not where an emulator
+// slice happens to end)
+const ram = cpu.ramRomOs;
+function poke() {
+    Buffer.from(KS, "hex").forEach((b, i) => { ram[sy["K%"] + i] = b; });
+    Buffer.from(WS, "hex").forEach((b, i) => { ram[sy.FRIN + i] = b; });
+    ram[sy.DELTA] = 0; ram[sy.QQ11] = 0; ram[sy.VIEW] = 0;
+}
 cpu.debugInstruction.add(pc => {
     const was = last; last = pc;
-    if (phase === 0) { if (at(pc, "MLOOP")) atLoop = true; return false; }
+    if (phase === 0) { if (at(pc, "MLOOP")) { poke(); atLoop = true; phase = 1; } return false; }
     if (at(pc, "MLOOP")) iters++;
     if (at(pc, "f_ships")) frames++;
     last = was;
@@ -56,11 +68,6 @@ cpu.debugInstruction.add(pc => {
 });
 for (let k = 0; k < 200 && !atLoop; k++) await s.runFor(20000);
 if (!atLoop) { console.log("STATION FAIL: never reached MLOOP"); process.exit(1); }
-const ram = cpu.ramRomOs;
-Buffer.from(KS, "hex").forEach((b, i) => { ram[sy["K%"] + i] = b; });
-Buffer.from(WS, "hex").forEach((b, i) => { ram[sy.FRIN + i] = b; });
-ram[sy.DELTA] = 0; ram[sy.QQ11] = 0; ram[sy.VIEW] = 0;
-phase = 1;
 // over 8 iterations: the station recorded, and drawn
 for (let k = 0; k < 2000 && iters < 8; k++) await s.runFor(20000);
 writeFileSync(`${OUT}/station.png`, await s.screenshotActive({ scale: 1 }));
