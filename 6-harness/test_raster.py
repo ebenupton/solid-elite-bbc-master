@@ -114,7 +114,7 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
 MG = dict(INWK=0x9C, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
-          TYPE=0x85, MCNT=0x84, SNE=0x0C40, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
+          TYPE=0x85, MCNT=0x84, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
 MG['K%'] = 0x0400
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # banded planets (gfx-planet7.asm's _PLANET_BANDS, the Makefile's bands=on):
@@ -307,7 +307,6 @@ class Machine(tr.Machine):
         for n in range(512):
             self.mem[MG['QSL'] + n] = (n * n // 4) & 255
             self.mem[MG['QSH'] + n] = (n * n // 4) >> 8
-        self.mem[MG['SNE']:MG['SNE'] + 48] = PCM.SNE
         self.andy = [rnd.randrange(256) for _ in range(0x1000)]
         self.andy[0:len(dataa)] = list(dataa)
         self.banks = {5: b5, 7: b7}
@@ -791,8 +790,6 @@ def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
     on = 6 <= r < 256
     if mem[MG['INWK']:MG['INWK'] + 36] != inwk:
         raise AssertionError('PF_HOOK did not keep INWK')
-    if on and 'pf_ps' in m.syms:            # (the planet as drawn: turned back by pf_spin)
-        inwk = PCM.pf_spin(inwk, _b7(m, 'pf_ps') | _b7(m, 'pf_ps', None, 1) << 8)
     base, circs = PCM.pf_records(inwk, qq2, typ) if on else (0, [])
     base, recs = _body(cx, cy, r, base, circs)
     n = sum(1 for c in recs if c is not None and not c['none'])
@@ -914,54 +911,56 @@ def test_pfhook(self, n):
 
 
 def test_hold(self, n):
-    """PF_HOOK's held records (pf_hold): n random planets, each made once and
-    then called on with MCNT one less each time and its centre moved: the
-    records are kept for one call (three in deep space: z at least 512 x 256),
-    moved with the disc, so PC_ROWS gives the rows of the planet as it was
-    (planet_caps.pf_spin's turn at the call that made them) at the new
-    centre; the call after makes them again"""
+    """PF_HOOK's held records (pf_hold): n random planets, each called on
+    over several iterations (MCNT one less each time) as it turns a little
+    and its centre moves: the records are made when MCNT is even (a multiple
+    of 4 in deep space, z at least 512 x 256) and otherwise kept from the
+    last call that made them, moved with the disc, so PC_ROWS gives the rows
+    of the planet as it was then at the new centre"""
     rnd, m, mem = self.rnd, self.m, self.m.mem
     self.set_clip((1, 254, 1, 191))
     held = 0
     for i in range(n):
         vecs = _rand_frame(rnd)
+        ax, w = rnd.randrange(3), rnd.uniform(-0.1, 0.1)
         typ = rnd.choice((128, 130))
         r = rnd.randrange(6, 251)
         cx, cy = rnd.randrange(-r // 2, 256 + r // 2), rnd.randrange(-r // 2, 192 + r // 2)
         qq2 = [rnd.randrange(256) for _ in range(6)]
         qq2[5] = (qq2[5] & 0x8C) | ((qq2[1] ^ qq2[3]) & 0x73)    # (no moon, no ring: h = 0)
         deep = rnd.random() < 0.5
+        mask = 3 if deep else 1
         zs = rnd.randrange(2, 100) if deep else rnd.randrange(2)
-        inwk = [0] * 36
-        inwk[6:9] = [rnd.randrange(256), rnd.randrange(256), zs]
-        for k, v in enumerate(vecs[0] + vecs[1] + vecs[2]):
-            inwk[9 + 2 * k], inwk[10 + 2 * k] = _smag(v)
-        mem[MG['INWK']:MG['INWK'] + 36] = inwk
         mem[MG['TYPE']] = typ
         mem[MG['QQ2']:MG['QQ2'] + 6] = qq2
         mem[MG['VIEW']] = 0
-        mem[MG['MCNT']] = (_b7(m, 'pf_lm') + 100) & 255     # (not the iteration after the last call)
+        mcnt = (_b7(m, 'pf_lm') + 100) & 255    # (not the iteration after the last call)
         made = None
-        for step in range((3 if deep else 1) + 2):
+        for step in range(7):
             if step:
-                mem[MG['MCNT']] = (mem[MG['MCNT']] - 1) & 255
+                mcnt = (mcnt - 1) & 255
                 cx += rnd.randrange(-3, 4)
                 cy += rnd.randrange(-3, 4)
+                vecs = _rotate(vecs, ax, w)
+            inwk = [0] * 36
+            inwk[6:9] = [rnd.randrange(256), rnd.randrange(256), zs]
+            for k, v in enumerate(vecs[0] + vecs[1] + vecs[2]):
+                inwk[9 + 2 * k], inwk[10 + 2 * k] = _smag(v)
+            mem[MG['INWK']:MG['INWK'] + 36] = inwk
+            mem[MG['MCNT']] = mcnt
             for nm, v in (('K3', cx), ('K4', cy), ('K', r)):
                 mem[MG[nm]], mem[MG[nm] + 1] = v & 255, (v >> 8) & 255
             m.guard = False
             m.call(m.syms['PF_HOOK'], bank=7)
             m.guard = True
-            if mem[MG['INWK']:MG['INWK'] + 36] != inwk:
-                raise AssertionError('PF_HOOK did not keep INWK')
-            hold = 0 < step <= (3 if deep else 1)
-            if not hold:
-                made = PCM.pf_spin(inwk, _b7(m, 'pf_ps') | _b7(m, 'pf_ps', None, 1) << 8)
-            else:
+            hold = made is not None and (mcnt & mask) != 0
+            if hold:
                 held += 1
+            else:
+                made = inwk
             base, circs = PCM.pf_records(made, qq2, typ)
             base, recs = _body(cx, cy, r, base, circs)
-            self._pfrows(base, recs, cx, cy, r, 'PF_HOOK %s (type %d centre %d,%d r %d, step %d)' % ('held' if hold else 'made', typ, cx, cy, r, step))
+            self._pfrows(base, recs, cx, cy, r, 'PF_HOOK %s (type %d centre %d,%d r %d, step %d, MCNT %d)' % ('held' if hold else 'made', typ, cx, cy, r, step, mcnt))
     return '%d held calls' % held
 
 

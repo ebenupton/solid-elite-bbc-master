@@ -74,6 +74,20 @@ from SNG47 there; the gate's systems have none.
 * **Sound.** `NOISE` would let real time leak into the game state, through
   its choice of sound channel and the carry it returns into `DORND`. So
   `SOPR` is cleared at every `NOISE` entry in both runs.
+* **The altitude.** The altitude check (main flight loop part 15) takes
+  `SQRT(R Q)` with `Q` whatever the last routine to use it left there, which a
+  build that draws differently leaves differently; at that call (`LL5`
+  returning to `LDA Q : STA ALTIT`) `Q` is set to 0 in both runs.
+* **The planet's half spin.** The port turns the planet by its own pitch and
+  roll (`MVEIT` part 8) only on iterations with `MCNT` even (`H_MVS4`, which
+  part 7's last call goes through, skips part 8 on the others, leaving
+  `RAT2` = 0 as part 8 does), so that it spins at half the
+  original's rate and its surface is remade on exactly those iterations. In a
+  build without `H_MVS4` (SNG47) the harness does the same: at part 8's
+  first instruction, for `TYPE` 128 or more with `MCNT` odd, it sets the
+  pitch and roll counters (`INWK+29`, `INWK+30`) to 0, so part 8 turns
+  nothing, and puts them back at `MV5`. The whole game state, the planet's
+  vectors included, is then compared with nothing left out.
 * **Boot leftovers.** At `TT170`, any byte of the compared state that the
   new build has not yet written is seeded from the reference (`--seed
   boot`). Such a byte was left by the loader, not by the game.
@@ -115,7 +129,7 @@ from SNG47 there; the gate's systems have none.
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
 | `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
 | `mfbcmp.mjs` | The renderer's regression check: hashes both screen buffers at the end of every K-th iteration's frame over the gate's run, or with `--frames` at every frame the frame layer finishes (keyed iteration.n), for comparing two builds whose game state is identical, which must draw the same pixels; `--cmp` compares two runs, and `--dump N` writes an iteration's buffers. `--mask row,col0,col1` adds to each frame's hash one with those text cells blanked, so that `--cmp` fails only on frames that differ outside them. |
-| `mspin.mjs` | The planet's turn per iteration over the gate's run: the game's vectors (at `PF_HOOK`'s entry) and the drawing's (turned back by `pf_spin`, at the style's entry), overall and with the player not turning, and the player's own roll and pitch. |
+| `mspin.mjs` | The planet's turn over the gate's run: from one iteration to the next with the player still, on iterations with `MCNT` even (the planet's own pitch and roll) and odd; from one fresh frame (the records made) to the next; and the player's own roll and pitch. |
 | `mfbdump.mjs`, `fbdiff.py` | For a change meant to alter the picture: `mfbdump.mjs` writes every frame of the gate's run whole (the buffer each frame drew, at `f_reset` as `mfbcmp.mjs --frames` keys them, with the planet's place and radius), and `fbdiff.py A B [--png DIR] [--scenes S]` compares two builds' dumps pixel by pixel: the frames that differ, their rows and pixels (by the planet's radius and by scene), the worst frame, and crops of the worst frames before and after with the differing pixels. |
 | `records/order.mjs` | Whether every frame draws each ship it recorded exactly once, over the gate's piloted run (the ships `f_ships` hands to `f_ship` against `0 .. F_NSHIP - 1`, and how many it projects and draws; an emulator slice's first instruction, which jsbeeb calls no hook for, is counted from the second). |
 | `records/live.mjs` | Liveness: every zero page and workspace byte a routine writes (`PTCLS`, or `LL9`'s part 6 on), watched from its return to the game's next access over the gate's run, so that only what the game reads afterwards need be kept. |

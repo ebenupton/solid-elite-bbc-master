@@ -1,10 +1,11 @@
-// The planet's turn per iteration, as the game has it and as the drawing has
-// it (pf_spin), over the gate's run: at PF_HOOK's entry (the game's vectors)
-// and at pf_beach's or pf_craters' entry (the drawing's), roofv and sidev,
-// and the player's roll and pitch (ALP1, BET1); prints the median angle
-// between consecutive iterations' vectors, overall and with the player not
-// turning (ALP1 = BET1 = 0: the planet's spin alone), and the player's own
-// turn (ALP1 and BET1, the roll and pitch, over 256 radians).
+// The planet's turn over the gate's run: its vectors at each PF_HOOK call
+// (the game's, as drawn) and at each call that makes the records (pf_beach's
+// or pf_craters' entry: the fresh frames, MCNT even, or a multiple of 4 in
+// deep space), and the player's own roll and pitch (ALP1, BET1). Prints the
+// median turn from one iteration to the next, with the player still, on
+// iterations with MCNT even (the planet's own pitch and roll turn it, MVEIT
+// part 8) and odd (they do not); and from one fresh frame to the next (the
+// turn the drawing shows at once), overall and with the player still.
 //
 // node 6-harness/mspin.mjs [--disc d] [--syms s] [--iters N] [--seedfile f]
 import { runElite, loadSyms, CAND_SYMS, CAND_DISC } from "./mlib.mjs";
@@ -15,32 +16,34 @@ const a = parseArgs({ disc: "value", syms: "value", iters: "value", seedfile: "v
 const sy = loadSyms(a.syms || CAND_SYMS);
 const seed = a.seedfile ? JSON.parse(readFileSync(a.seedfile, "utf8")) : null;
 let cur = -1, inst = false;
-const game = [], draw = [];
+const calls = [], fresh = [];
 const vec = (m, o) => [0, 1, 2].map(j => { const lo = m[sy.INWK + o + 2 * j], hi = m[sy.INWK + o + 2 * j + 1]; const v = lo | (hi & 127) << 8; return hi & 128 ? -v : v; });
 await runElite({ disc: a.disc || CAND_DISC, syms: sy, pilot: makePilot(), iters: +(a.iters || 10000), patch: patchCommander, seed, maxSecs: 40000,
     onIter: (i, s, r) => { cur = i; const cpu = r.cpu, m = cpu.ramRomOs; if (inst) return; inst = true;
-        const b7 = n => sy[n] !== undefined;
         cpu.debugInstruction.add(pc => {
             if ((cpu.romsel & 15) !== 7) return false;
-            if (pc === sy.PF_HOOK) game.push([cur, vec(m, 15), vec(m, 21), m[sy.ALP1], m[sy.BET1], m[sy.VIEW]]);
-            else if ((b7("pf_beach") && pc === sy.pf_beach) || (b7("pf_craters") && pc === sy.pf_craters)) draw.push([cur, vec(m, 15), vec(m, 21)]);
+            if (pc === sy.PF_HOOK) calls.push({ i: cur, r: vec(m, 15), s: vec(m, 21), still: !(m[sy.ALP1] & 127) && !(m[sy.BET1] & 127), mcnt: m[sy.MCNT], pl: Math.hypot(m[sy.ALP1] & 127, m[sy.BET1] & 127) / 256 * 180 / Math.PI });
+            else if (pc === sy.pf_beach || pc === sy.pf_craters) fresh.push({ i: cur, r: vec(m, 15), s: vec(m, 21), still: !(m[sy.ALP1] & 127) && !(m[sy.BET1] & 127) });
             return false;
         }); } });
 const ang = (u, v) => { const d = u[0] * v[0] + u[1] * v[1] + u[2] * v[2], nu = Math.hypot(...u), nv = Math.hypot(...v); return Math.acos(Math.max(-1, Math.min(1, d / (nu * nv)))) * 180 / Math.PI; };
-function rate(rows, still) {
-    const out = [];
-    for (let k = 1; k < rows.length; k++) {
-        const [i, r, s, al, be, vw] = rows[k], p = rows[k - 1];
-        if (p[0] !== i - 1) continue;
-        if (still && (game.find(g => g[0] === i) || [0, 0, 0, 1, 1])[3] | (game.find(g => g[0] === i) || [0, 0, 0, 1, 1])[4]) continue;
-        out.push(Math.max(ang(r, p[1]), ang(s, p[2])));
-    }
-    out.sort((x, y) => x - y);
-    return out.length ? `${out[out.length >> 1].toFixed(2)} deg (n ${out.length})` : "none";
+const med = x => { x.sort((p, q) => p - q); return x.length ? `${x[x.length >> 1].toFixed(2)} deg (n ${x.length})` : "none"; };
+const turn = (p, q) => Math.max(ang(q.r, p.r), ang(q.s, p.s));
+const it = { even: [], odd: [] }, fr = { all: [], still: [] }, gap = {};
+for (let k = 1; k < calls.length; k++) {
+    const p = calls[k - 1], q = calls[k];
+    if (q.i !== p.i + 1 || !q.still) continue;
+    it[q.mcnt & 1 ? "odd" : "even"].push(turn(p, q));
 }
-console.log(`game's vectors: median turn ${rate(game, false)}; player still: ${rate(game, true)}`);
-const pl = game.map(g => Math.hypot(g[3] & 127, g[4] & 127) / 256 * 180 / Math.PI).sort((x, y) => x - y);
-const moving = pl.filter(x => x > 0);
-console.log(`the player's own turn (ALP1, BET1 over 256 radians): zero in ${pl.length - moving.length} of ${pl.length} calls; when turning, median ${moving.length ? moving[moving.length >> 1].toFixed(2) : 0} deg, largest ${pl[pl.length - 1].toFixed(2)} deg`);
-console.log(`drawing's vectors: median turn ${rate(draw, false)}; player still: ${rate(draw, true)}`);
+for (let k = 1; k < fresh.length; k++) {
+    const p = fresh[k - 1], q = fresh[k], d = q.i - p.i;
+    if (d < 1 || d > 4) continue;
+    gap[d] = (gap[d] || 0) + 1;
+    fr.all.push(turn(p, q));
+    if (q.still) fr.still.push(turn(p, q));
+}
+const pl = calls.map(c => c.pl), mv = pl.filter(x => x > 0);
+console.log(`the game's vectors, player still: MCNT even ${med(it.even)}, MCNT odd ${med(it.odd)}`);
+console.log(`the player's own turn: zero in ${pl.length - mv.length} of ${pl.length} calls; when turning, median ${med(mv)}`);
+console.log(`from one fresh frame to the next (iterations apart: ${Object.entries(gap).map(([d, n]) => `${d}: ${n}`).join(", ")}): ${med(fr.all)}; player still ${med(fr.still)}`);
 process.exit(0);

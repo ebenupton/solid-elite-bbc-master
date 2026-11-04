@@ -311,6 +311,19 @@ export async function runElite(opts) {
     const H_RDK = hook("RDKEY", 5), H_DKS5 = hook("DKS5", 17), H_NOISE = hook("NOISE"), H_MLOOP = hook("MLOOP"), H_LL5 = hook("LL5"),
         H_TT100 = hook("TT100"), H_QU5 = hook("QU5"), H_BAY = hook("BAY"), H_MT26 = hook("MT26"), H_TT170 = hook("TT170");
 
+    // The half spin's patch (see the handler): only for a build without the
+    // port's own skip (H_MVS4); its address, part 8's first instruction, is
+    // found when the game is in memory (TT170), before MV8: LDA INWK+30, AND
+    // #&80, STA RAT2
+    let H_P8 = null, p8save = null;
+    const H_MV5 = sy.MV5 !== undefined ? hook("MV5") : null;
+    const findP8 = () => {
+        if (sy.H_MVS4 !== undefined || sy.MV8 === undefined || !H_MV5) return null;
+        const m = mapOfLabel(sy, "MV8"), want = [0xa5, sy.INWK + 30, 0x29, 0x80, 0x85, sy.RAT2];
+        for (let a = sy.MV8 - 6; a > sy.MV8 - 64; a--)
+            if (want.every((b, i) => physRead(cpu, m, a + i) === b)) return { a, m };
+        throw new Error("MVEIT part 8 not found before MV8 (the half spin's patch)");
+    };
     const res = { snaps: [], screens: [], iterTimes: [], tt100Times: [], tt100AtIter: [], init: null, keyLog: [], events: [], s, cpu, sy, regions };
     let started = false, done = false, armPatch = false, iter = 0, tt100 = 0, checked = false;
     const ctxBase = { rb, rd, sy, iterOf: () => iter, tt100Of: () => tt100 };
@@ -368,6 +381,22 @@ export async function runElite(opts) {
             const rc = a => cpu.readmem(a & 0xffff);     // (the caller's code, as paged: it may be in bank 4)
             if (rc(ret) === 0xa5 && rc(ret + 1) === sy.Q && rc(ret + 2) === 0x8d && (rc(ret + 3) | rc(ret + 4) << 8) === sy.ALTIT)
                 cpu.ramRomOs[sy.Q] = 0;
+        } else if (H_P8 && at(H_P8, pc)) {
+            // The planet's half spin. The port turns the planet (and the sun,
+            // whose counters are 0) by its own pitch and roll only on
+            // iterations with MCNT even (MVEIT part 8, skipped by H_MVS4 on
+            // the others, with RAT2 = 0 as part 8 leaves it). A build without
+            // H_MVS4 (SNG47) gets the same: at part 8's first instruction, for
+            // TYPE >= 128 with MCNT odd, the pitch and roll counters are
+            // set to 0 (part 8 then rotates nothing and leaves RAT2 = 0) and
+            // put back at MV5, so its game state matches the port's.
+            if ((rb(sy.TYPE) & 0x80) && (rb(sy.MCNT) & 1)) {
+                p8save = [rb(sy.INWK + 29), rb(sy.INWK + 30)];
+                cpu.ramRomOs[sy.INWK + 29] = 0; cpu.ramRomOs[sy.INWK + 30] = 0;
+            }
+        } else if (p8save && at(H_MV5, pc)) {
+            cpu.ramRomOs[sy.INWK + 29] = p8save[0]; cpu.ramRomOs[sy.INWK + 30] = p8save[1];
+            p8save = null;
         } else if (at(H_MLOOP, pc) && started) {
             res.snaps.push(snapshot());
             if (opts.screen) res.screens.push(screenHash());
@@ -398,6 +427,7 @@ export async function runElite(opts) {
                 if (op(H_RDK) !== 0x68) throw new Error(`RDKEY+5 is not PLA (&${op(H_RDK).toString(16)})`);
                 if (op(H_DKS5) !== 0xa9 || op(H_DKS5, 1) !== 0x0b) throw new Error("DKS5+17 is not LDA #&0B");
             }
+            H_P8 = findP8();
             if (opts.seed) for (const [a, bytes] of opts.seed) wr(a, bytes);
             if (opts.seedBoot) { res.seeded = opts.seedBoot(regions, written, rb); for (const [a, bytes] of res.seeded) wr(a, bytes); }
             bootWrites.remove();

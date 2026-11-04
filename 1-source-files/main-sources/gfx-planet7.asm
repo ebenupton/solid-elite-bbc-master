@@ -86,12 +86,10 @@
  STA pf_cx,X
  DEX
  BPL pfh5
- JSR pf_turn            \ (psi: the drawing's turn back)
  STZ pc_inv
  JSR pf_hold            \ (the last records, moved with the disc)
  BCC P%+5
  JMP pfh3h
- JSR pf_spin            \ (the planet turned back by half its spin)
  LDA PF_CLS
  BNE pfh2
  INC pc_inv             \ (the beach ball: base 1)
@@ -121,18 +119,12 @@
  EOR QQ2+5
  STA pf_h
  ENDIF
- IF _PLANET_MOON OR _PLANET_RINGS
- BIT pf_on              \ (the moon's crater and the ring from the planet as
- BMI P%+5               \ drawn, on held iterations too)
- JSR pf_spin
- ENDIF
  IF _PLANET_MOON
  JSR pf_moon
  ENDIF
  IF _PLANET_RINGS
  JSR pf_ring
  ENDIF
- JSR pf_unspin          \ (the game's vectors back in INWK)
  LDX #22
 .pfh1
  LDA pm_zsave,X
@@ -146,21 +138,30 @@
  PLP
  RTS
 
-\ pf_hold: the circles' records are made every other iteration, and every
-\ fourth in deep space (the planet's z at least 512 x 256: INWK+8's low
-\ bits at least 2, as 6-harness/scenes.py's scenes have it). In between,
-\ when the radius, TYPE and VIEW are the same as the last call's and that
-\ call was the previous iteration's (MCNT), the last records are kept,
-\ moved with the disc's centre (their centre lines, centre rows and
-\ thresholds: exactly as if made at the new centre with the planet as it
-\ was), and C is set. pf_note: the records just made, noted, with the
-\ iterations they may be kept for (pf_ph).
+\ pf_hold: the circles' records are made on the iterations with MCNT even,
+\ the ones on which the game turns the planet by its own pitch and roll
+\ (MVEIT part 8), and in deep space (the planet's z at least 512 x 256:
+\ INWK+8's low bits at least 2, as 6-harness/scenes.py's scenes have it)
+\ only on those with MCNT a multiple of 4. On the others, when the radius,
+\ TYPE and VIEW are the same as the last call's and that call was the
+\ previous iteration's (MCNT), the last records are kept, moved with the
+\ disc's centre (their centre lines, centre rows and thresholds: exactly as
+\ if made at the new centre with the planet as it was), and C is set.
+\ pf_note: the records just made, noted (pf_ph bit 7: there are some).
 
 .pfo0
  CLC
  RTS
 .pf_hold
- LDA pf_ph
+ BIT pf_ph
+ BPL pfo0
+ LDA INWK+8             \ MCNT AND 1, or 3 in deep space: 0, make them
+ AND #&7F
+ CMP #2
+ LDA #1
+ BCC P%+4
+ LDA #3
+ AND MCNT               \ (bankcheck: ok: game context)
  BEQ pfo0
  LDA pf_r
  CMP pf_lr
@@ -177,7 +178,6 @@
  BNE pfo0
  DEC A
  STA pf_lm
- DEC pf_ph
  SEC                    \ the centre's move (dx, dy)
  LDA pcbx
  SBC pf_lx
@@ -256,12 +256,7 @@
  RTS
 
 .pf_note
- LDA INWK+8             \ kept for 1 iteration, or 3 in deep space
- AND #&7F
- CMP #2
- LDA #1
- BCC P%+4
- LDA #3
+ LDA #&80
  STA pf_ph
  LDA pf_r
  STA pf_lr
@@ -282,313 +277,6 @@
  STA pf_lx,X
  DEX
  BPL pfnx
- RTS
-
-\ pf_spin: the planet drawn spinning at half the game's rate. Each iteration
-\ the game turns it by 1/16 radian in pitch and in roll (MVEIT part 8, the
-\ counters at 127), which together turn it by phi = 0.0883 radians about
-\ the axis a = (nosev - sidev) / 2, fixed in the planet; the drawing turns its
-\ vectors back about a by psi (pf_ps), which falls by phi / 2 (PF_DPS, in
-\ SNE's steps of pi/32 over 256) for each iteration since the last call
-\ (MCNT). roofv and q = (nosev + sidev) / 2, both at right angles to a, turn
-\ in their plane: roofv' = c roofv + 2 s' q, q' = c q - s' roofv (c = cos psi,
-\ s' = sin psi / sqrt(2): q is roofv's length over sqrt(2)); then nosev' = a +
-\ q', sidev' = q' - a. sin and cos are interpolated in the game's SNE (in
-\ HAZEL, which game context has paged in). INWK's vectors are kept in pf_vs
-\ and put back by pf_unspin, so no game state is changed: only the drawing
-\ sees the planet turned.
-
-PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
-
-.pf_turn
- LDA pf_pm              \ k = the iterations since the last call
- SEC
- SBC MCNT               \ (bankcheck: ok: game context)
- TAX
- LDA MCNT               \ (bankcheck: ok)
- STA pf_pm
- TXA                    \ psi -= k phi / 2
- LDX #PF_DPS
- JSR pm_mul8
- STA pf_t
- SEC
- LDA pf_ps
- SBC pm_m8
- STA pf_ps
- LDA pf_ps+1
- SBC pf_t
- STA pf_ps+1
- RTS
-
-.pf_spin
- JSR pfs_sin            \ c = cos psi: |c| in pf_cm, its sign in pf_cs
- STA pf_s1m             \ (sin first: s' = |sin psi| 181 / 256)
- LDA pf_t
- STA pf_ss
- LDA pf_s1m
- LDX #181
- JSR pm_mul8
- STA pf_s1m
- LDA pf_ps+1
- CLC
- ADC #16
- JSR pfs_sn2
- STA pf_cm
- LDA pf_t
- STA pf_cs
- LDX #17                \ INWK's vectors kept
-.pfq1
- LDA INWK+9,X
- STA pf_vs,X
- DEX
- BPL pfq1
- LDA #&80
- STA pf_on
- LDX #4                 \ each component, X = 4, 2, 0
-.pfq2
- STX pf_k2
- LDA INWK+15,X          \ w0 = roofv, w1 = q = n/2 + s/2, w2 = a = n/2 - s/2
- LDY INWK+16,X
- JSR pfs_get
- STA pf_w
- STY pf_w+1
- LDX pf_k2
- LDA INWK+9,X
- LDY INWK+10,X
- JSR pfs_get
- JSR pfs_half
- STA pf_w+2
- STY pf_w+3
- STA pf_w+4
- STY pf_w+5
- LDX pf_k2
- LDA INWK+21,X
- LDY INWK+22,X
- JSR pfs_get
- JSR pfs_half
- STA pf_t2
- STY pf_t2+1
- CLC
- LDA pf_w+2
- ADC pf_t2
- STA pf_w+2
- LDA pf_w+3
- ADC pf_t2+1
- STA pf_w+3
- SEC
- LDA pf_w+4
- SBC pf_t2
- STA pf_w+4
- LDA pf_w+5
- SBC pf_t2+1
- STA pf_w+5
- LDY #2                 \ 2 s' q
- LDA pf_s1m
- LDX pf_ss
- JSR pfs_mul
- ASL pf_r0
- ROL pf_r0+1
- LDA pf_r0
- STA pf_t2
- LDA pf_r0+1
- STA pf_t2+1
- LDY #0                 \ roofv' = c roofv + 2 s' q
- LDA pf_cm
- LDX pf_cs
- JSR pfs_mul
- CLC
- LDA pf_r0
- ADC pf_t2
- TAX
- LDA pf_r0+1
- ADC pf_t2+1
- TAY
- TXA
- LDX pf_k2
- JSR pfs_put
- STA INWK+15,X
- TYA
- STA INWK+16,X
- LDY #0                 \ s' roofv
- LDA pf_s1m
- LDX pf_ss
- JSR pfs_mul
- LDA pf_r0
- STA pf_t2
- LDA pf_r0+1
- STA pf_t2+1
- LDY #2                 \ q' = c q - s' roofv
- LDA pf_cm
- LDX pf_cs
- JSR pfs_mul
- SEC
- LDA pf_r0
- SBC pf_t2
- STA pf_t2
- LDA pf_r0+1
- SBC pf_t2+1
- STA pf_t2+1
- CLC                    \ nosev' = a + q'
- LDA pf_w+4
- ADC pf_t2
- TAX
- LDA pf_w+5
- ADC pf_t2+1
- TAY
- TXA
- LDX pf_k2
- JSR pfs_put
- STA INWK+9,X
- TYA
- STA INWK+10,X
- SEC                    \ sidev' = q' - a
- LDA pf_t2
- SBC pf_w+4
- TAX
- LDA pf_t2+1
- SBC pf_w+5
- TAY
- TXA
- LDX pf_k2
- JSR pfs_put
- STA INWK+21,X
- TYA
- STA INWK+22,X
- LDX pf_k2
- DEX
- DEX
- BMI pfq9
- JMP pfq2
-.pfq9
- RTS
-
-.pf_unspin              \ INWK's vectors put back
- BIT pf_on
- BPL pfq9
- STZ pf_on
- LDX #17
-.pfq3
- LDA pf_vs,X
- STA INWK+9,X
- DEX
- BPL pfq3
- RTS
-
-.pfs_get                \ (A Y) sign-magnitude (A low, Y high) to two's
- STA pf_t2              \ complement in (A Y)
- TYA
- BPL pfq4
- AND #&7F
- TAY
- LDA #0
- SEC
- SBC pf_t2
- PHA
- TYA
- EOR #&FF
- ADC #0
- TAY
- PLA
- RTS
-.pfq4
- LDA pf_t2
- RTS
-
-.pfs_half               \ (A Y) / 2, signed
- PHA
- TYA
- CMP #&80
- ROR A
- TAY
- PLA
- ROR A
- RTS
-
-.pfs_put                \ (A Y) two's complement to sign-magnitude in (A Y)
- CPY #&80               \ (X kept)
- BCC pfq5
- STA pf_t3
- LDA #0
- SEC
- SBC pf_t3
- PHA
- TYA
- EOR #&FF
- ADC #0
- ORA #&80
- TAY
- PLA
-.pfq5
- RTS
-
-.pfs_mul                \ pf_r0 = pf_w+Y (signed) x A / 256, A's sign in X bit 7
- STA pm_b
- STZ pm_b+1
- TXA
- EOR pf_w+1,Y
- STA pf_t
- LDA pf_w,Y
- STA pm_a
- LDA pf_w+1,Y
- BPL pfq6
- LDA #0
- SEC
- SBC pf_w,Y
- STA pm_a
- LDA #0
- SBC pf_w+1,Y
-.pfq6
- STA pm_a+1
- JSR pm_mul16
- LDA pm_p+1
- STA pf_r0
- LDA pm_p+2
- STA pf_r0+1
- BIT pf_t
- BPL pfq7
- SEC
- LDA #0
- SBC pf_r0
- STA pf_r0
- LDA #0
- SBC pf_r0+1
- STA pf_r0+1
-.pfq7
- RTS
-
-.pfs_sin                \ A = |sin psi| (8 bits), pf_t bit 7 its sign
- LDA pf_ps+1
-.pfs_sn2                \ (A = the angle's high byte, its low byte pf_ps)
- AND #63
- CMP #32
- LDX #0
- BCC P%+4
- LDX #&80
- STX pf_t
- AND #31
- TAX
- LDA SNE+1,X            \ (bankcheck: ok: game data)
- SEC
- SBC SNE,X              \ (bankcheck: ok)
- BCC pfq8
- PHX                    \ rising: SNE(j) + d f / 256
- LDX pf_ps
- JSR pm_mul8
- PLX
- CLC
- ADC SNE,X              \ (bankcheck: ok)
- RTS
-.pfq8
- EOR #&FF               \ falling: SNE(j) - d f / 256
- ADC #1
- PHX
- LDX pf_ps
- JSR pm_mul8
- PLX
- STA pf_t2
- LDA SNE,X              \ (bankcheck: ok)
- SEC
- SBC pf_t2
  RTS
 
 \ pf_beach: a meridian planet's two great circles, normal to roofv and sidev
@@ -1644,7 +1332,7 @@ ENDIF                   \ (_PLANET_RINGS)
 .pf_cx EQUW 0           \ the planet's centre and radius (PF_HOOK)
 .pf_cy EQUW 0
 .pf_r  EQUB 0
-.pf_ph  EQUB 0          \ pf_hold's: the iterations the last records may be kept
+.pf_ph  EQUB 0          \ pf_hold's: bit 7, there are records to keep
 .pf_lr  EQUB 0          \ the last records' radius, TYPE, VIEW, MCNT
 .pf_lt  EQUB 0
 .pf_lv  EQUB 0
@@ -1656,20 +1344,6 @@ ENDIF                   \ (_PLANET_RINGS)
 .pf_dx  EQUW 0          \ the centre's move
 .pf_dy  EQUW 0
 .pf_k   EQUB 0
-.pf_ps  EQUW 0          \ pf_spin's: psi, the drawing's turn back (pi/8192)
-.pf_pm  EQUB 0          \ MCNT at the last call
-.pf_on  EQUB 0          \ bit 7: INWK's vectors are in pf_vs
-.pf_vs  SKIP 18         \ INWK's vectors
-.pf_cm  EQUB 0          \ |cos psi| and its sign (bit 7)
-.pf_cs  EQUB 0
-.pf_s1m EQUB 0          \ |sin psi| / sqrt(2) and its sign
-.pf_ss  EQUB 0
-.pf_w   SKIP 6          \ roofv, q, a (one component, two's complement)
-.pf_r0  EQUW 0          \ a product
-.pf_t2  EQUW 0
-.pf_t3  EQUB 0
-.pf_t   EQUB 0
-.pf_k2  EQUB 0
 IF _PLANET_MOON OR _PLANET_RINGS
 .pf_h  EQUB 0           \ h, the system's moon and ring (PF_HOOK)
 ENDIF

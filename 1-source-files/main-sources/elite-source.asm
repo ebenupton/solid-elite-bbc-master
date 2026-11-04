@@ -22493,6 +22493,46 @@ ENDIF
 
 \ ******************************************************************************
 \
+\       Name: H_MVS4
+\       Type: Subroutine
+\   Category: Moving
+\    Summary: Port: MVEIT part 7's last MVS4, then part 8 skipped for the planet
+\             on odd iterations: its half spin
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: the planet (and the sun, whose counters are 0) turns by its own pitch
+\ and roll (MVEIT part 8: 1/16 radian each a step, its counters at 127) only
+\ on iterations with MCNT even, so it spins at half the original's rate, and
+\ the circles' records are made on the iterations it turns (gfx-planet7.asm's
+\ pf_hold). On the others part 8 is skipped, leaving RAT2 = 0 as part 8 does
+\ for counters at 127 or 0, and MVEIT goes on at MV5. The harness makes SNG47
+\ skip the same turns (6-harness/README.md), so the game states still match.
+\ Here, after DVID4, so that it flows into the hot pass's second container in
+\ main RAM, which has the room.
+\
+\ ******************************************************************************
+
+.H_MVS4
+
+ JSR MVS4               \ Apply our pitch and roll rotations to the sidev vector
+
+ LDA TYPE               \ The planet or the sun (TYPE 128 or more) on an
+ BPL hsp9               \ iteration with MCNT odd: part 8 skipped, returning
+ LDA MCNT               \ from MVEIT's call into part 7 to MV5
+ LSR A
+ BCC hsp9
+ STZ RAT2
+ PLA
+ PLA
+ JMP MV5
+
+.hsp9
+
+ RTS
+
+\ ******************************************************************************
+\
 \       Name: DVL9a
 \       Type: Subroutine
 \   Category: Maths (Arithmetic)
@@ -46661,7 +46701,8 @@ ENDMACRO
  JSR MVS4               \ ship's roofv vector
 
  LDY #21                \ Apply our pitch and roll rotations to the current
- JSR MVS4               \ ship's sidev vector
+ JSR H_MVS4             \ ship's sidev vector (Port: then H_MVS4 skips part 8
+                        \ for the planet on odd iterations: its half spin)
 
 \ ******************************************************************************
 \

@@ -552,35 +552,33 @@ in the glue area:
   into the disc layer's arrays, which `R_DISCROWS` then draws like any
   other disc.
 
-The game spins the planet as the original does, by 1/16 radian in roll and
-pitch each iteration (MVEIT part 8, its counters at 127): together a turn
-of 0.0883 radians (5.05 degrees) about its axis `nosev - sidev`. The
-drawing shows it spinning at half that rate. `pf_spin` turns the vectors
-`PF_HOOK` is given back about that axis by half the game's spin since the
-planet was first drawn (`pf_ps`, falling by `PF_DPS` for each iteration
-`MCNT` has counted since the last call), interpolating the game's sine table
-`SNE`, and `pf_unspin` puts `INWK`'s vectors back before `H_CIRC` goes on,
-so the game's state is the original's and the comparison with SNG47 leaves
-nothing more out. The game's own vectors could not be turned more slowly
-instead: they are not only drawn, as `H_CIRC` leaves `K2` from `nosev` for
-`MV40`, which adds it into the next object's y, so the station or the sun
-would move. `6-harness/mspin.mjs` measures the turns over the gate's run:
-the game's vectors turn by a median 5.05 degrees an iteration when the
-player is not turning (5.02 overall: the player's own roll and pitch, a
-median 2.99 degrees when they are not zero, add to it or take from it), the
-drawing's by 2.52 (2.69 overall). `planet_caps.py`'s `pf_spin` models it bit
-for bit.
+The planet spins at half the original's rate, in the game: `MVEIT` part 8
+turns the planet by its own pitch and roll (1/16 radian each, its counters
+at 127: together 5.05 degrees about its axis `nosev - sidev`) only on the
+iterations with `MCNT` even (`H_MVS4`, which part 7's last `MVS4` call now
+goes through, skips part 8 on the others, leaving `RAT2` = 0 as part 8
+does). The harness makes SNG47 skip the same turns (6-harness/README.md), so
+the whole game state, the planet's vectors included, still matches the
+original at every iteration, and saves are unchanged. `6-harness/mspin.mjs`
+measures it over the gate's run: with the player still, 5.05 degrees on the
+iterations with `MCNT` even and none on the others (the player's own roll and
+pitch, when not zero, a median of 2.5 degrees an iteration).
 
-The records are made every other iteration, and every fourth in deep space
-(the planet's z at least 512 x 256, as `6-harness/scenes.py`'s scenes have
-it: beyond the big planet's range). In between, when the radius, `TYPE` and
-`VIEW` are the last call's and that call was the previous iteration's
-(`MCNT`), `pf_hold` keeps the last records and moves them with the disc's
-centre: their centre lines, centre rows and threshold rows (`pc_circ` keeps
-the thresholds unclamped in `pc_tu`), exactly as if they were made at the new
-centre with the planet as it was. The surface then moves on in steps of
-two or four iterations' spin, and every disc is still drawn incrementally.
-`test_raster.py`'s `hold` checks the held rows against the model.
+The circles' records are made on those same iterations, `MCNT` even, and in
+deep space (the planet's z at least 512 x 256, as `6-harness/scenes.py`'s
+scenes have it: beyond the big planet's range) on those with `MCNT` a
+multiple of 4. On the others, when the radius, `TYPE` and `VIEW` are the
+last call's and that call was the previous iteration's (`MCNT`), `pf_hold`
+keeps the last records and moves them with the disc's centre: their centre
+lines, centre rows and threshold rows (`pc_circ` keeps the thresholds
+unclamped in `pc_tu`), exactly as if they were made at the new centre with
+the planet as it was. A held frame then lacks only the player's own turn
+since the records were made (the planet's own does not happen on it),
+except in deep space, where the iterations with `MCNT` 2 more than a
+multiple of 4 turn the planet and are held. Every disc is still drawn
+incrementally. From one fresh frame to the next the planet turns a median
+5.03 degrees. `test_raster.py`'s `hold` checks the held rows against the
+model.
 
 The 6502 code matches two reference models row for row:
 `6-harness/planet_caps.py` models the engine and the styles bit for bit,

@@ -362,46 +362,6 @@ def pf_caps(inwk, qq2):
     return caps
 
 
-# ------------------------------------------------------------ the spin
-
-SNE = [255 if abs(math.sin((i % 32) / 64 * 2 * math.pi)) >= 1 else int(256 * abs(math.sin((i % 32) / 64 * 2 * math.pi)) + 0.5)
-       for i in range(48)]            # the game's sine table (elite-data.asm)
-
-
-def _sn2(hi, lo):
-    """pfs_sn2: |sin| of the angle (hi lo) (pi/32 a unit of hi), interpolated in
-    SNE, and its sign"""
-    i = hi & 63
-    j = i & 31
-    d = SNE[j + 1] - SNE[j]
-    v = SNE[j] + ((d * lo) >> 8) if d >= 0 else SNE[j] - (((-d) * lo) >> 8)
-    return v & 255, i >= 32
-
-
-def pf_spin(inwk, ps):
-    """pf_spin (gfx-planet7.asm): the planet's vectors as drawn, turned back
-    about (nosev - sidev) by psi = ps (pi/8192), bit for bit"""
-    s, ss = _sn2(ps >> 8, ps & 255)
-    s1 = (s * 181) >> 8
-    c, cs = _sn2(((ps >> 8) + 16) & 255, ps & 255)
-    w16 = lambda v: ((v + 0x8000) & 0xFFFF) - 0x8000
-
-    def mul(w, k, neg):
-        p = ((abs(w) * k) >> 8) & 0xFFFF
-        return w16(-p if (w < 0) != neg else p)
-    out = list(inwk)
-    for j in range(3):
-        n, r, sv = (_tc(inwk, o + 2 * j) for o in (9, 15, 21))
-        q = w16((n >> 1) + (sv >> 1))
-        a = w16((n >> 1) - (sv >> 1))
-        r2 = w16(mul(r, c, cs) + w16(2 * mul(q, s1, ss)))
-        q2 = w16(mul(q, c, cs) - mul(r, s1, ss))
-        for o, v in ((15, r2), (9, w16(a + q2)), (21, w16(q2 - a))):
-            m = -v if v < 0 else v
-            out[o + 2 * j], out[o + 2 * j + 1] = m & 255, ((m >> 8) & 0x7F) | (0x80 if v < 0 else 0)
-    return out
-
-
 # ------------------------------------------------------------ the moon
 
 PFM_RHO = (48, 56, 64, 72)            # its radius over the planet's (0.8)
