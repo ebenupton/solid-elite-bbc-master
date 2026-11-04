@@ -552,9 +552,24 @@ in the glue area:
   into the disc layer's arrays, which `R_DISCROWS` then draws like any
   other disc.
 
-Each frame the planet spins as in the original, by 1/16 radian in roll and
-pitch, so the records are made every frame. Keeping rows between frames
-would pay only for a circle that is hidden or edge-on, and is not done.
+The game spins the planet as the original does, by 1/16 radian in roll and
+pitch each iteration (MVEIT part 8, its counters at 127): together a turn
+of 0.0883 radians (5.05 degrees) about its axis `nosev - sidev`. The
+drawing shows it spinning at half that rate. `pf_spin` turns the vectors
+`PF_HOOK` is given back about that axis by half the game's spin since the
+planet was first drawn (`pf_ps`, falling by `PF_DPS` for each iteration
+`MCNT` has counted since the last call), interpolating the game's sine table
+`SNE`, and `pf_unspin` puts `INWK`'s vectors back before `H_CIRC` goes on,
+so the game's state is the original's and the comparison with SNG47 leaves
+nothing more out. The game's own vectors could not be turned more slowly
+instead: they are not only drawn, as `H_CIRC` leaves `K2` from `nosev` for
+`MV40`, which adds it into the next object's y, so the station or the sun
+would move. `6-harness/mspin.mjs` measures the turns over the gate's run:
+the game's vectors turn by a median 5.05 degrees an iteration when the
+player is not turning (5.02 overall: the player's own roll and pitch, a
+median 2.99 degrees when they are not zero, add to it or take from it), the
+drawing's by 2.52 (2.69 overall). `planet_caps.py`'s `pf_spin` models it bit
+for bit.
 
 The 6502 code matches two reference models row for row:
 `6-harness/planet_caps.py` models the engine and the styles bit for bit,

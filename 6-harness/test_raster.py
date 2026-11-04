@@ -114,7 +114,7 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
 MG = dict(INWK=0x9C, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
-          TYPE=0x85, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
+          TYPE=0x85, MCNT=0x84, SNE=0x0C40, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
 MG['K%'] = 0x0400
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
 # banded planets (gfx-planet7.asm's _PLANET_BANDS, the Makefile's bands=on):
@@ -307,6 +307,7 @@ class Machine(tr.Machine):
         for n in range(512):
             self.mem[MG['QSL'] + n] = (n * n // 4) & 255
             self.mem[MG['QSH'] + n] = (n * n // 4) >> 8
+        self.mem[MG['SNE']:MG['SNE'] + 48] = PCM.SNE
         self.andy = [rnd.randrange(256) for _ in range(0x1000)]
         self.andy[0:len(dataa)] = list(dataa)
         self.banks = {5: b5, 7: b7}
@@ -574,10 +575,10 @@ def _game_spans(cx, cy, r, clip=(1, 254, 1, 191)):
     return out
 
 
-def _b7(m, name, vals=None):
+def _b7(m, name, vals=None, off=0):
     """bank 7's bytes at a label (read, or written if vals)"""
     m.page(7)
-    a = m.syms[name]
+    a = m.syms[name] + off
     if vals is None:
         out = m.mem[a]
     else:
@@ -788,6 +789,10 @@ def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
         raise AssertionError('PF_HOOK did not keep A, X, Y, the flags and zero page &10-&28: %s %s %s'
                              % ((mpu.a, mpu.x, mpu.y, mpu.p), (a0, x0, y0), [(0x10 + k, a_, b_) for k, (a_, b_) in enumerate(zip(mem[0x10:0x29], zp)) if a_ != b_]))
     on = 6 <= r < 256
+    if mem[MG['INWK']:MG['INWK'] + 36] != inwk:
+        raise AssertionError('PF_HOOK did not keep INWK')
+    if on and 'pf_ps' in m.syms:            # (the planet as drawn: turned back by pf_spin)
+        inwk = PCM.pf_spin(inwk, _b7(m, 'pf_ps') | _b7(m, 'pf_ps', None, 1) << 8)
     base, circs = PCM.pf_records(inwk, qq2, typ) if on else (0, [])
     base, recs = _body(cx, cy, r, base, circs)
     n = sum(1 for c in recs if c is not None and not c['none'])
