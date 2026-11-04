@@ -494,6 +494,14 @@ ENDIF
  STA pc_v
  LDA pc_v+1
  ADC pcby+1
+ PHA                    \ (unclamped, into pc_tw, for pf_hold)
+ TYA
+ ASL A
+ TAX
+ LDA pc_v
+ STA pc_tw,X
+ PLA
+ STA pc_tw+1,X
  BMI pct2
  BNE pct3
  LDA pc_v
@@ -529,6 +537,18 @@ ENDIF
  CMP #3
  BEQ pcy9
 .pcy2
+ LDA PC_N               \ (its unclamped thresholds, for pf_hold)
+ ASL A
+ ASL A
+ TAX
+ LDA pc_tw
+ STA pc_tu,X
+ LDA pc_tw+1
+ STA pc_tu+1,X
+ LDA pc_tw+2
+ STA pc_tu+2,X
+ LDA pc_tw+3
+ STA pc_tu+3,X
  LDX PC_N               \ the record into its slot
  INC PC_N
  LDY pcb_o+1,X
@@ -2000,4 +2020,6 @@ pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
 .pcc    EQUB 0          \ the circle's cosine (0.8) and its sign (bit 7)
 .pcneg  EQUB 0
 .pcn    EQUW 0          \ 2^24 / the axis' nominal length (>> 3)
+.pc_tw  SKIP 4          \ the record's thresholds T1, T2 before clamping (16-bit)
+.pc_tu  SKIP 4 * PCSLOTS \ and each slot's (pf_hold moves them with the disc)
 .PCB    SKIP RSZ * PCSLOTS  \ the records: the planet's, and the moon's crater

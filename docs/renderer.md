@@ -571,6 +571,17 @@ median 2.99 degrees when they are not zero, add to it or take from it), the
 drawing's by 2.52 (2.69 overall). `planet_caps.py`'s `pf_spin` models it bit
 for bit.
 
+The records are made every other iteration, and every fourth in deep space
+(the planet's z at least 512 x 256, as `6-harness/scenes.py`'s scenes have
+it: beyond the big planet's range). In between, when the radius, `TYPE` and
+`VIEW` are the last call's and that call was the previous iteration's
+(`MCNT`), `pf_hold` keeps the last records and moves them with the disc's
+centre: their centre lines, centre rows and threshold rows (`pc_circ` keeps
+the thresholds unclamped in `pc_tu`), exactly as if they were made at the new
+centre with the planet as it was. The surface then moves on in steps of
+two or four iterations' spin, and every disc is still drawn incrementally.
+`test_raster.py`'s `hold` checks the held rows against the model.
+
 The 6502 code matches two reference models row for row:
 `6-harness/planet_caps.py` models the engine and the styles bit for bit,
 and the beach ball's rows are those of `6-harness/planet_analytic.py`

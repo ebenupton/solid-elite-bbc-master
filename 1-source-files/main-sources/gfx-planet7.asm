@@ -86,8 +86,12 @@
  STA pf_cx,X
  DEX
  BPL pfh5
- JSR pf_spin            \ (the planet turned back by half its spin)
+ JSR pf_turn            \ (psi: the drawing's turn back)
  STZ pc_inv
+ JSR pf_hold            \ (the last records, moved with the disc)
+ BCC P%+5
+ JMP pfh3h
+ JSR pf_spin            \ (the planet turned back by half its spin)
  LDA PF_CLS
  BNE pfh2
  INC pc_inv             \ (the beach ball: base 1)
@@ -103,6 +107,8 @@
  ENDIF
  JSR pf_craters
 .pfh3
+ JSR pf_note
+.pfh3h
  LDA PC_N               \ (records, or a base colour)
  ORA pc_inv
  BEQ pfh7
@@ -114,6 +120,11 @@
  EOR QQ2+3              \ and ring
  EOR QQ2+5
  STA pf_h
+ ENDIF
+ IF _PLANET_MOON OR _PLANET_RINGS
+ BIT pf_on              \ (the moon's crater and the ring from the planet as
+ BMI P%+5               \ drawn, on held iterations too)
+ JSR pf_spin
  ENDIF
  IF _PLANET_MOON
  JSR pf_moon
@@ -135,6 +146,144 @@
  PLP
  RTS
 
+\ pf_hold: the circles' records are made every other iteration, and every
+\ fourth in deep space (the planet's z at least 512 x 256: INWK+8's low
+\ bits at least 2, as 6-harness/scenes.py's scenes have it). In between,
+\ when the radius, TYPE and VIEW are the same as the last call's and that
+\ call was the previous iteration's (MCNT), the last records are kept,
+\ moved with the disc's centre (their centre lines, centre rows and
+\ thresholds: exactly as if made at the new centre with the planet as it
+\ was), and C is set. pf_note: the records just made, noted, with the
+\ iterations they may be kept for (pf_ph).
+
+.pfo0
+ CLC
+ RTS
+.pf_hold
+ LDA pf_ph
+ BEQ pfo0
+ LDA pf_r
+ CMP pf_lr
+ BNE pfo0
+ LDA TYPE               \ (bankcheck: ok: game context)
+ CMP pf_lt
+ BNE pfo0
+ LDA VIEW               \ (bankcheck: ok)
+ CMP pf_lv
+ BNE pfo0
+ LDA MCNT               \ (bankcheck: ok)
+ INC A
+ CMP pf_lm
+ BNE pfo0
+ DEC A
+ STA pf_lm
+ DEC pf_ph
+ SEC                    \ the centre's move (dx, dy)
+ LDA pcbx
+ SBC pf_lx
+ STA pf_dx
+ LDA pcbx+1
+ SBC pf_lx+1
+ STA pf_dx+1
+ SEC
+ LDA pcby
+ SBC pf_ly
+ STA pf_dy
+ LDA pcby+1
+ SBC pf_ly+1
+ STA pf_dy+1
+ JSR pfn_xy
+ LDX #0
+.pfo1
+ CPX pf_hn
+ BCS pfo3
+ STX pf_k
+ LDY pcb_o,X
+ CLC
+ LDA PCB+R_C0,Y
+ ADC pf_dx
+ STA PCB+R_C0,Y
+ LDA PCB+R_C0+1,Y
+ ADC pf_dx+1
+ STA PCB+R_C0+1,Y
+ CLC
+ LDA PCB+R_YC,Y
+ ADC pf_dy
+ STA PCB+R_YC,Y
+ LDA PCB+R_YC+1,Y
+ ADC pf_dy+1
+ STA PCB+R_YC+1,Y
+ TXA
+ ASL A
+ ASL A
+ TAX
+ JSR pfo_t
+ INX
+ INX
+ INY
+ JSR pfo_t
+ LDX pf_k
+ INX
+ BRA pfo1
+.pfo3
+ LDA pf_hn
+ STA PC_N
+ LDA pf_hinv
+ STA pc_inv
+ SEC
+ RTS
+
+.pfo_t                  \ pc_tu+X (16-bit) += dy, clamped to 0..192 into
+ CLC                    \ PCB+R_T1+Y
+ LDA pc_tu,X
+ ADC pf_dy
+ STA pc_tu,X
+ LDA pc_tu+1,X
+ ADC pf_dy+1
+ STA pc_tu+1,X
+ BMI pot2
+ BNE pot3
+ LDA pc_tu,X
+ CMP #193
+ BCC pot4
+.pot3
+ LDA #192
+ BRA pot4
+.pot2
+ LDA #0
+.pot4
+ STA PCB+R_T1,Y
+ RTS
+
+.pf_note
+ LDA INWK+8             \ kept for 1 iteration, or 3 in deep space
+ AND #&7F
+ CMP #2
+ LDA #1
+ BCC P%+4
+ LDA #3
+ STA pf_ph
+ LDA pf_r
+ STA pf_lr
+ LDA TYPE               \ (bankcheck: ok: game context)
+ STA pf_lt
+ LDA VIEW               \ (bankcheck: ok)
+ STA pf_lv
+ LDA MCNT               \ (bankcheck: ok)
+ STA pf_lm
+ LDA PC_N
+ STA pf_hn
+ LDA pc_inv
+ STA pf_hinv
+.pfn_xy
+ LDX #3
+.pfnx
+ LDA pcbx,X
+ STA pf_lx,X
+ DEX
+ BPL pfnx
+ RTS
+
 \ pf_spin: the planet drawn spinning at half the game's rate. Each iteration
 \ the game turns it by 1/16 radian in pitch and in roll (MVEIT part 8, the
 \ counters at 127), which together turn it by phi = 0.0883 radians about
@@ -151,7 +300,7 @@
 
 PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
 
-.pf_spin
+.pf_turn
  LDA pf_pm              \ k = the iterations since the last call
  SEC
  SBC MCNT               \ (bankcheck: ok: game context)
@@ -169,6 +318,9 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA pf_ps+1
  SBC pf_t
  STA pf_ps+1
+ RTS
+
+.pf_spin
  JSR pfs_sin            \ c = cos psi: |c| in pf_cm, its sign in pf_cs
  STA pf_s1m             \ (sin first: s' = |sin psi| 181 / 256)
  LDA pf_t
@@ -1492,6 +1644,18 @@ ENDIF                   \ (_PLANET_RINGS)
 .pf_cx EQUW 0           \ the planet's centre and radius (PF_HOOK)
 .pf_cy EQUW 0
 .pf_r  EQUB 0
+.pf_ph  EQUB 0          \ pf_hold's: the iterations the last records may be kept
+.pf_lr  EQUB 0          \ the last records' radius, TYPE, VIEW, MCNT
+.pf_lt  EQUB 0
+.pf_lv  EQUB 0
+.pf_lm  EQUB 0
+.pf_lx  EQUW 0          \ and centre (as pcbx, pcby)
+.pf_ly  EQUW 0
+.pf_hn  EQUB 0          \ and PC_N and pc_inv
+.pf_hinv EQUB 0
+.pf_dx  EQUW 0          \ the centre's move
+.pf_dy  EQUW 0
+.pf_k   EQUB 0
 .pf_ps  EQUW 0          \ pf_spin's: psi, the drawing's turn back (pi/8192)
 .pf_pm  EQUB 0          \ MCNT at the last call
 .pf_on  EQUB 0          \ bit 7: INWK's vectors are in pf_vs
