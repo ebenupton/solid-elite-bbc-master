@@ -337,15 +337,15 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA pf_t
  STA pf_cs
  LDX #17                \ INWK's vectors kept
-.psp1
+.pfq1
  LDA INWK+9,X
  STA pf_vs,X
  DEX
- BPL psp1
+ BPL pfq1
  LDA #&80
  STA pf_on
  LDX #4                 \ each component, X = 4, 2, 0
-.psp2
+.pfq2
  STX pf_k2
  LDA INWK+15,X          \ w0 = roofv, w1 = q = n/2 + s/2, w2 = a = n/2 - s/2
  LDY INWK+16,X
@@ -457,27 +457,27 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDX pf_k2
  DEX
  DEX
- BMI psp9
- JMP psp2
-.psp9
+ BMI pfq9
+ JMP pfq2
+.pfq9
  RTS
 
 .pf_unspin              \ INWK's vectors put back
  BIT pf_on
- BPL psp9
+ BPL pfq9
  STZ pf_on
  LDX #17
-.psp3
+.pfq3
  LDA pf_vs,X
  STA INWK+9,X
  DEX
- BPL psp3
+ BPL pfq3
  RTS
 
 .pfs_get                \ (A Y) sign-magnitude (A low, Y high) to two's
  STA pf_t2              \ complement in (A Y)
  TYA
- BPL psp4
+ BPL pfq4
  AND #&7F
  TAY
  LDA #0
@@ -490,7 +490,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  TAY
  PLA
  RTS
-.psp4
+.pfq4
  LDA pf_t2
  RTS
 
@@ -506,7 +506,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
 
 .pfs_put                \ (A Y) two's complement to sign-magnitude in (A Y)
  CPY #&80               \ (X kept)
- BCC psp5
+ BCC pfq5
  STA pf_t3
  LDA #0
  SEC
@@ -518,7 +518,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  ORA #&80
  TAY
  PLA
-.psp5
+.pfq5
  RTS
 
 .pfs_mul                \ pf_r0 = pf_w+Y (signed) x A / 256, A's sign in X bit 7
@@ -530,14 +530,14 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA pf_w,Y
  STA pm_a
  LDA pf_w+1,Y
- BPL psp6
+ BPL pfq6
  LDA #0
  SEC
  SBC pf_w,Y
  STA pm_a
  LDA #0
  SBC pf_w+1,Y
-.psp6
+.pfq6
  STA pm_a+1
  JSR pm_mul16
  LDA pm_p+1
@@ -545,7 +545,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA pm_p+2
  STA pf_r0+1
  BIT pf_t
- BPL psp7
+ BPL pfq7
  SEC
  LDA #0
  SBC pf_r0
@@ -553,7 +553,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA #0
  SBC pf_r0+1
  STA pf_r0+1
-.psp7
+.pfq7
  RTS
 
 .pfs_sin                \ A = |sin psi| (8 bits), pf_t bit 7 its sign
@@ -570,7 +570,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  LDA SNE+1,X            \ (bankcheck: ok: game data)
  SEC
  SBC SNE,X              \ (bankcheck: ok)
- BCC psp8
+ BCC pfq8
  PHX                    \ rising: SNE(j) + d f / 256
  LDX pf_ps
  JSR pm_mul8
@@ -578,7 +578,7 @@ PF_DPS = 115            \ phi / 2 = 0.04413 radians, in pi/8192
  CLC
  ADC SNE,X              \ (bankcheck: ok)
  RTS
-.psp8
+.pfq8
  EOR #&FF               \ falling: SNE(j) - d f / 256
  ADC #1
  PHX

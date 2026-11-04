@@ -50366,7 +50366,7 @@ End macro PMQ
      B66D   AD 1C BA   LDA &BA1C
      B670   8D 0E BA   STA &BA0E
      B673   A2 11      LDX #&11
-.psp1
+.pfq1
      B675   B5 A5      LDA &A5,X
      B677   9D FB B9   STA &B9FB,X
      B67A   CA         DEX
@@ -50374,7 +50374,7 @@ End macro PMQ
      B67D   A9 80      LDA #&80
      B67F   8D FA B9   STA &B9FA
      B682   A2 04      LDX #&04
-.psp2
+.pfq2
      B684   8E 1D BA   STX &BA1D
      B687   B5 AB      LDA &AB,X
      B689   B4 AC      LDY &AC,X
@@ -50488,14 +50488,14 @@ End macro PMQ
      B798   CA         DEX
      B799   30 03      BMI &B79E
      B79B   4C 84 B6   JMP &B684
-.psp9
+.pfq9
      B79E   60         RTS
 .pf_unspin
      B79F   2C FA B9   BIT &B9FA
      B7A2   10 FA      BPL &B79E
      B7A4   9C FA B9   STZ &B9FA
      B7A7   A2 11      LDX #&11
-.psp3
+.pfq3
      B7A9   BD FB B9   LDA &B9FB,X
      B7AC   95 A5      STA &A5,X
      B7AE   CA         DEX
@@ -50517,7 +50517,7 @@ End macro PMQ
      B7C7   A8         TAY
      B7C8   68         PLA
      B7C9   60         RTS
-.psp4
+.pfq4
      B7CA   AD 19 BA   LDA &BA19
      B7CD   60         RTS
 .pfs_half
@@ -50543,7 +50543,7 @@ End macro PMQ
      B7EA   09 80      ORA #&80
      B7EC   A8         TAY
      B7ED   68         PLA
-.psp5
+.pfq5
      B7EE   60         RTS
 .pfs_mul
      B7EF   85 14      STA &14
@@ -50561,7 +50561,7 @@ End macro PMQ
      B80A   85 10      STA &10
      B80C   A9 00      LDA #&00
      B80E   F9 12 BA   SBC &BA12,Y
-.psp6
+.pfq6
      B811   85 11      STA &11
      B813   20 FD AA   JSR &AAFD
      B816   A5 19      LDA &19
@@ -50577,7 +50577,7 @@ End macro PMQ
      B82E   A9 00      LDA #&00
      B830   ED 18 BA   SBC &BA18
      B833   8D 18 BA   STA &BA18
-.psp7
+.pfq7
      B836   60         RTS
 .pfs_sin
      B837   AD F8 B9   LDA &B9F8
@@ -50601,7 +50601,7 @@ End macro PMQ
      B85B   18         CLC
      B85C   7D 31 D7   ADC &D731,X
      B85F   60         RTS
-.psp8
+.pfq8
      B860   49 FF      EOR #&FF
      B862   69 01      ADC #&01
      B864   DA         PHX
