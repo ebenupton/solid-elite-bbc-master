@@ -2,7 +2,7 @@
 // circle engine's cost in each, for the speed by scene (6-harness/scenes.py).
 //
 // node 6-harness/mscenes.mjs --out FILE.json [--disc d] [--syms s]
-//                            [--iters 10000] [--seedfile f]
+//                            [--iters 10000] [--seedfile f] [--inputs]
 //
 // The run is the gate's (verify.sh's mcompare.mjs): mpilot.mjs's pilot and
 // commander patch, and the boot leftovers seeded from --seedfile (the gate's
@@ -19,24 +19,27 @@
 // 7, from G_PFHOOK, entry to return): the radius K (r), its class (PF_CLS
 // after, bit 7: the detail made), the records made (n), its cycles (c: all,
 // interrupts included; irq: those outside bank 7; div: pm_fdiv and
-// pfd_norm; mul: pm_mul16, pm_mul8 and pc_mul; sqrt: pm_isqrt; the rest is
+// pfd_norm; mul: pm_mul16, pm_sq16, pm_mul8, pc_mul and pc_sq; sqrt:
+// pm_isqrt; the rest is
 // c - irq - div - mul - sqrt), a hash of its inputs (h: TYPE, K, K3, K4,
 // nosev, roofv and sidev, QQ2) and of its outputs (o: PF_CLS, PC_N, pc_inv
 // and the records PCB[0 .. 24 PC_N)), from which scenes.py counts how often
 // the inputs or the records are those of the previous call (memoisation).
+// --inputs also keeps each call's inputs (in: the bytes hashed, in that
+// order), from which planet_caps.py remakes its records and rows.
 import { writeFileSync, readFileSync } from "fs";
 import { createHash } from "crypto";
 import { runElite, loadSyms, mapOfLabel, physRead, CAND_DISC, CAND_SYMS } from "./mlib.mjs";
 import { makePilot, patchCommander } from "./mpilot.mjs";
 import { parseArgs } from "./args.mjs";
-const args = parseArgs({ disc: "value", syms: "value", iters: "value", out: "value", seedfile: "value" });
+const args = parseArgs({ disc: "value", syms: "value", iters: "value", out: "value", seedfile: "value", inputs: "flag" });
 if (!args.out) { console.error("--out FILE.json needed"); process.exit(2); }
 const sy = loadSyms(args.syms || CAND_SYMS);
 const seed = args.seedfile ? JSON.parse(readFileSync(args.seedfile, "utf8")) : null;
 const rows = [];
 // bank 7's labels, for grouping the detail's cycles by routine
 const b7 = Object.keys(sy).filter(k => mapOfLabel(sy, k) === 7).map(k => [sy[k], k]).sort((a, b) => a[0] - b[0]);
-const GROUP = { div: /^(pm_fdiv|pfd|pfn)/, mul: /^(pm_mul|pmm_add|pmq|pc_mul)/, sqrt: /^(pm_isqrt|pis)/ };
+const GROUP = { div: /^(pm_fdiv|pfd|pfn)/, mul: /^(pm_mul|pm_sq|pmm_add|pmq|pc_mul|pc_sq)/, sqrt: /^(pm_isqrt|pis)/ };
 const grp = new Uint8Array(0x4000);         // 0 rest, 1 div, 2 mul, 3 sqrt
 for (let i = 0; i < b7.length; i++) {
     const [a, n] = b7[i], e = i + 1 < b7.length ? b7[i + 1][0] : 0xc000;
@@ -66,7 +69,7 @@ const r = await runElite({ disc: args.disc || CAND_DISC, syms: sy, pilot: makePi
                     const out = [physRead(cpu, 7, sy.PF_CLS), n, physRead(cpu, 7, sy.pc_inv)];
                     for (let j = 0; j < 24 * n; j++) out.push(physRead(cpu, 7, sy.PCB + j));
                     const g = call.g, c = Math.round(now - call.t0);
-                    rows[rows.length - 1].pf.push({ r: call.r, cls: out[0], n, c, irq: Math.round(g[4]), div: Math.round(g[1]), mul: Math.round(g[2]), sqrt: Math.round(g[3]), h: call.h, o: hash(out) });
+                    rows[rows.length - 1].pf.push({ r: call.r, cls: out[0], n, c, irq: Math.round(g[4]), div: Math.round(g[1]), mul: Math.round(g[2]), sqrt: Math.round(g[3]), h: call.h, o: hash(out), ...(args.inputs ? { in: call.inp } : {}) });
                     call = null;
                 } else lastG = pc >= 0x8000 && pc < 0xc000 && (cpu.romsel & 15) === 7 ? grp[pc - 0x8000] : 4;
             } else if (pc === sy.PF_HOOK && (cpu.romsel & 15) === 7) {
@@ -74,7 +77,7 @@ const r = await runElite({ disc: args.disc || CAND_DISC, syms: sy, pilot: makePi
                 for (let j = 9; j < 27; j++) inp.push(m[sy.INWK + j]);
                 for (let j = 0; j < 6; j++) inp.push(m[sy.QQ2 + j]);
                 const ret = ((m[0x101 + cpu.s] | m[0x102 + cpu.s] << 8) + 1) & 0xffff;
-                call = { t0: cyc(), r: m[sy.K + 1] ? 256 : m[sy.K], h: hash(inp), ret, sp: (cpu.s + 2) & 255, g: [0, 0, 0, 0, 0] };
+                call = { t0: cyc(), r: m[sy.K + 1] ? 256 : m[sy.K], h: hash(inp), inp, ret, sp: (cpu.s + 2) & 255, g: [0, 0, 0, 0, 0] };
                 last = call.t0; lastG = 0;
             }
             return false;
