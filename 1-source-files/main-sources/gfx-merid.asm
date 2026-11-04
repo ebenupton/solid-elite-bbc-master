@@ -59,9 +59,8 @@ pm_a  = &10             \ zero page workspace (Elite's, saved and restored):
 pm_b  = &14             \ multiplicand, dividend; multiplier, divisor;
 pm_p  = &18             \ product, quotient; temporary
 pm_tt = &20
-pmi_res = &23           \ pm_isqrt's
-pmi_one = &25
-pmi_s = &27             \ (&27-&28)
+pmi_n = &23             \ pm_isqrt's: n' (&23-&24) and a square (&25-&26)
+pmi_c = &25
 
 \ A circle's record (RSZ bytes, in its slot of PCB)
 R_A   = 0               \ a, 16.16 signed
@@ -1045,55 +1044,90 @@ ENDIF
  SBC QSH,Y              \ (bankcheck: ok)
  RTS
 
-\ pm_isqrt: A = floor(sqrt(pm_tt)) (16-bit), pm_tt = the remainder pm_tt - A^2:
-\ a bit at a time, the candidates' squares from the quarter-square table
-\ (c^2 = 4 f(c) + (c AND 1))
+\ pm_isqrt: A = f = floor(sqrt(pm_tt)) (16-bit), pm_tt = the remainder
+\ pm_tt - f^2. n is normalised to n' = 4^k n >= 2^14 (k = 0..7), so that
+\ f' = floor(sqrt(n')) is pis_t's floor(sqrt(256 h')) (h' = n' DIV 256) or
+\ one more (as sqrt(256 h' + 255) - sqrt(256 h') < 1); then f = f' >> k.
+\ The squares come from the quarter-square table (c^2 = 4 QS(c) + (c AND 1))
 
 .pm_isqrt
- LDA #0
- STA pmi_res
- LDA #&80
- STA pmi_one
-.pis1
- LDA pmi_res
- ORA pmi_one
- TAX
- JSR pis_sq
- LDA pm_tt
- CMP pmi_s
+ LDY #0                 \ k
+ LDX pm_tt
  LDA pm_tt+1
- SBC pmi_s+1
- BCC pis2
- STX pmi_res
-.pis2
- LSR pmi_one
  BNE pis1
- LDX pmi_res
+ TXA                    \ n < 256: n' = 256 n, k = 4
+ BEQ pis9               \ (n = 0: f = 0, the remainder 0)
+ LDX #0
+ LDY #4
+.pis1
+ STX pmi_n
+ CMP #64
+ BCS pis3
+.pis2                   \ n' = 4 n' until n' >= 2^14
+ ASL pmi_n
+ ROL A
+ ASL pmi_n
+ ROL A
+ INY
+ CMP #64
+ BCC pis2
+.pis3                   \ A = h' (64..255), Y = k
+ STA pmi_n+1
+ TAX
+ LDA pis_t-64,X         \ g = floor(sqrt(256 h'))
+ CMP #255
+ BEQ pis4               \ (g = 255: f' = 255, as n' < 256^2)
+ TAX
+ INX                    \ f' = g + 1 iff (g + 1)^2 <= n'
+ JSR pis_sq
+ LDA pmi_n
+ CMP pmi_c
+ LDA pmi_n+1
+ SBC pmi_c+1
+ TXA
+ BCS pis4
+ DEX
+ TXA
+.pis4
+ CPY #0                 \ f = f' >> k
+ BEQ pis6
+.pis5
+ LSR A
+ DEY
+ BNE pis5
+.pis6
+ TAX                    \ the remainder n - f^2
  JSR pis_sq
  LDA pm_tt
  SEC
- SBC pmi_s
+ SBC pmi_c
  STA pm_tt
  LDA pm_tt+1
- SBC pmi_s+1
+ SBC pmi_c+1
  STA pm_tt+1
- LDA pmi_res
+ TXA
+.pis9
  RTS
 
-.pis_sq                 \ pmi_s = X^2
+.pis_sq                 \ pmi_c = X^2 (X kept)
  LDA QSL,X              \ (bankcheck: ok: game context)
  ASL A
- STA pmi_s
+ STA pmi_c
  LDA QSH,X              \ (bankcheck: ok)
  ROL A
- ASL pmi_s
+ ASL pmi_c
  ROL A
- STA pmi_s+1
+ STA pmi_c+1
  TXA
  AND #1
- ORA pmi_s
- STA pmi_s
+ ORA pmi_c
+ STA pmi_c
  RTS
+
+.pis_t                  \ floor(sqrt(256 h)), h = 64..255 (pm_isqrt)
+ FOR h, 64, 255
+  EQUB INT(SQR(256 * h))
+ NEXT
 \ ******************************************************************************
 \
 \ PC_ROWS (the planet: slots 0 .. PC_N - 1, base colour pc_inv), PC_MROWS
