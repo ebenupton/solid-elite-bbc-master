@@ -827,6 +827,10 @@ ENDIF
  LDA pm_p
  LDX pm_p+1
  RTS
+.pfd_e0
+ JMP pfd_0
+.pfd_es
+ JMP pfd_sat
 
 .pm_fdiv
  LDA pm_P,X             \ U -> pm_a, V -> pm_b
@@ -844,28 +848,10 @@ ENDIF
  LDA pm_P+2,Y
  STA pm_b+2
  LDA pm_P+3,Y
+ ORA pm_a+3             \ either >= 2^24: both lose their low byte (once:
+ BEQ pfd1               \ both are then below 2^24)
+ LDA pm_P+3,Y
  STA pm_b+3
- LDA #0
- STA pm_p
- STA pm_p+1
- STA pm_p+2
- STA pm_p+3
-.pfd1
- LDA pm_a               \ U = 0: 0
- ORA pm_a+1
- ORA pm_a+2
- ORA pm_a+3
- BNE P%+3
- RTS
- LDA pm_b               \ V = 0 (or gone): saturated
- ORA pm_b+1
- ORA pm_b+2
- ORA pm_b+3
- BNE P%+5
- JMP pfd_sat
- LDA pm_a+3             \ either >= 2^24: both lose a byte
- ORA pm_b+3
- BEQ pfd2
  LDX #0
 .pfd1a
  LDA pm_a+1,X
@@ -875,79 +861,154 @@ ENDIF
  INX
  CPX #3
  BNE pfd1a
- LDA #0
- STA pm_a+3
- STA pm_b+3
- BEQ pfd1
-.pfd2
- LDX #pm_a              \ normalise U, V: X = their zero page address
+.pfd1
+ LDA pm_a               \ U = 0: 0
+ ORA pm_a+1
+ ORA pm_a+2
+ BEQ pfd_e0
+ LDA pm_b               \ V = 0 (or gone): saturated
+ ORA pm_b+1
+ ORA pm_b+2
+ BEQ pfd_es
+ LDX #pm_b              \ normalise V: V' = (pm_b+2 pm_b+1), ev
  JSR pfd_norm
- STY pm_eu
- LDX #pm_b
- JSR pfd_norm
- TYA                    \ the shift 5 + ev - eu
+ STA pm_b+2
+ TYA
  CLC
  ADC #5
- SEC
- SBC pm_eu
  STA pm_eu
- LDY #12                \ q = floor(U' 2^11 / V'), U' and V' in bytes 1-2
- CLC                    \ (R = U', its bit 16 in C)
+ LDX #pm_a              \ and U: U' = (A pm_a+1), eu; the shift 5 + ev - eu
+ JSR pfd_norm
+ PHA
+ TYA
+ EOR #&FF
+ SEC
+ ADC pm_eu
+ STA pm_eu
+ PLA
+ STZ pm_p+1             \ q = floor(U' 2^11 / V'), its top 4 bits into
+ LDX #4                 \ pm_p+1, then 8 into pm_p, R = U' (A pm_a+1, its
+ CLC                    \ bit 16 in C)
 .pfd5
  BCS pfd6               \ R >= 2^16 > V': subtract
- LDA pm_a+1
- CMP pm_b+1
- LDA pm_a+2
- SBC pm_b+2
+ CMP pm_b+2
+ BCC pfd7
+ BNE pfd6
+ LDY pm_a+1
+ CPY pm_b+1
  BCC pfd7
 .pfd6
+ TAY
  LDA pm_a+1
  SBC pm_b+1
  STA pm_a+1
- LDA pm_a+2
+ TYA
  SBC pm_b+2
- STA pm_a+2
  SEC
 .pfd7
- ROL pm_p               \ the quotient bit (C)
- ROL pm_p+1
+ ROL pm_p+1             \ the quotient bit (C)
  ASL pm_a+1             \ R <<= 1
- ROL pm_a+2
- DEY
+ ROL A
+ DEX
  BNE pfd5
+ LDX #8
+.pfd5b
+ BCS pfd6b
+ CMP pm_b+2
+ BCC pfd7b
+ BNE pfd6b
+ LDY pm_a+1
+ CPY pm_b+1
+ BCC pfd7b
+.pfd6b
+ TAY
+ LDA pm_a+1
+ SBC pm_b+1
+ STA pm_a+1
+ TYA
+ SBC pm_b+2
+ SEC
+.pfd7b
+ ROL pm_p
+ ASL pm_a+1
+ ROL A
+ DEX
+ BNE pfd5b
+ STZ pm_p+2
+ STZ pm_p+3
  LDY pm_eu              \ shift q
- BPL pfd8
-.pfd7r
- LSR pm_p+1
- ROR pm_p
- INY
- BNE pfd7r
- RTS
+ BMI pfdr
+ TYA                    \ left: by bits (into pm_p+2), then by bytes
+ AND #7
+ BEQ pfd9
+ TAX
 .pfd8
- CPY #8
- BCC pfd9
- LDA pm_p+3             \ a byte at a time
+ ASL pm_p
+ ROL pm_p+1
+ ROL pm_p+2
+ DEX
+ BNE pfd8
+.pfd9
+ TYA
+ LSR A
+ LSR A
+ LSR A
+ BEQ pfd10
+ CMP #2
+ BCC pfdb1
+ BEQ pfdb2
+ CMP #3
  BNE pfd_sat
- LDA pm_p+2
+ LDA pm_p+1             \ by 3 bytes
+ ORA pm_p+2
+ BNE pfd_sat
+ LDA pm_p
+ STA pm_p+3
+ STZ pm_p
+ RTS
+.pfdb2
+ LDA pm_p+2             \ by 2 bytes
+ BNE pfd_sat
+ LDA pm_p+1
+ STA pm_p+3
+ LDA pm_p
+ STA pm_p+2
+ STZ pm_p+1
+ STZ pm_p
+ RTS
+.pfdb1
+ LDA pm_p+2             \ by 1 byte
  STA pm_p+3
  LDA pm_p+1
  STA pm_p+2
  LDA pm_p
  STA pm_p+1
- LDA #0
+ STZ pm_p
+ RTS
+.pfdr
+ CPY #256-11            \ right: by 12 or more, 0
+ BCC pfd_0
+ CPY #256-7
+ BCS pfdr1
+ LDA pm_p+1             \ (by 8 to 11: a byte first)
  STA pm_p
+ STZ pm_p+1
  TYA
- SBC #8                 \ (C set)
+ ADC #8                 \ (C = 0)
  TAY
- JMP pfd8
-.pfd9
- DEY
- BMI pfd10
- ASL pm_p
- ROL pm_p+1
- ROL pm_p+2
- ROL pm_p+3
- BCC pfd9
+ BEQ pfd10
+.pfdr1
+ LSR pm_p+1
+ ROR pm_p
+ INY
+ BNE pfdr1
+ RTS
+.pfd_0
+ STZ pm_p
+ STZ pm_p+1
+ STZ pm_p+2
+ STZ pm_p+3
+ RTS
 .pfd_sat
  LDA #&FF
  STA pm_p
@@ -957,30 +1018,28 @@ ENDIF
 .pfd10
  RTS
 
-.pfd_norm               \ the 24-bit value at zero page X (non-zero): shift
- LDY #0                 \ left until bit 23 is set; Y = the shifts
-.pfn1
- LDA 2,X
+.pfd_norm               \ the 24-bit value at zero page X (non-zero) shifted
+ LDY #0                 \ left until bit 23 is set: A = its top byte, its
+ LDA 2,X                \ next at 1,X; Y = the shifts
  BNE pfn2
  LDA 1,X                \ a byte at a time
- STA 2,X
- LDA 0,X
- STA 1,X
- LDA #0
- STA 0,X
- TYA
- CLC
- ADC #8
- TAY
- BNE pfn1
+ LDY 0,X
+ STY 1,X
+ STZ 0,X
+ LDY #8
+ CMP #0
+ BNE pfn2
+ LDY #16
+ LDA 1,X
+ STZ 1,X
 .pfn2
  BMI pfn3
+.pfn1
+ INY
  ASL 0,X
  ROL 1,X
- ROL 2,X
- INY
- LDA 2,X
- BPL pfn2
+ ROL A
+ BPL pfn1
 .pfn3
  RTS
 
