@@ -2021,5 +2021,5 @@ pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
 .pcneg  EQUB 0
 .pcn    EQUW 0          \ 2^24 / the axis' nominal length (>> 3)
 .pc_tw  SKIP 4          \ the record's thresholds T1, T2 before clamping (16-bit)
-.pc_tu  SKIP 4 * PCSLOTS \ and each slot's (pf_hold moves them with the disc)
+.pc_tu  SKIP 4 * PCSLOTS \ and each slot's (pf_hold moves them to the disc)
 .PCB    SKIP RSZ * PCSLOTS  \ the records: the planet's, and the moon's crater

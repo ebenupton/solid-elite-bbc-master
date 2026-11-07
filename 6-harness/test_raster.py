@@ -912,11 +912,13 @@ def test_pfhook(self, n):
 
 def test_hold(self, n):
     """PF_HOOK's held records (pf_hold): n random planets, each called on
-    over several iterations (MCNT one less each time) as it turns a little
-    and its centre moves: the records are made when MCNT is even (a multiple
-    of 4 in deep space, z at least 512 x 256) and otherwise kept from the
-    last call that made them, moved with the disc, so PC_ROWS gives the rows
-    of the planet as it was then at the new centre"""
+    over several iterations (MCNT one less each time, or now and then the
+    same, as when M% runs again) as it turns a little and its centre moves:
+    a close planet's records are made on every call, and in deep space (z at
+    least 512 x 256) when MCNT is even and otherwise kept from the call
+    before, which made them, moved with the disc, so PC_ROWS gives the rows
+    of the planet as it was then at the new centre. Records kept once are not
+    kept again"""
     rnd, m, mem = self.rnd, self.m, self.m.mem
     self.set_clip((1, 254, 1, 191))
     held = 0
@@ -929,7 +931,6 @@ def test_hold(self, n):
         qq2 = [rnd.randrange(256) for _ in range(6)]
         qq2[5] = (qq2[5] & 0x8C) | ((qq2[1] ^ qq2[3]) & 0x73)    # (no moon, no ring: h = 0)
         deep = rnd.random() < 0.5
-        mask = 3 if deep else 1
         zs = rnd.randrange(2, 100) if deep else rnd.randrange(2)
         mem[MG['TYPE']] = typ
         mem[MG['QQ2']:MG['QQ2'] + 6] = qq2
@@ -938,7 +939,8 @@ def test_hold(self, n):
         made = None
         for step in range(7):
             if step:
-                mcnt = (mcnt - 1) & 255
+                if rnd.random() < 0.8:
+                    mcnt = (mcnt - 1) & 255
                 cx += rnd.randrange(-3, 4)
                 cy += rnd.randrange(-3, 4)
                 vecs = _rotate(vecs, ax, w)
@@ -953,11 +955,12 @@ def test_hold(self, n):
             m.guard = False
             m.call(m.syms['PF_HOOK'], bank=7)
             m.guard = True
-            hold = made is not None and (mcnt & mask) != 0
+            hold = deep and made is not None and (mcnt & 1) != 0 and made_at == (mcnt + 1) & 255
             if hold:
                 held += 1
+                made_at = None
             else:
-                made = inwk
+                made, made_at = inwk, mcnt
             base, circs = PCM.pf_records(made, qq2, typ)
             base, recs = _body(cx, cy, r, base, circs)
             self._pfrows(base, recs, cx, cy, r, 'PF_HOOK %s (type %d centre %d,%d r %d, step %d, MCNT %d)' % ('held' if hold else 'made', typ, cx, cy, r, step, mcnt))

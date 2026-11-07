@@ -564,21 +564,24 @@ measures it over the gate's run: with the player still, 5.05 degrees on the
 iterations with `MCNT` even and none on the others (the player's own roll and
 pitch, when not zero, a median of 2.5 degrees an iteration).
 
-The circles' records are made on those same iterations, `MCNT` even, and in
-deep space (the planet's z at least 512 x 256, as `6-harness/scenes.py`'s
-scenes have it: beyond the big planet's range) on those with `MCNT` a
-multiple of 4. On the others, when the radius, `TYPE` and `VIEW` are the
-last call's and that call was the previous iteration's (`MCNT`), `pf_hold`
-keeps the last records and moves them with the disc's centre: their centre
-lines, centre rows and threshold rows (`pc_circ` keeps the thresholds
+A close planet's circles get new records on every frame. In deep space (the
+planet's z at least 512 x 256, as `6-harness/scenes.py`'s scenes have it:
+beyond the big planet's range) they are made on the iterations the planet
+turns, `MCNT` even. On the others, when the radius, `TYPE` and `VIEW` are
+the last call's and that call was the previous iteration's (`MCNT`),
+`pf_hold` keeps its records and moves them with the disc's centre: their
+centre lines, centre rows and threshold rows (`pc_circ` keeps the thresholds
 unclamped in `pc_tu`), exactly as if they were made at the new centre with
-the planet as it was. A held frame then lacks only the player's own turn
-since the records were made (the planet's own does not happen on it),
-except in deep space, where the iterations with `MCNT` 2 more than a
-multiple of 4 turn the planet and are held. Every disc is still drawn
-incrementally. From one fresh frame to the next the planet turns a median
-5.03 degrees. `test_raster.py`'s `hold` checks the held rows against the
-model.
+the planet as it was. The planet does not turn on those iterations, so a
+kept frame shows its latest turn and lacks only the player's own turn since
+the records were made. Records are kept for one frame at most: the next call
+always makes them, even if `M%` runs again with `MCNT` unchanged. Every disc
+is still drawn incrementally. `6-harness/mspin.mjs` measures it over the
+gate's run: close up all 4,683 calls make records; in deep space all 2,166
+with `MCNT` even make them, and 1,989 of the 2,165 with `MCNT` odd keep them
+(the others follow a change of radius, or a call that was not the previous
+iteration's); with the player still, a kept frame lacks none of the planet's
+own turn. `test_raster.py`'s `hold` checks the kept rows against the model.
 
 The 6502 code matches two reference models row for row:
 `6-harness/planet_caps.py` models the engine and the styles bit for bit,

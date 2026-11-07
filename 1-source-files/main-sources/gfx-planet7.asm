@@ -138,15 +138,18 @@
  PLP
  RTS
 
-\ pf_hold: the circles' records are made on the iterations with MCNT even,
-\ the ones on which the game turns the planet by its own pitch and roll
-\ (MVEIT part 8), and in deep space (the planet's z at least 512 x 256:
-\ INWK+8's low bits at least 2, as 6-harness/scenes.py's scenes have it)
-\ only on those with MCNT a multiple of 4. On the others, when the radius,
+\ pf_hold: a close planet's records are made on every call. In deep space
+\ (the planet's z at least 512 x 256: INWK+8's low bits at least 2, as
+\ 6-harness/scenes.py's scenes have it) they are made on the iterations with
+\ MCNT even, the ones on which the game turns the planet by its own pitch
+\ and roll (MVEIT part 8, H_MVS4). On those with MCNT odd, when the radius,
 \ TYPE and VIEW are the same as the last call's and that call was the
-\ previous iteration's (MCNT), the last records are kept, moved with the
+\ previous iteration's (MCNT), that call's records are kept, moved with the
 \ disc's centre (their centre lines, centre rows and thresholds: exactly as
-\ if made at the new centre with the planet as it was), and C is set.
+\ if made at the new centre with the planet as it was), and C is set. So
+\ the records kept show the planet's latest turn. Keeping them clears the
+\ MCNT noted (M% can run again with MCNT unchanged), so the next call makes
+\ records: they are never kept twice, and move from the centre pf_note noted.
 \ pf_note: the records just made, noted (pf_ph bit 7: there are some).
 
 .pfo0
@@ -155,14 +158,13 @@
 .pf_hold
  BIT pf_ph
  BPL pfo0
- LDA INWK+8             \ MCNT AND 1, or 3 in deep space: 0, make them
+ LDA MCNT               \ MCNT even, or a close planet: make them
+ LSR A                  \ (bankcheck: ok: game context)
+ BCC pfo0
+ LDA INWK+8
  AND #&7F
  CMP #2
- LDA #1
- BCC P%+4
- LDA #3
- AND MCNT               \ (bankcheck: ok: game context)
- BEQ pfo0
+ BCC pfo0
  LDA pf_r
  CMP pf_lr
  BNE pfo0
@@ -192,7 +194,6 @@
  LDA pcby+1
  SBC pf_ly+1
  STA pf_dy+1
- JSR pfn_xy
  LDX #0
 .pfo1
  CPX pf_hn
@@ -233,17 +234,16 @@
  SEC
  RTS
 
-.pfo_t                  \ pc_tu+X (16-bit) += dy, clamped to 0..192 into
+.pfo_t                  \ pc_tu+X (16-bit) + dy, clamped to 0..192, into
  CLC                    \ PCB+R_T1+Y
  LDA pc_tu,X
  ADC pf_dy
- STA pc_tu,X
+ STA PCB+R_T1,Y
  LDA pc_tu+1,X
  ADC pf_dy+1
- STA pc_tu+1,X
  BMI pot2
  BNE pot3
- LDA pc_tu,X
+ LDA PCB+R_T1,Y
  CMP #193
  BCC pot4
 .pot3
@@ -270,7 +270,6 @@
  STA pf_hn
  LDA pc_inv
  STA pf_hinv
-.pfn_xy
  LDX #3
 .pfnx
  LDA pcbx,X

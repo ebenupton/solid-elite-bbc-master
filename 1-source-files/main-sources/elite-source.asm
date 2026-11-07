@@ -22504,10 +22504,11 @@ ENDIF
 \ Port: the planet (and the sun, whose counters are 0) turns by its own pitch
 \ and roll (MVEIT part 8: 1/16 radian each a step, its counters at 127) only
 \ on iterations with MCNT even, so it spins at half the original's rate, and
-\ the circles' records are made on the iterations it turns (gfx-planet7.asm's
-\ pf_hold). On the others part 8 is skipped, leaving RAT2 = 0 as part 8 does
-\ for counters at 127 or 0, and MVEIT goes on at MV5. The harness makes SNG47
-\ skip the same turns (6-harness/README.md), so the game states still match.
+\ in deep space the circles' records are made on the iterations it turns
+\ (gfx-planet7.asm's pf_hold). On the others part 8 is skipped, leaving RAT2 =
+\ 0 as part 8 does for counters at 127 or 0, and MVEIT goes on at MV5. The
+\ harness makes SNG47 skip the same turns (6-harness/README.md), so the game
+\ states still match.
 \ Here, after DVID4, so that it flows into the hot pass's second container in
 \ main RAM, which has the room.
 \
