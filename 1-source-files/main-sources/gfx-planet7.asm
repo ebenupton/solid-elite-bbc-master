@@ -141,15 +141,15 @@
 \ pf_hold: a close planet's records are made on every call. In deep space
 \ (the planet's z at least 512 x 256: INWK+8's low bits at least 2, as
 \ 6-harness/scenes.py's scenes have it) they are made on the iterations with
-\ MCNT even, the ones on which the game turns the planet by its own pitch
-\ and roll (MVEIT part 8, H_MVS4). On those with MCNT odd, when the radius,
-\ TYPE and VIEW are the same as the last call's and that call was the
-\ previous iteration's (MCNT), that call's records are kept, moved with the
-\ disc's centre (their centre lines, centre rows and thresholds: exactly as
-\ if made at the new centre with the planet as it was), and C is set. So
-\ the records kept show the planet's latest turn. Keeping them clears the
-\ MCNT noted (M% can run again with MCNT unchanged), so the next call makes
-\ records: they are never kept twice, and move from the centre pf_note noted.
+\ MCNT even. On those with MCNT odd, when the radius, TYPE and VIEW are the
+\ same as the last call's and that call was the previous iteration's (MCNT),
+\ that call's records are kept, moved with the disc's centre (their centre
+\ lines, centre rows and thresholds: exactly as if made at the new centre
+\ with the planet as it was), and C is set. So a kept frame lacks one of the
+\ planet's half steps (MVEIT part 8, H_MVS4) and the player's own turn since.
+\ Keeping them clears the MCNT noted (M% can run again with MCNT unchanged),
+\ so the next call makes records: they are never kept twice, and move from
+\ the centre pf_note noted.
 \ pf_note: the records just made, noted (pf_ph bit 7: there are some).
 
 .pfo0

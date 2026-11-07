@@ -1,7 +1,7 @@
-streams (measure): 606 blocks (low 32, hot 351 with 41 ACCCON X, cold 161), 193 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
-streams (place): 606 blocks (low 32, hot 351 with 41 ACCCON X, cold 161), 193 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
+streams (measure): 607 blocks (low 32, hot 352 with 41 ACCCON X, cold 161), 194 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
+streams (place): 607 blocks (low 32, hot 352 with 41 ACCCON X, cold 161), 194 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
 streams: hot1 &2F7C-&3FFF: 45 units, 4221 bytes, 7 free
-streams: hot2 &7400-&7FFF: 25 units, 2912 bytes, 160 free
+streams: hot2 &7400-&7FFF: 26 units, 3058 bytes, 14 free
 streams: hot3 &8000-&B91C: 123 units, 14239 bytes, 382 free
 streams: hot data:
 streams: HAZEL &C000-&DA38, 1223 free; nothing in bank 4
@@ -7320,19 +7320,101 @@ Saving file '3-assembled-output/BCODE.unprot.bin'
      7F4A   80 EC      BRA &7F38
 .H_MVS4
      7F4C   20 7A B3   JSR &B37A
-     7F4F   A5 85      LDA &85
-     7F51   10 0C      BPL &7F5F
-     7F53   A5 84      LDA &84
-     7F55   4A         LSR A
-     7F56   90 07      BCC &7F5F
-     7F58   64 92      STZ &92
-     7F5A   68         PLA
-     7F5B   68         PLA
-     7F5C   4C 0D B3   JMP &B30D
-.hsp9
-     7F5F   60         RTS
+     7F4F   24 85      BIT &85
+     7F51   30 01      BMI &7F54
+     7F53   60         RTS
+     7F54   68         PLA
+     7F55   68         PLA
+     7F56   A2 1E      LDX #&1E
+     7F58   A0 09      LDY #&09
+     7F5A   20 67 7F   JSR &7F67
+     7F5D   A2 1D      LDX #&1D
+     7F5F   A0 15      LDY #&15
+     7F61   20 67 7F   JSR &7F67
+     7F64   4C 0D B3   JMP &B30D
+.hsp1
+     7F67   B5 9C      LDA &9C,X
+     7F69   29 80      AND #&80
+     7F6B   85 92      STA &92
+     7F6D   55 9C      EOR &9C,X
+     7F6F   F0 15      BEQ &7F86
+     7F71   C9 7F      CMP #&7F
+     7F73   E9 00      SBC #&00
+     7F75   05 92      ORA &92
+     7F77   95 9C      STA &9C,X
+     7F79   A2 0F      LDX #&0F
+.hsp2
+     7F7B   20 87 7F   JSR &7F87
+     7F7E   E8         INX
+     7F7F   E8         INX
+     7F80   C8         INY
+     7F81   C8         INY
+     7F82   E0 15      CPX #&15
+     7F84   D0 F5      BNE &7F7B
+.hsp3
+     7F86   60         RTS
+.MVS5H
+     7F87   86 79      STX &79
+     7F89   A5 92      LDA &92
+     7F8B   20 B1 7F   JSR &7FB1
+     7F8E   85 57      STA &57
+     7F90   86 56      STX &56
+     7F92   98         TYA
+     7F93   A4 79      LDY &79
+     7F95   AA         TAX
+     7F96   DA         PHX
+     7F97   A5 92      LDA &92
+     7F99   49 80      EOR #&80
+     7F9B   20 B1 7F   JSR &7FB1
+     7F9E   7A         PLY
+     7F9F   99 9D 00   STA &009D,Y
+     7FA2   8A         TXA
+     7FA3   99 9C 00   STA &009C,Y
+     7FA6   A6 79      LDX &79
+     7FA8   A5 56      LDA &56
+     7FAA   95 9C      STA &9C,X
+     7FAC   A5 57      LDA &57
+     7FAE   95 9D      STA &9D,X
+     7FB0   60         RTS
+.mvh1
+     7FB1   48         PHA
+     7FB2   B5 9D      LDA &9D,X
+     7FB4   29 7F      AND #&7F
+     7FB6   4A         LSR A
+     7FB7   4A         LSR A
+     7FB8   4A         LSR A
+     7FB9   85 7C      STA &7C
+     7FBB   B5 9C      LDA &9C,X
+     7FBD   38         SEC
+     7FBE   E5 7C      SBC &7C
+     7FC0   85 7A      STA &7A
+     7FC2   B5 9D      LDA &9D,X
+     7FC4   E9 00      SBC #&00
+     7FC6   85 7B      STA &7B
+     7FC8   B9 9C 00   LDA &009C,Y
+     7FCB   85 0C      STA &0C
+     7FCD   B9 9D 00   LDA &009D,Y
+     7FD0   29 80      AND #&80
+     7FD2   85 7C      STA &7C
+     7FD4   B9 9D 00   LDA &009D,Y
+     7FD7   29 7F      AND #&7F
+     7FD9   4A         LSR A
+     7FDA   66 0C      ROR &0C
+     7FDC   4A         LSR A
+     7FDD   66 0C      ROR &0C
+     7FDF   4A         LSR A
+     7FE0   66 0C      ROR &0C
+     7FE2   4A         LSR A
+     7FE3   66 0C      ROR &0C
+     7FE5   4A         LSR A
+     7FE6   66 0C      ROR &0C
+     7FE8   05 7C      ORA &7C
+     7FEA   85 7C      STA &7C
+     7FEC   68         PLA
+     7FED   45 7C      EOR &7C
+     7FEF   4C 7B 7E   JMP &7E7B
 .HOT2_END%
-Quarter-square tables: &7000-&73FF , then the hot pass &7400 -&7F5F  free 160 
+Quarter-square tables: &7000-&73FF , then the hot pass &7400 -&7FF1  free 14 
 Saving file '3-assembled-output/HICODE.bin'
 .ylookup
      8000   40

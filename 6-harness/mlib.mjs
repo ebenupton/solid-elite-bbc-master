@@ -312,10 +312,10 @@ export async function runElite(opts) {
         H_TT100 = hook("TT100"), H_QU5 = hook("QU5"), H_BAY = hook("BAY"), H_MT26 = hook("MT26"), H_TT170 = hook("TT170");
 
     // The half spin's patch (see the handler): only for a build without the
-    // port's own skip (H_MVS4); its address, part 8's first instruction, is
-    // found when the game is in memory (TT170), before MV8: LDA INWK+30, AND
-    // #&80, STA RAT2
-    let H_P8 = null, p8save = null;
+    // port's own half steps (H_MVS4); its address, part 8's first
+    // instruction, is found when the game is in memory (TT170), before MV8:
+    // LDA INWK+30, AND #&80, STA RAT2
+    let H_P8 = null, p8vec = null;
     const H_MV5 = sy.MV5 !== undefined ? hook("MV5") : null;
     const findP8 = () => {
         if (sy.H_MVS4 !== undefined || sy.MV8 === undefined || !H_MV5) return null;
@@ -382,21 +382,19 @@ export async function runElite(opts) {
             if (rc(ret) === 0xa5 && rc(ret + 1) === sy.Q && rc(ret + 2) === 0x8d && (rc(ret + 3) | rc(ret + 4) << 8) === sy.ALTIT)
                 cpu.ramRomOs[sy.Q] = 0;
         } else if (H_P8 && at(H_P8, pc)) {
-            // The planet's half spin. The port turns the planet (and the sun,
-            // whose counters are 0) by its own pitch and roll only on
-            // iterations with MCNT even (MVEIT part 8, skipped by H_MVS4 on
-            // the others, with RAT2 = 0 as part 8 leaves it). A build without
-            // H_MVS4 (SNG47) gets the same: at part 8's first instruction, for
-            // TYPE >= 128 with MCNT odd, the pitch and roll counters are
-            // set to 0 (part 8 then rotates nothing and leaves RAT2 = 0) and
-            // put back at MV5, so its game state matches the port's.
-            if ((rb(sy.TYPE) & 0x80) && (rb(sy.MCNT) & 1)) {
-                p8save = [rb(sy.INWK + 29), rb(sy.INWK + 30)];
-                cpu.ramRomOs[sy.INWK + 29] = 0; cpu.ramRomOs[sy.INWK + 30] = 0;
-            }
-        } else if (p8save && at(H_MV5, pc)) {
-            cpu.ramRomOs[sy.INWK + 29] = p8save[0]; cpu.ramRomOs[sy.INWK + 30] = p8save[1];
-            p8save = null;
+            // The planet's half spin. The port turns the planet by its own
+            // pitch and roll (MVEIT part 8) by half the original's angle,
+            // every iteration (H_MVS4 and MVS5H). A build without H_MVS4
+            // (SNG47) gets the same: at part 8's first instruction, for the
+            // planet (TYPE >= 128: the sun never reaches part 8), the half
+            // steps are worked out from its vectors as MVS5H works them out
+            // (halfPart8), and at MV5, once SNG47's own part 8 has run (its
+            // counters, RAT2 and Q are as the port leaves them), its vectors
+            // are replaced by them.
+            if (rb(sy.TYPE) & 0x80) p8vec = halfPart8(i => rb(sy.INWK + i));
+        } else if (p8vec && at(H_MV5, pc)) {
+            for (let i = 0; i < 18; i++) cpu.ramRomOs[sy.INWK + 9 + i] = p8vec[i];
+            p8vec = null;
         } else if (at(H_MLOOP, pc) && started) {
             res.snaps.push(snapshot());
             if (opts.screen) res.screens.push(screenHash());
@@ -484,6 +482,51 @@ export async function runElite(opts) {
     res.iters = iter; res.tt100 = tt100;
     handler.remove();
     return res;
+}
+
+// The planet's half spin, as the port's H_MVS4 and MVS5H work it out (the
+// harness's patch to SNG47, in runElite's handler): MVEIT part 8 by half the
+// original's angle, from INWK (inwk(i) = INWK+i, read before part 8 runs).
+// For each of the pitch counter (INWK+30: roofv with nosev) and the roll
+// counter (INWK+29: roofv with sidev) that is not 0 (bits 0-6), each pair of
+// coordinates (x, y), in the direction d (the counter's sign), becomes
+//   x' = x (1 - 1/2048) + d y / 32,  y' = y (1 - 1/2048) - d x / 32
+// in sign-magnitude, exactly as MVS5H: x less its high byte's magnitude over
+// 8, y's magnitude shifted right five times, the two added as ADD adds them.
+// Returns INWK+9 to INWK+26 (nosev, roofv, sidev) after the turn.
+export function halfPart8(inwk) {
+    const v = Array.from({ length: 18 }, (_, i) => inwk(9 + i));
+    const lo = o => v[o - 9], hi = o => v[o - 8];
+    // ADD: (A X) = (A P) + (S R), sign-magnitude, as the original's ADD and MU8
+    const add = (A, P, S, R) => {
+        const T = A & 0x80;
+        if (!((T ^ S) & 0x80)) {
+            const sum = R + P;
+            return [((S + A + (sum >> 8)) & 0xff) | T, sum & 0xff];
+        }
+        const m1 = (A & 0x7f) << 8 | P, m2 = (S & 0x7f) << 8 | R;
+        if (m1 >= m2) { const d = m1 - m2; return [(d >> 8) | T, d & 0xff]; }
+        const d = m2 - m1; return [(d >> 8) | (T ^ 0x80), d & 0xff];
+    };
+    // (A X) = INWK(x) (1 - 1/2048) + INWK(y) / 32 with its sign EOR dir
+    const mvh = (x, y, dir) => {
+        const t = (hi(x) & 0x7f) >> 3, r = lo(x) - t;
+        const R = r & 0xff, S = (hi(x) - (r < 0 ? 1 : 0)) & 0xff;
+        const m = ((hi(y) & 0x7f) << 8 | lo(y)) >> 5;
+        return add((m >> 8) | ((hi(y) & 0x80) ^ dir), m & 0xff, S, R);
+    };
+    const put = (o, [h, l]) => { v[o - 9] = l; v[o - 8] = h; };
+    for (const [c, y0] of [[30, 9], [29, 21]]) {
+        const cnt = inwk(c);
+        if (!(cnt & 0x7f)) continue;
+        const d = cnt & 0x80;
+        for (let k = 0; k < 6; k += 2) {
+            const x = 15 + k, y = y0 + k;
+            const nx = mvh(x, y, d), ny = mvh(y, x, d ^ 0x80);
+            put(y, ny); put(x, nx);
+        }
+    }
+    return v;
 }
 
 // Snapshot helpers

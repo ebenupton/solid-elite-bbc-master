@@ -552,36 +552,50 @@ in the glue area:
   into the disc layer's arrays, which `R_DISCROWS` then draws like any
   other disc.
 
-The planet spins at half the original's rate, in the game: `MVEIT` part 8
-turns the planet by its own pitch and roll (1/16 radian each, its counters
-at 127: together 5.05 degrees about its axis `nosev - sidev`) only on the
-iterations with `MCNT` even (`H_MVS4`, which part 7's last `MVS4` call now
-goes through, skips part 8 on the others, leaving `RAT2` = 0 as part 8
-does). The harness makes SNG47 skip the same turns (6-harness/README.md), so
-the whole game state, the planet's vectors included, still matches the
-original at every iteration, and saves are unchanged. `6-harness/mspin.mjs`
-measures it over the gate's run: with the player still, 5.05 degrees on the
-iterations with `MCNT` even and none on the others (the player's own roll and
-pitch, when not zero, a median of 2.5 degrees an iteration).
+The planet spins at half the original's rate, in the game, and smoothly:
+`MVEIT` part 8 turns the planet by its own pitch and roll (its counters at
+127) by half the original's angle on every iteration. The original turns a
+ship by 1/16 radian a step (`MVS5`: `x' = x (1 - 1/512) + d y / 16`, `y' = y
+(1 - 1/512) - d x / 16`, in each pair of coordinates, with `d` the counter's
+sign); for the planet `H_MVS4`, which part 7's last `MVS4` call goes through,
+does part 8's work with `MVS5H`, 1/32 radian a step: `x' = x (1 - 1/2048) +
+d y / 32`, `y' = y (1 - 1/2048) - d x / 32`, worked out as `MVS5` works out
+its step (the first term as the vector less its high byte's magnitude over 8,
+the second as the other's magnitude shifted right five times, the two added
+by `ADD`), with the counters damped and `RAT2` left as part 8 leaves them.
+Together the two half steps turn the planet by 2.5 degrees an iteration
+about its axis `nosev - sidev`. A step changes a vector's length by a factor
+of at most `1 + 2^-22` before rounding, against the full step's `1 + 2^-18`,
+and `TIDY` renormalises the planet's vectors every 16 iterations as before.
+Ships still turn by `MVS5`'s full steps. The harness gives SNG47 the same
+half steps (6-harness/README.md), so the whole game state, the planet's
+vectors included, still matches the original at every iteration, and saves
+are unchanged. `6-harness/mspin.mjs` measures it over the gate's run: with
+the player still, 2.51 degrees on every iteration, `MCNT` even or odd (the
+player's own roll and pitch, when not zero, a median of 2.7 degrees an
+iteration); the planet's vectors keep within 0.93 and 1.04 of unit length
+and within 5.2 degrees of right angles, as with full steps every other
+iteration (0.93 to 1.04, 4.5 degrees).
 
 A close planet's circles get new records on every frame. In deep space (the
 planet's z at least 512 x 256, as `6-harness/scenes.py`'s scenes have it:
-beyond the big planet's range) they are made on the iterations the planet
-turns, `MCNT` even. On the others, when the radius, `TYPE` and `VIEW` are
-the last call's and that call was the previous iteration's (`MCNT`),
-`pf_hold` keeps its records and moves them with the disc's centre: their
-centre lines, centre rows and threshold rows (`pc_circ` keeps the thresholds
-unclamped in `pc_tu`), exactly as if they were made at the new centre with
-the planet as it was. The planet does not turn on those iterations, so a
-kept frame shows its latest turn and lacks only the player's own turn since
-the records were made. Records are kept for one frame at most: the next call
-always makes them, even if `M%` runs again with `MCNT` unchanged. Every disc
-is still drawn incrementally. `6-harness/mspin.mjs` measures it over the
-gate's run: close up all 4,683 calls make records; in deep space all 2,166
-with `MCNT` even make them, and 1,989 of the 2,165 with `MCNT` odd keep them
-(the others follow a change of radius, or a call that was not the previous
-iteration's); with the player still, a kept frame lacks none of the planet's
-own turn. `test_raster.py`'s `hold` checks the kept rows against the model.
+beyond the big planet's range) they are made on the iterations with `MCNT`
+even. On the others, when the radius, `TYPE` and `VIEW` are the last call's
+and that call was the previous iteration's (`MCNT`), `pf_hold` keeps its
+records and moves them with the disc's centre: their centre lines, centre
+rows and threshold rows (`pc_circ` keeps the thresholds unclamped in
+`pc_tu`), exactly as if they were made at the new centre with the planet as
+it was. A kept frame lacks the planet's latest half step and the player's
+own turn since the records were made. Records are kept for one frame at
+most: the next call always makes them, even if `M%` runs again with `MCNT`
+unchanged. Every disc is still drawn incrementally. `6-harness/mspin.mjs`
+measures it over the gate's run: close up all 586 calls make records; in
+deep space all 4,333 with `MCNT` even make them, and 3,891 of the 4,335 with
+`MCNT` odd keep them (the others follow a change of radius, or a call that
+was not the previous iteration's); with the player still, a kept frame lacks
+2.5 degrees of the planet's own turn, on a disc of radius 45 pixels at most
+(a median of 39), so its surface lags by up to 2 pixels for that frame.
+`test_raster.py`'s `hold` checks the kept rows against the model.
 
 The 6502 code matches two reference models row for row:
 `6-harness/planet_caps.py` models the engine and the styles bit for bit,

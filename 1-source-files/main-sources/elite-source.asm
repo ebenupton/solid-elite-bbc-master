@@ -22496,19 +22496,19 @@ ENDIF
 \       Name: H_MVS4
 \       Type: Subroutine
 \   Category: Moving
-\    Summary: Port: MVEIT part 7's last MVS4, then part 8 skipped for the planet
-\             on odd iterations: its half spin
+\    Summary: Port: MVEIT part 7's last MVS4, then part 8 for the planet by half
+\             the angle: its half spin
 \
 \ ------------------------------------------------------------------------------
 \
-\ Port: the planet (and the sun, whose counters are 0) turns by its own pitch
-\ and roll (MVEIT part 8: 1/16 radian each a step, its counters at 127) only
-\ on iterations with MCNT even, so it spins at half the original's rate, and
-\ in deep space the circles' records are made on the iterations it turns
-\ (gfx-planet7.asm's pf_hold). On the others part 8 is skipped, leaving RAT2 =
-\ 0 as part 8 does for counters at 127 or 0, and MVEIT goes on at MV5. The
-\ harness makes SNG47 skip the same turns (6-harness/README.md), so the game
-\ states still match.
+\ Port: the planet turns by its own pitch and roll (MVEIT part 8, its counters
+\ at 127) by half the original's angle, 1/32 radian each a step (MVS5H), on
+\ every iteration, so it spins smoothly at half the original's rate. Ships
+\ still go through part 8 and MVS5 (the sun never reaches part 7: part 6
+\ returns for it). For the planet this does all of part 8's work, with the
+\ counters damped and RAT2 left as part 8 leaves them, then MVEIT goes on at
+\ MV5. The harness makes SNG47 turn the planet by the same half steps
+\ (6-harness/README.md), so the game states still match.
 \ Here, after DVID4, so that it flows into the hot pass's second container in
 \ main RAM, which has the room.
 \
@@ -22518,19 +22518,170 @@ ENDIF
 
  JSR MVS4               \ Apply our pitch and roll rotations to the sidev vector
 
- LDA TYPE               \ The planet or the sun (TYPE 128 or more) on an
- BPL hsp9               \ iteration with MCNT odd: part 8 skipped, returning
- LDA MCNT               \ from MVEIT's call into part 7 to MV5
- LSR A
- BCC hsp9
- STZ RAT2
- PLA
- PLA
- JMP MV5
+ BIT TYPE               \ If this is a ship (TYPE < 128), return to part 8
+ BMI P%+3
+ RTS
 
-.hsp9
+ PLA                    \ The planet: drop MVEIT's return into part 8, and do
+ PLA                    \ its work here by half steps
+
+ LDX #30                \ Pitch: rotate (roofv, nosev) by the pitch counter
+ LDY #9
+ JSR hsp1
+
+ LDX #29                \ Roll: rotate (roofv, sidev) by the roll counter
+ LDY #21
+ JSR hsp1
+
+ JMP MV5                \ Go on with MVEIT part 9
+
+.hsp1
+
+                        \ The counter at INWK+X, damped as part 8 damps it,
+                        \ its sign in RAT2; if it is not 0, rotate (roofv_x,
+                        \ INWK+Y), (roofv_y, INWK+Y+2), (roofv_z, INWK+Y+4)
+                        \ by half a step in that direction
+
+ LDA INWK,X             \ RAT2 = the counter's sign, A = its value
+ AND #%10000000
+ STA RAT2
+ EOR INWK,X
+
+ BEQ hsp3               \ A counter of 0 turns nothing
+
+ CMP #%01111111         \ Damp it as part 8 does: A = A - 1 unless it is 127,
+ SBC #0                 \ and put back its sign
+ ORA RAT2
+ STA INWK,X
+
+ LDX #15                \ Rotate (roofv_x, INWK+Y), then the y and z pairs
+
+.hsp2
+
+ JSR MVS5H
+
+ INX
+ INX
+ INY
+ INY
+
+ CPX #21
+ BNE hsp2
+
+.hsp3
 
  RTS
+
+\ ******************************************************************************
+\
+\       Name: MVS5H
+\       Type: Subroutine
+\   Category: Moving
+\    Summary: Port: Apply half of MVS5's pitch or roll (1/32 radian) to an
+\             orientation vector, for the planet
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: as the original's MVS5, with half the angle, and the second-order term
+\ to match (cos 1/32 = 1 - 1/2048). With X and Y the vectors' offsets and the
+\ direction in RAT2, positive:
+\
+\   X = X * (1 - 1/2048) + Y / 32
+\   Y = Y * (1 - 1/2048) - X / 32
+\
+\ and negative, the signs of the second terms swapped. Each line is worked
+\ out as MVS5 works it out: the first term as the vector less its high byte's
+\ magnitude over 8 (|x| / 2048), the second as the other vector's magnitude
+\ shifted right five times with its sign, and the two added with ADD. The
+\ harness works out exactly the same for SNG47's planet.
+\
+\ ------------------------------------------------------------------------------
+\
+\ Returns:
+\
+\   X, Y                Preserved
+\
+\   Q                   Set to X, as MVS5 leaves it
+\
+\ ******************************************************************************
+
+.MVS5H
+
+ STX Q                  \ Q = X, the first vector
+
+ LDA RAT2               \ (A X) = X * (1 - 1/2048) +/- Y / 32, kept in K(1 0)
+ JSR mvh1
+ STA K+1
+ STX K
+
+ TYA                    \ Swap the vectors: X = the second, Y = the first
+ LDY Q
+ TAX
+
+ PHX                    \ (A X) = Y * (1 - 1/2048) -/+ X / 32, into the second
+ LDA RAT2               \ vector (the first is still unchanged)
+ EOR #%10000000
+ JSR mvh1
+ PLY
+ STA INWK+1,Y
+ TXA
+ STA INWK,Y
+
+ LDX Q                  \ And K(1 0) into the first vector
+ LDA K
+ STA INWK,X
+ LDA K+1
+ STA INWK+1,X
+
+ RTS
+
+.mvh1
+
+                        \ (A X) = INWK(X) * (1 - 1/2048) + INWK(Y) / 32 with
+                        \ its sign EOR A; Y is preserved
+
+ PHA                    \ Keep the direction
+
+ LDA INWK+1,X           \ T = |INWK+1,X| / 8 = |INWK(X)| / 2048
+ AND #%01111111
+ LSR A
+ LSR A
+ LSR A
+ STA T
+
+ LDA INWK,X             \ (S R) = INWK(X) - |INWK(X)| / 2048
+ SEC
+ SBC T
+ STA R
+ LDA INWK+1,X
+ SBC #0
+ STA S
+
+ LDA INWK,Y             \ (A P) = |INWK(Y)| / 32
+ STA P
+ LDA INWK+1,Y
+ AND #%10000000
+ STA T                  \ (T = INWK(Y)'s sign)
+ LDA INWK+1,Y
+ AND #%01111111
+ LSR A
+ ROR P
+ LSR A
+ ROR P
+ LSR A
+ ROR P
+ LSR A
+ ROR P
+ LSR A
+ ROR P
+
+ ORA T                  \ With INWK(Y)'s sign EOR the direction
+ STA T
+ PLA
+ EOR T
+
+ JMP ADD                \ (A X) = (A P) + (S R), returning from the subroutine
+                        \ using a tail call
 
 \ ******************************************************************************
 \
@@ -46702,8 +46853,8 @@ ENDMACRO
  JSR MVS4               \ ship's roofv vector
 
  LDY #21                \ Apply our pitch and roll rotations to the current
- JSR H_MVS4             \ ship's sidev vector (Port: then H_MVS4 skips part 8
-                        \ for the planet on odd iterations: its half spin)
+ JSR H_MVS4             \ ship's sidev vector (Port: then H_MVS4 does part 8
+                        \ for the planet by half steps: its half spin)
 
 \ ******************************************************************************
 \
