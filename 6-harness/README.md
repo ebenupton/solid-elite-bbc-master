@@ -81,13 +81,14 @@ from SNG47 there; the gate's systems have none.
 * **The planet's half spin.** The port turns the planet by its own pitch and
   roll (`MVEIT` part 8) by half the original's angle, 1/32 radian a step in
   place of 1/16, on every iteration, so that it spins smoothly at half the
-  original's rate (`H_MVS4`, which part 7's last call goes through, does part
-  8's work for the planet with `MVS5H`: `x' = x (1 - 1/2048) + d y / 32`, `y'
-  = y (1 - 1/2048) - d x / 32`, worked out as `MVS5` works out its full step).
-  In a build without `H_MVS4` (SNG47) the harness does the same: at part 8's
-  first instruction, for the planet (`TYPE` 128 or more; the sun never
-  reaches part 8), `halfPart8` (`mlib.mjs`) works out the half steps from the
-  planet's vectors exactly as `MVS5H` does, its own `ADD` included, and at
+  original's rate (`MVS5`, which part 8 calls for each pair of coordinates,
+  takes the half step for `TYPE` 128 or more: `x' = x (1 - 1/2048) + d y /
+  32`, `y' = y (1 - 1/2048) - d x / 32`, worked out as it works out its full
+  step). In a build without the half steps (SNG47; the port's `MVS5` has the
+  label `mvs5hf`) the harness does the same: at part 8's first instruction,
+  for the planet (`TYPE` 128 or more; the sun never reaches part 8),
+  `halfPart8` (`mlib.mjs`) works out the half steps from the planet's
+  vectors exactly as the port's `MVS5` does, `ADD`'s sums included, and at
   `MV5`, once SNG47's own part 8 has run (so its counters, `RAT2` and `Q` are
   as the port leaves them, and it spends the cycles of a turn), the vectors
   are replaced by them. The whole game state, the planet's vectors included,

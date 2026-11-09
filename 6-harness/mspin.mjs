@@ -3,7 +3,7 @@
 // or pf_craters' entry: the fresh frames, every iteration close up, MCNT even
 // in deep space), and the player's own roll and pitch (ALP1, BET1). Prints the
 // median turn from one iteration to the next with the player still (the
-// planet's own pitch and roll, by half steps every iteration: H_MVS4), by
+// planet's own pitch and roll, by half steps every iteration: MVS5), by
 // MCNT's parity and its spread; and from one fresh frame to the next (the
 // turn the drawing shows at once), overall and with the player still. Then
 // the lengths of the planet's three vectors over the run (unit length 96 x

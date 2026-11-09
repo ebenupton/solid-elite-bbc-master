@@ -557,12 +557,14 @@ The planet spins at half the original's rate, in the game, and smoothly:
 127) by half the original's angle on every iteration. The original turns a
 ship by 1/16 radian a step (`MVS5`: `x' = x (1 - 1/512) + d y / 16`, `y' = y
 (1 - 1/512) - d x / 16`, in each pair of coordinates, with `d` the counter's
-sign); for the planet `H_MVS4`, which part 7's last `MVS4` call goes through,
-does part 8's work with `MVS5H`, 1/32 radian a step: `x' = x (1 - 1/2048) +
-d y / 32`, `y' = y (1 - 1/2048) - d x / 32`, worked out as `MVS5` works out
-its step (the first term as the vector less its high byte's magnitude over 8,
-the second as the other's magnitude shifted right five times, the two added
-by `ADD`), with the counters damped and `RAT2` left as part 8 leaves them.
+sign); for the planet (`TYPE` 128 or more: the sun never reaches part 8) the
+same `MVS5` takes 1/32 radian a step: `x' = x (1 - 1/2048) + d y / 32`, `y' =
+y (1 - 1/2048) - d x / 32`, worked out as for the full step, with the first
+term's high byte magnitude shifted right three times in place of once and
+the second term's magnitude five times in place of four (each extra shift
+skipped for a ship: `BIT TYPE`, `BPL`), the two added as `ADD` adds them.
+Part 8 itself is the original's, so the counters, `RAT2` and `Q` are as for
+a ship. A ship pays 24 cycles a call of `MVS5` for the four tests.
 Together the two half steps turn the planet by 2.5 degrees an iteration
 about its axis `nosev - sidev`. A step changes a vector's length by a factor
 of at most `1 + 2^-22` before rounding, against the full step's `1 + 2^-18`,

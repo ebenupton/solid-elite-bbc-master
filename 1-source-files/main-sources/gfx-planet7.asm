@@ -146,7 +146,7 @@
 \ that call's records are kept, moved with the disc's centre (their centre
 \ lines, centre rows and thresholds: exactly as if made at the new centre
 \ with the planet as it was), and C is set. So a kept frame lacks one of the
-\ planet's half steps (MVEIT part 8, H_MVS4) and the player's own turn since.
+\ planet's half steps (MVEIT part 8, MVS5) and the player's own turn since.
 \ Keeping them clears the MCNT noted (M% can run again with MCNT unchanged),
 \ so the next call makes records: they are never kept twice, and move from
 \ the centre pf_note noted.

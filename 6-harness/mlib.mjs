@@ -312,13 +312,13 @@ export async function runElite(opts) {
         H_TT100 = hook("TT100"), H_QU5 = hook("QU5"), H_BAY = hook("BAY"), H_MT26 = hook("MT26"), H_TT170 = hook("TT170");
 
     // The half spin's patch (see the handler): only for a build without the
-    // port's own half steps (H_MVS4); its address, part 8's first
-    // instruction, is found when the game is in memory (TT170), before MV8:
-    // LDA INWK+30, AND #&80, STA RAT2
+    // port's own half steps (MVS5's for the planet, which has the label
+    // mvs5hf); its address, part 8's first instruction, is found when the
+    // game is in memory (TT170), before MV8: LDA INWK+30, AND #&80, STA RAT2
     let H_P8 = null, p8vec = null;
     const H_MV5 = sy.MV5 !== undefined ? hook("MV5") : null;
     const findP8 = () => {
-        if (sy.H_MVS4 !== undefined || sy.MV8 === undefined || !H_MV5) return null;
+        if (sy.mvs5hf !== undefined || sy.MV8 === undefined || !H_MV5) return null;
         const m = mapOfLabel(sy, "MV8"), want = [0xa5, sy.INWK + 30, 0x29, 0x80, 0x85, sy.RAT2];
         for (let a = sy.MV8 - 6; a > sy.MV8 - 64; a--)
             if (want.every((b, i) => physRead(cpu, m, a + i) === b)) return { a, m };
@@ -384,10 +384,10 @@ export async function runElite(opts) {
         } else if (H_P8 && at(H_P8, pc)) {
             // The planet's half spin. The port turns the planet by its own
             // pitch and roll (MVEIT part 8) by half the original's angle,
-            // every iteration (H_MVS4 and MVS5H). A build without H_MVS4
-            // (SNG47) gets the same: at part 8's first instruction, for the
-            // planet (TYPE >= 128: the sun never reaches part 8), the half
-            // steps are worked out from its vectors as MVS5H works them out
+            // every iteration (MVS5, for TYPE >= 128). A build without the
+            // half steps (SNG47) gets the same: at part 8's first instruction,
+            // for the planet (TYPE >= 128: the sun never reaches part 8), the
+            // half steps are worked out from its vectors as MVS5 works them out
             // (halfPart8), and at MV5, once SNG47's own part 8 has run (its
             // counters, RAT2 and Q are as the port leaves them), its vectors
             // are replaced by them.
@@ -484,15 +484,16 @@ export async function runElite(opts) {
     return res;
 }
 
-// The planet's half spin, as the port's H_MVS4 and MVS5H work it out (the
+// The planet's half spin, as the port's MVS5 works it out for the planet (the
 // harness's patch to SNG47, in runElite's handler): MVEIT part 8 by half the
 // original's angle, from INWK (inwk(i) = INWK+i, read before part 8 runs).
 // For each of the pitch counter (INWK+30: roofv with nosev) and the roll
 // counter (INWK+29: roofv with sidev) that is not 0 (bits 0-6), each pair of
 // coordinates (x, y), in the direction d (the counter's sign), becomes
 //   x' = x (1 - 1/2048) + d y / 32,  y' = y (1 - 1/2048) - d x / 32
-// in sign-magnitude, exactly as MVS5H: x less its high byte's magnitude over
-// 8, y's magnitude shifted right five times, the two added as ADD adds them.
+// in sign-magnitude, exactly as the port's MVS5: x less its high byte's
+// magnitude over 8, y's magnitude shifted right five times, the two added as
+// ADD adds them.
 // Returns INWK+9 to INWK+26 (nosev, roofv, sidev) after the turn.
 export function halfPart8(inwk) {
     const v = Array.from({ length: 18 }, (_, i) => inwk(9 + i));
