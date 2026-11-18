@@ -13980,25 +13980,6 @@ ENDIF
 \
 \ ******************************************************************************
 
-.stlff
-
- LDA #255               \ STL1's inlined DVID4z: R = 255
- JMP stlr
-
-.stl_dvs
-
- JSR DVID4              \ DELTA >= z_hi (rare): (P R) = 256 * DELTA / z_hi with
-                        \ A = R, as DV42 returns (Q = z_hi and A = DELTA are
-                        \ already set)
-
- LSR P                  \ Rotate (P A) right by 2 places, which sets P = 0 (as P
- ROR A                  \ has a maximum value of 2) and leaves:
- LSR P                  \
- ROR A                  \   A = 64 * speed / z_hi
-
- JMP stl_dvr            \ Rejoin the loop (Port: here, before STARS1, for the
-                        \ BCS that comes here)
-
 .stl_pat
 
                         \ Port: patch b = A AND 31 (MULTS multiplies by
@@ -14031,9 +14012,42 @@ ENDIF
  ADC #2                 \ (C = 0: no carry out of HI(QSL))
  STA mlb5+2,X
 
+ TXA                    \ Port: and for MLSA (X <> 0), its first instruction:
+ BEQ stlpr              \ STA T when b <> 0, BRA mlsk when b = 0, as the roll
+ LDA #&85               \ products are then 0 (until ALP1 first changes, MLSA
+ LDY #T                 \ keeps its assembled STA T: its own path, which gives
+ LDX mla1+1             \ the same results)
+ BNE stlw
+ LDA #&80
+ LDY #mlsk-MLSA-2
+
+.stlw
+
+ STA MLSA
+ STY MLSA+1
+
 .stlpr
 
  RTS
+
+.stlff
+
+ LDA #255               \ STL1's inlined DVID4z: R = 255
+ JMP stlr
+
+.stl_dvs
+
+ JSR DVID4              \ DELTA >= z_hi (rare): (P R) = 256 * DELTA / z_hi with
+                        \ A = R, as DV42 returns (Q = z_hi and A = DELTA are
+                        \ already set)
+
+ LSR P                  \ Rotate (P A) right by 2 places, which sets P = 0 (as P
+ ROR A                  \ has a maximum value of 2) and leaves:
+ LSR P                  \
+ ROR A                  \   A = 64 * speed / z_hi
+
+ JMP stl_dvr            \ Rejoin the loop (Port: here, before STARS1, for the
+                        \ BCS that comes here)
 
 .STARS1
 
@@ -14555,7 +14569,10 @@ ENDIF
 
 .MLSA
 
- STA T                  \ Set T = A, as MULTS does
+ STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
+                        \ to BRA mlsk when ALP1 = 0)
+
+.mla0
  AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlaz, as MULTS does
  BEQ mlaz               \ at MU6
  TAX                    \ Set X = |A|
@@ -14636,6 +14653,36 @@ ENDIF
  LDX ALP1               \ ADD
  JSR MULTS
  BRA mla6
+
+.mlsk
+
+                        \ Port: MLSA when ALP1 = 0 (stl_pat puts BRA mlsk in
+                        \ place of its STA T): the product is 0, so when |A|
+                        \ and |S| are both non-zero, ADD gives (A X) = (S R)
+                        \ whatever the signs (the same-sign sum at mlt, or
+                        \ MU8 with |S R| > 0), and that is returned here; the
+                        \ T, T1, P, C and V that MLSA would leave are not read
+                        \ before MLSB (its STA T, then P from the product, or
+                        \ at mlbz, and the C of its CPX) and PIX1's or stlb's
+                        \ ADD (T1, T, V) rewrite them. Else (|A| = 0, which
+                        \ also sets P+1 at mlaz, or |S| = 0) MLSA's own path
+
+ BIT #%01111111         \ If |A| = 0, take MLSA's path
+ BEQ mlskf
+
+ LDX S                  \ If |S| = 0 (S = 0 or &80), take MLSA's path
+ BEQ mlskf
+ CPX #%10000000
+ BEQ mlskf
+
+ TXA                    \ (A X) = (S R)
+ LDX R
+ RTS
+
+.mlskf
+
+ STA T                  \ MLSA's path: its STA T, then the rest
+ JMP mla0
 
  ASSERT mla1 - mlb1 = MLSA - MLSB AND mla3 - mlb3 = MLSA - MLSB
  ASSERT mla5 - mlb5 = MLSA - MLSB AND mla2 - mlb2 = MLSA - MLSB
