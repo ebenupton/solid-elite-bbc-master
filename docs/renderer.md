@@ -82,12 +82,13 @@ would have drawn, then returns from the routine itself:
   "Planet surfaces"). A meridian planet's equator and meridian and a crater
   planet's crater are not worked out at all: in record mode `H_CIRC`
   returns from `PL9` itself, leaving what the game reads of that path as
-  the original leaves it (`K2`, which `MV40` adds into the next object's
-  y; `TGT`; `FLAG`). That path (`PL9` parts 2 and 3, `PLS2`, `PLS22` and its
-  curve loop, `PLS3`, `PLS4`, `PLS5`) is `Area: none` in the source
-  ([memory-map.md](memory-map.md)): planets are never drawn outside record
-  mode, as `GFORCE` is set only for the hyperspace rings, which use
-  `CIRCLE2`. `SUN` records the sun's half-widths.
+  the original leaves it (`TGT` and `FLAG`; `MV40` no longer reads `K2`,
+  see "MV40's K2" below). That path (`PL9` parts 2 and 3, `PLS1`, `PLS2`,
+  `PLS22` and its curve loop, `PLS3`, `PLS4`, `PLS5`) is `Area: none` in the
+  source ([memory-map.md](memory-map.md)): planets are never drawn outside
+  record mode, as `GFORCE` is set only for the hyperspace rings, which use
+  `CIRCLE2`. `SUN` records the sun's disc, and draws no rows ("The sun's
+  edge", below).
 * `PIXEL2` records a star. `PIX1` no longer erases a star's old position, a
   choice that `pxpat` patches once per star pass. `DOEXP` notes an
   explosion's cloud, which the frame draws from the ship line heap (see
@@ -680,14 +681,24 @@ one a row, each row's half-width the circle's plus a random fringe
 the comparison's reference alike (the reference's patch turns `SUN`'s one
 `JSR DORND` into `LDA #0 : NOP`). With no random numbers taken, all the rows
 left in the game's state is what `SUN`'s part 1 computes before them (`TGT`,
-`LSX`, `COL`, and `K2`, which `MV40` reads) and what part 4 ends with (`SUNX`
-and the C flag clear). So the port's `SUN` is part 1, then `K2`, `SUNX` and
-an `RTS`; parts 2 to 4, `HLOIN2`, `EDGES` and the orange table are `Area:
+`LSX` and `COL`) and what part 4 ends with (`SUNX` and the C flag clear).
+So the port's `SUN` is part 1, then `SUNX` and an `RTS`; parts 2 to 4, `HLOIN2`, `EDGES` and the orange table are `Area:
 none`, and the fringe size, `PLF3` and `PLF17`, `HLOIN`'s own entry and the
 renderer's `H_HLOIN` went with them. `WPLS` and `FLFLLS` keep only `LSX`.
 A visible sun no longer costs its rows: `msunnear.mjs`'s posed scene (a
 radius 16 sun beside a planet of radius 120) runs at 6.53 it/s against
 5.96.
+
+**MV40's K2.** `MV40` (the planet's and the sun's movement by our roll and
+pitch) works out y = K2 + K as a 32-bit sum and keeps its middle bytes,
+starting with the low bytes, `ADC K2` (or `SBC K2`). Nothing in `MV40` sets
+`K2`'s low byte, so the carry into y came from whatever last left `K2`:
+often the planet's drawing (`PLS1`, which `H_CIRC` used to run for this
+alone) or `SUN`'s K^2. `ADC K2` is `ADC #0` and `SBC K2` is `SBC #0`, in the
+game and in the comparison's reference alike: the planets' and suns' y
+rounds without the stray carry, at most one unit in y_lo, and no longer
+depends on what was drawn before. `H_CIRC`'s `PLS1` and `SUN`'s K2 = K^2 went
+with it.
 
 **Two discs.** `PLANET` gives the sun and the planet the same radius at the
 same z, so the bigger disc is the nearer. `f_discs` makes the bigger one
@@ -920,15 +931,28 @@ ball filling the view), sun (a radius 32 sun beside a radius 60 planet),
 docking (the station ahead at 1500), zone (the safe zone, the sun parked
 behind us) and rear (the beach ball in the rear view).
 
-| Scene | After the CPC findings | The sun's parking | The sun's edge | The clouds' seed |
-|---|---:|---:|---:|---:|
-| Flight | 175,589 | 175,472 | 173,759 | 173,801 |
-| Combat | 104,982 | 104,945 | 103,637 | 103,589 |
-| Beach ball | 189,112 | 190,871 | 190,622 | 190,609 |
-| Sun | 203,384 | 203,290 | 146,546 | 146,419 |
-| Docking | 346,017 | 337,000 | 335,179 | 335,168 |
-| Zone | 314,781 | 302,995 | 300,973 | 301,022 |
-| Rear | 189,406 | 189,199 | 189,992 | 189,986 |
+| Scene | After the CPC findings | The sun's parking | The sun's edge | The clouds' seed | MV40's K2 |
+|---|---:|---:|---:|---:|---:|
+| Flight | 175,589 | 175,472 | 173,759 | 173,801 | 174,770 |
+| Combat | 104,982 | 104,945 | 103,637 | 103,589 | 104,692 |
+| Beach ball | 189,112 | 190,871 | 190,622 | 190,609 | 190,175 |
+| Sun | 203,384 | 203,290 | 146,546 | 146,419 | 147,856 |
+| Docking | 346,017 | 337,000 | 335,179 | 335,168 | 335,789 |
+| Zone | 314,781 | 302,995 | 300,973 | 301,022 | 303,167 |
+| Rear | 189,406 | 189,199 | 189,992 | 189,986 | 188,449 |
 
 (Cycles a frozen iteration; iterations a second = 2,000,000 / cycles.) No
 scene has an explosion, so the clouds' seed changes none of them.
+
+The figures move with the game's timing as well as with its work: the
+frame layer's buffers, and what the kept and incremental rows find in them,
+depend on where the flips fall among the iterations, so a change of a few
+hundred cycles can move a scene by about 1% either way. `MV40`'s `K2`
+removes `PLS1` from `H_CIRC` (673 cycles a frozen iteration in `PLANET` in
+the flight scene, 628 in the beach ball's) and K2 = K^2 from `SUN`, yet
+flight, combat, sun and zone read up to 2,147 cycles more: a delay loop of
+the removed code's length in its place gives the previous figures back to
+within 80 cycles in every scene. `mbench.mjs` also prints the work (the
+cycles less the frame layer's wait for the flip, which only combat has),
+which does not take this out: a routine's own cost is best timed within
+the scene.

@@ -33710,6 +33710,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing planets
 \    Summary: Calculate (Y A) = nosev_x / z
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34459,16 +34460,9 @@ ENDIF
                         \ sun's edge draws no random numbers (in the reference
                         \ too, the comparison's patch to SUN), so all the rows
                         \ left in the game's state was what part 4 ends with:
-                        \ SUNX = K3, and the C flag clear, and K2 = K^2, which
-                        \ part 1 sets for the rows and MV40 reads (its step 3
-                        \ takes K2's low byte without setting it). Parts 2 to
-                        \ 4 are Area: none
-
- LDA K                  \ Set K2(1 0) = K * K, as part 1 does for the rows
- JSR SQUA2
- STA K2+1
- LDA P
- STA K2
+                        \ SUNX = K3, and the C flag clear (K2 = K^2, which part
+                        \ 1 set for the rows, MV40 no longer reads: MV40's K2).
+                        \ Parts 2 to 4 are Area: none
 
  CLC                    \ Clear the C flag to indicate success in drawing the
                         \ sun
@@ -47786,7 +47780,13 @@ ENDMACRO
 
  LDA K                  \ We now do the following sum:
  CLC                    \
- ADC K2                 \   (A y_hi y_lo -) = K(3 2 1 0) + K2(3 2 1 0)
+ ADC #0                 \   (A y_hi y_lo -) = K(3 2 1 0) + K2(3 2 1 0)
+                        \
+                        \ (Port: K2's low byte is taken as 0: the original
+                        \ adds K2 here, which nothing in MV40 sets, so the
+                        \ carry came from whatever last left K2, the planet's
+                        \ drawing as often as not; the comparison's reference
+                        \ has the same patch, MV40's K2)
                         \
                         \ starting with the low bytes (which we don't keep)
                         \
@@ -47814,7 +47814,8 @@ ENDMACRO
 
  LDA K                  \ If we get here then K2 and K have different signs, so
  SEC                    \ instead of adding, we need to subtract to get the
- SBC K2                 \ result we want, like this:
+ SBC #0                 \ result we want, like this (Port: K2's low byte taken
+                        \ as 0, as above):
                         \
                         \   (A y_hi y_lo -) = K(3 2 1 0) - K2(3 2 1 0)
                         \

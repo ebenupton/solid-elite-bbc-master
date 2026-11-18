@@ -3,8 +3,10 @@
 harness writes at TT170 so that the original runs the same game logic as
 this build: the sun parked while the space station holds its slot (SUNUP,
 SUNSC, SUNBK, SUNLAU in src/elite-source.asm; docs/renderer.md, "The
-sun's parking"), and the sun's edge drawing no random numbers (SUN's JSR
-DORND as LDA #0 : NOP, the fringe 0: "The sun's edge"). Run by the Makefile
+sun's parking"), the sun's edge drawing no random numbers (SUN's JSR
+DORND as LDA #0 : NOP, the fringe 0: "The sun's edge"), the explosion
+clouds' seed (keepRand, below) and MV40's K2 (its ADC K2 and SBC K2 as ADC
+#0 and SBC #0: "MV40's K2"). Run by the Makefile
 from master/; writes
 
   3-assembled-output/sunref.json          the patch (6-harness/mlib.mjs's loadRefPatch, which
@@ -170,6 +172,15 @@ def edge(ref):
             "search": [ref["SUN"], ref["CIRCLE"]]}
 
 
+def k2(ref):
+    """MV40's K2: its ADC K2 and SBC K2 (the low bytes of the sums into y,
+    which nothing in MV40 sets: whatever last left K2, often the planet's
+    drawing) become ADC #0 and SBC #0"""
+    rng = [ref["MV40"], ref["PLUT"]]              # (MV40, MV1, MV2: PLUT follows)
+    return [{"name": "MV40: ADC K2", "addr": None, "orig": [0x65, ref["K2"]], "new": [0x69, 0x00], "search": rng},
+            {"name": "MV40: SBC K2", "addr": None, "orig": [0xE5, ref["K2"]], "new": [0xE9, 0x00], "search": rng}]
+
+
 def patch(ref, sr, code, passive):
     def site(name, addr, orig, new):
         return {"name": name, "addr": addr, "orig": orig, "new": new}
@@ -195,8 +206,9 @@ def patch(ref, sr, code, passive):
         s_["search"] = [ref[rng[0]], ref[rng[1]]]
     if not passive:
         sites.append(edge(ref))
+        sites += k2(ref)
     keep = {} if passive else {"keepRand": {"at": ref["PTCLS"], "bytes": [ref["RAND"], ref["RAND"] + 2]}}
-    return {**keep, "name": "the sun's parking" + (" (passive)" if passive else ", the sun's edge, the clouds' seed"),
+    return {**keep, "name": "the sun's parking" + (" (passive)" if passive else ", the sun's edge, the clouds' seed, MV40's K2"),
             "code": [[sr["SR_START"], list(code)]], "sites": sites, "lso": sr["SR_HEAP"],
             "region": [sr["SUNPK"], sr["SR_END"] - sr["SUNPK"], "SUNPK"],
             "hooks": {n: sr[n] for n in ("A_SUNUP", "A_SUNBK", "A_SUNSC", "A_SUNLAU", "A_SUNS1") if n in sr}}

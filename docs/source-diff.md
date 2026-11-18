@@ -258,8 +258,10 @@ blocks emit.
 The sun's edge: SUN's parts 2 to 4, HLOIN2, EDGES and the orange table are `Area: none`
 (the rows, which took the only random numbers, are gone: the reference's patch takes
 SUN's JSR DORND out too); SUN's part 1 loses its fringe size and its set-up for the rows
-(ending with K2, SUNX and an RTS), HLOIN its own entry, and WPLS and FLFLLS their line
-heap work, each with a `Port:` note.
+(ending with SUNX and an RTS), HLOIN its own entry, and WPLS and FLFLLS their line
+heap work, each with a `Port:` note. MV40's K2: its ADC K2 and SBC K2 become ADC #0
+and SBC #0 (2, 2: the reference's patch the same), with a `Port:` note, and PLS1 is
+`Area: none` (H_CIRC no longer calls it for K2).
 
 ## Step 0: trivial fixes (done)
 

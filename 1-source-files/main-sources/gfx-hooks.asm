@@ -42,12 +42,10 @@
 \ about to draw the planet's circle) and its surface detail (G_PFHOOK), and
 \ returns from PL9 itself, whose meridians and crater the renderer draws
 \ (their maths, PL9 parts 2 and 3, PLS2, PLS22 ..., are "Area: none"),
-\ leaving what the game reads of them: K2 (MV40 adds it into the next
-\ object's y without setting it first) as PLS1 leaves it for nosev_x (a
-\ meridian planet of radius 6 or more; halved, a crater planet whose crater
-\ faces us), TGT (31 or 64) and FLAG (0); and LSX2 = 0, STP and CNT as
-\ CIRCLE2 would. If the circle isn't on screen (CHKON), it returns from
-\ CIRCLE with C set, as CIRCLE does
+\ leaving what the game reads of them: TGT (31 or 64) and FLAG (0); and
+\ LSX2 = 0, STP and CNT as CIRCLE2 would (MV40 no longer reads K2, which
+\ PLS1 left there: MV40's K2). If the circle isn't on screen (CHKON), it
+\ returns from CIRCLE with C set, as CIRCLE does
 
 .H_CIRC
  LDA QQ11
@@ -96,13 +94,6 @@
  LDA #64
 .hci3
  STA TGT
- LDX #9
- JSR PLS1
- LDY TYPE               \ (halved for a crater planet)
- CPY #128
- BEQ P%+3
- LSR A
- STA K2
 .hci9
  RTS
 

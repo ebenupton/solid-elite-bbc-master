@@ -11,7 +11,10 @@
 // as in the snapshot), so that no ship spawns and no random number taken
 // before (the original's sun's edge, explosion clouds ...) changes what
 // follows. The figure is the emulated cycles from one MLOOP to the next,
-// averaged over the N iterations, and the iterations a second.
+// averaged over the N iterations, and the iterations a second; and the work:
+// those cycles less the frame layer's wait for the flip (7 cycles a turn of
+// ff2's LDA GFLIP : BNE ff2), as the 25 a second cap makes the first figure
+// move with the vsync's phase, by about 1% either way for a small change.
 //
 // The scenes (the front view unless said; positions in the game's units):
 //   flight     cruising: the planet far off (radius about 20), three ships
@@ -28,7 +31,7 @@
 //   rear       the beach ball in the rear view, with ships
 //
 // node 6-harness/mbench.mjs [--disc d] [--syms s] [--scene a,b] [--n 128] [--warm 8] [--out file.json]
-// Prints "scene: cycles/iteration it/s" per scene.
+// Prints "scene: cycles/iteration it/s work" per scene.
 import { MachineSession } from "/Users/ebenupton/.npm/_npx/e76f2a7d329553db/node_modules/jsbeeb/src/machine-session.js";
 import { BBC } from "/Users/ebenupton/.npm/_npx/e76f2a7d329553db/node_modules/jsbeeb/src/utils.js";
 import { loadSyms, ROOT, regionsFor, pinRtc } from "./mlib.mjs";
@@ -84,6 +87,7 @@ await secs(28); await key("N"); await secs(3); await key("SPACE"); await secs(4)
 const regions = regionsFor(sy);
 const at = (pc, n) => pc === sy[n] && (sy.__bank[n] === undefined || sy[n] < 0x8000 || (cpu.romsel & 15) === (sy.__bank[n] & 15));
 const cyc = () => cpu.cycleSeconds * 2e6 + cpu.currentCycles;
+const FF2 = sy.ff2;                                 // the frame layer's wait for the flip: LDA GFLIP : BNE ff2
 
 function pose(sc) {
     const K = sy["K%"];
@@ -105,8 +109,10 @@ function pose(sc) {
 const results = {};
 for (const name of which) {
     const sc = SCENES[name];
-    let k = -1, snap = null, times = [], posed = false, done = false, rand, many, slsp;
+    let k = -1, snap = null, times = [], posed = false, done = false, rand, many, slsp, spins = 0, lastPc = -1, spinAt = [];
     const h = cpu.debugInstruction.add(pc => {
+        if (FF2 !== undefined && pc === FF2 && lastPc === FF2 + 3 && at(pc, "ff2")) spins++;
+        lastPc = pc;
         if (!at(pc, "MLOOP") || done) return false;
         k++;
         if (!posed) { pose(sc); posed = true; k = 0; return false; }
@@ -119,7 +125,7 @@ for (const name of which) {
                 ram[sy.SLSP] = slsp[0]; ram[sy.SLSP + 1] = slsp[1];
                 for (let i = 2 + sc.ships.length; i <= 12; i++) ram[sy.FRIN + i] = 0;
             }
-            times.push(cyc());
+            times.push(cyc()); spinAt.push(spins);
         }
         if (times.length > N) done = true;
         return false;
@@ -127,8 +133,9 @@ for (const name of which) {
     for (let q = 0; q < 200000 && !done; q++) await s.runFor(20000);
     h.remove();
     const per = (times[times.length - 1] - times[0]) / (times.length - 1);
-    results[name] = { cycles: Math.round(per), its: +(2e6 / per).toFixed(3), n: times.length - 1 };
-    console.log(`${name.padEnd(10)} ${String(Math.round(per)).padStart(7)} cycles/iteration  ${(2e6 / per).toFixed(2).padStart(6)} it/s`);
+    const work = per - 7 * (spinAt[spinAt.length - 1] - spinAt[0]) / (times.length - 1);
+    results[name] = { cycles: Math.round(per), its: +(2e6 / per).toFixed(3), work: Math.round(work), n: times.length - 1 };
+    console.log(`${name.padEnd(10)} ${String(Math.round(per)).padStart(7)} cycles/iteration  ${(2e6 / per).toFixed(2).padStart(6)} it/s  ${String(Math.round(work)).padStart(7)} work`);
 }
 if (a.out) writeFileSync(a.out, JSON.stringify({ disc: DISC, N, WARM, results }, null, 1));
 process.exit(0);
