@@ -104,3 +104,4 @@ the bytes, and the rate (cycles saved per byte spent).
 | R_POLY's phase A without its edge count (r_cc): the walk from the top vertex meets ymax within n - 1 edges | -17 | -22 (ANDY; r_cc's byte in bank 5 goes to the padding after it) | - |
 | DIL takes each bar's cache index from DIALS (a fixed slot per bar) rather than working it out from SC | -144 | +4 (bank 4, from the log tables' alignment padding: no free byte lost) | 36 |
 | MLSB, the stardust's pitch product, skipped when BET1 = 0 (stl_pat patches a BRA to mlbkj over its first instruction) | -92 | +29 (main and bank 4: the flow moved FEED..BELL from the first container on) | 3.2 |
+| PF_HOOK without its copy of the planet's centre into pf_cx and pf_cy, which only the planet's ring read | -71 | -14 (bank 7) | - |

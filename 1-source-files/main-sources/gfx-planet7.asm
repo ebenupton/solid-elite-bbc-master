@@ -58,12 +58,6 @@
  STA pcby
  LDA K4+1
  STA pcby+1
- LDX #4                 \ (the planet's centre and radius)
-.pfh5
- LDA pcbx,X
- STA pf_cx,X
- DEX
- BPL pfh5
  STZ pc_inv
  JSR pf_hold            \ (the last records, moved with the disc)
  BCC P%+5
@@ -443,9 +437,7 @@
  RTS
 
 
-.pf_cx EQUW 0           \ the planet's centre and radius (PF_HOOK)
-.pf_cy EQUW 0
-.pf_r  EQUB 0
+.pf_r  EQUB 0           \ the planet's radius (PF_HOOK)
 .pf_ph  EQUB 0          \ pf_hold's: bit 7, there are records to keep
 .pf_lr  EQUB 0          \ the last records' radius, TYPE, VIEW, MCNT
 .pf_lt  EQUB 0
