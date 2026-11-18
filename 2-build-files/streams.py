@@ -264,8 +264,9 @@ def last_statement(lines, s, e):
     """the last statement of lines[s:e] that is assembled (None if none),
     passing over the lines of conditional assembly (IF, ELIF, ELSE, ENDIF),
     the branches the build's flags rule out, and the statements that
-    assemble nothing (constants, PRINTs, ASSERTs ...: MT16 ends with DTW7 =
-    MT16 + 1, after the LDA that falls through into TT26)"""
+    assemble nothing (constants, PRINTs, ASSERTs, labels alone ...: MT16 ends
+    with DTW7 = MT16 + 1, after the LDA that falls through into TT26, and
+    MVEIT's part 1 with the label .MV3)"""
     for i in range(e - 1, s - 1, -1):
         if ACTIVE and not ACTIVE[i]:
             continue
@@ -275,9 +276,9 @@ def last_statement(lines, s, e):
         if c.upper().startswith("EQU"):
             return c
         for st in reversed([x.strip() for x in c.split(" : ")]):
-            if assembles(st, set()):
-                return st
-    return None
+            if assembles(st, set()) and not re.match(r"^\.[A-Za-z_][\w%]*$", st):
+                return st                  # (a label alone assembles nothing:
+    return None                            # MVEIT part 1 ends with .MV3)
 
 
 def entry_label(lines, s, e, macros):
