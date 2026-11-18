@@ -133,6 +133,16 @@ if grep -q "'GHAND'" "$CSYMS"; then
     grep -q "^SHIPPOSE PASS" "$LOG/shippose.log" || { grep "BAD" "$LOG/shippose.log" | head -10; echo "shippose: FAIL"; fail shippose; }
     SAVE="$SAVE, shippose"
 fi
+if [ -f 3-assembled-output/sunref.json ]; then
+    # the reference's patch (2-build-files/sunref): its bytes (only its code
+    # and its sites change SNG47) and its passive variant against the
+    # original (game state identical over the gate's run and the views run:
+    # the patch changes nothing unless the sun is parked)
+    node 6-harness/msunref.mjs --out "$LOG/sunref" > "$LOG/sunref.log" 2>&1
+    grep -E "^(bytes|passive|passive-views):" "$LOG/sunref.log"
+    grep -q "^SUNREF PASS" "$LOG/sunref.log" || { tail -20 "$LOG/sunref.log"; echo "sunref: FAIL"; fail sunref; }
+    SAVE="$SAVE, sunref"
+fi
 echo "regressions: PASS (redock, $SAVE)"
 
 # ---- 4. speed

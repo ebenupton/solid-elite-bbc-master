@@ -117,7 +117,7 @@ all:
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -d > 3-assembled-output/symbols.txt
 	$(PYTHON) 2-build-files/layout-info.py
 	$(PYTHON) 2-build-files/bankcheck.py
-	$(PYTHON) 2-build-files/sunref/sunref.py >> 3-assembled-output/compile.txt
+	BEEBASM=$(BEEBASM) $(PYTHON) 2-build-files/sunref/sunref.py >> 3-assembled-output/compile.txt
 	$(PYTHON) 2-build-files/starocc.py 3-assembled-output
 	$(BEEBASM) -i 1-source-files/main-sources/elite-loader.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt

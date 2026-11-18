@@ -27,8 +27,9 @@ the original source's build) against the new disc
 10,000 main-loop iterations. Then it runs the regression checks: dock,
 launch and dock again; save, load, fail to load and catalogue through the
 game's disc menu; save the same commander on SNG47 and on the build and
-compare the files byte for byte; change view in flight; and pose the ships the ship audit
-flagged in flight (`mshippose.mjs`). It prints `VERIFY PASS` with
+compare the files byte for byte; change view in flight; pose the ships the ship audit
+flagged in flight (`mshippose.mjs`); and prove the reference's patch
+(`msunref.mjs`, below). It prints `VERIFY PASS` with
 the speed of both builds in flight-loop iterations per emulated second,
 their ratio, and the new build's cycles per flight iteration. A run takes
 about 10 minutes, or 5 once the reference run is cached in `work/`.
@@ -89,6 +90,23 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
   as the port leaves them, and it spends the cycles of a turn), the vectors
   are replaced by them. The whole game state, the planet's vectors included,
   is then compared with nothing left out.
+* **The sun's parking.** The original has one slot, `FRIN+1`, for the sun
+  and the space station: near the planet it removes the sun (`WPLS`), when
+  the station goes out of range it makes a new sun overhead (`KS4`), and
+  after a launch there is no sun. The port keeps the sun, parked in `SUNPK`
+  while the station holds the slot, and the original gets the same change as
+  a patch of assembled code (`2-build-files/sunref/sunref.py`, which the
+  Makefile runs, writes `3-assembled-output/sunref.json`): the port's own
+  routines `SUNUP`, `SUNSC`, `SUNBK` and `SUNLAU`, assembled from the same
+  source blocks against SNG47's symbols, in SNG47's unused memory at
+  `&0B9D`, with the parked sun after them and the station's own line heap
+  at `&0C92`, and seven sites in SNG47's code, each the same length and
+  checked against SNG47's bytes at `TT170` before anything is written
+  (`mlib.mjs`'s `applyRefPatch`). The parked sun is compared as a region of
+  both machines. `msunref.mjs` proves at every gate that the patch changes
+  SNG47's memory only at its code and its sites, and that its passive
+  variant (part 14 and `TT110` calling `WPLS` and `NWSPS`) leaves SNG47's
+  game state identical over the gate's run and the views run.
 * **Boot leftovers.** At `TT170`, any byte of the compared state that the
   new build has not yet written is seeded from the reference (`--seed
   boot`). Such a byte was left by the loader, not by the game.
@@ -121,10 +139,11 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `mdocktime.mjs` | The docked screens' drawing times: boots the build as the gate does and, from the Status screen, presses each docked-screen key in turn (f8, f1 ... f7, f9), giving each screen's cycles from the key's scan to the next, and its busy cycles (less the wait for the vertical sync). The emulation is deterministic, so a build gives the same figures every run. |
 | `mflarevis.mjs` | The lens flare's occlusion probes: flies the gate's pilot to an iteration, then puts the sun (and optionally a ship in front of it) on a path, and dumps each frame's back buffer with the probes in sight and their cycles, for `2-build-files/flarevis.py` to render. |
 | `mplanet.mjs` | Planet scenes: flies the gate's pilot to an iteration, then poses the planet (its place, radius, type, the system's seed and its orientation, or the game's own spin) and dumps each frame's back buffer with the cycles in the planet's routines (`MPWATCH=name,...` adds routines), for `2-build-files/planetvis.py` to render. |
-| `msunnear.mjs` | The sun near the planet: a posed scene (a big planet, the sun rising from behind its limb, the station crossing it; `--spawn`: the station appearing in the game's own way), each frame's back buffer dumped with the probes in sight and the cycles of the sun's routines, for `2-build-files/sunnear.py` to render (frames, a sheet and a movie). `--pose`/`--spin` put the planet's orientation, the stars, `MCNT` and the seeds, so two builds' frames compare byte for byte; `--sz1`/`--sx1` move the sun over the script (the second disc grows, crosses the window's side or becomes the bigger disc); `--watch` gives named routines' cycles per frame. |
+| `msunnear.mjs` | The sun near the planet: a posed scene (a big planet, the parked sun rising from behind its limb, the station crossing it; `--spawn`: the station appearing in the game's own way), each frame's back buffer dumped with the probes in sight and the cycles of the sun's routines, for `2-build-files/sunnear.py` to render (frames, a sheet and a movie). `--pose`/`--spin` put the planet's orientation, the stars, `MCNT` and the seeds, so two builds' frames compare byte for byte; `--sz1`/`--sx1` move the sun over the script (the second disc grows, crosses the window's side or becomes the bigger disc); `--watch` gives named routines' cycles per frame. |
 | `discmem/bench.sh`, `discmem/cmp.py`, `discmem/perframe.py`, `discmem/gatecmp.py`, `discmem/gatespeed.py` | The disc layer's bench: its scenes on a build (posed planets, including above the screen and by the window's side, and the sun near the planet, across the edge, growing and swapping; the gate's frames; a replayed session with `RUN1`, its speed windows taking in the beach balls), and two builds compared: pixels byte for byte, cycles by routine, frame by frame, and the gate's windows (`gatespeed.py`: two gates' speed tables side by side, and the windows that got slower). |
 | `discmem/mdprof.mjs`, `discmem/pagex.py` | The disc layer profiled over windows of a replayed session: each routine's cycles on and at the top of the call stack, its calls, and each call of the strip encoders (`r_dpe`, `r_dq`): what it was given (no old span, the same count and colour, one more or fewer boundary, the colour flipped, the old count unknown), how it ended and its cycles before its first write, in the pixels and in the repaints. `pagex.py` lists a listing's branches whose taken path crosses a page (by default the disc window's). |
-| `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: `S_SUN`, the disc layer, the second disc, the lens flare and the whole frame. |
+| `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: the game's `SUN` (slot 1's sun or the parked one), the disc layer, the second disc, the lens flare and the whole frame. |
+| `msunref.mjs` | The reference's patch, in the gate: its bytes (SNG47's main RAM before and after it is written differs only at its code and its sites) and its passive variant (SNG47 against SNG47 with it, game state identical over the gate's run and the views run). |
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
 | `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
 | `mfbcmp.mjs` | The renderer's regression check: hashes both screen buffers at the end of every K-th iteration's frame over the gate's run, or with `--frames` at every frame the frame layer finishes (keyed iteration.n), for comparing two builds whose game state is identical, which must draw the same pixels; `--cmp` compares two runs, and `--dump N` writes an iteration's buffers. `--mask row,col0,col1` adds to each frame's hash one with those text cells blanked, so that `--cmp` fails only on frames that differ outside them. |

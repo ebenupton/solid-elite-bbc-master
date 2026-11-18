@@ -14,7 +14,7 @@
 \ with the other pass's IF LIGHTPASS block assembled out), each half running in
 \ game context only (never with ACCCON X set, which would hide the quarter
 \ squares QSL/QSH, main RAM at &7000, that it multiplies with): L_SUN at
-\ bank 4's end (elite-layout.asm, with S_SUN), from G_FRAME before F_FRAME;
+\ bank 4's end (elite-layout.asm), from G_FRAME before F_FRAME;
 \ L_REC in bank 6, with the frame layer, from F_SHIP. L_REC's reads of
 \ QSL/QSH are marked "bankcheck: ok": the frame layer reads main RAM above
 \ &3000 nowhere else, as it may run with X set. LLT, L_SUN's result that
@@ -26,13 +26,14 @@
 \ the unit vector towards the sun in view space (x right, y up, z in; 16-bit
 \ signed, 1 = &4000), and LLT = LV * 41.3 (signed bytes) for the next
 \ iteration's ships:
-\   * slot 1 (FRIN+1) is the sun (type 129): LV = the sun's position,
-\     normalised, when it has just appeared and every 32nd iteration; on the
-\     others LV is rotated by our roll and pitch as MV40 rotates the planet
-\     and sun (the sun is so far away that our own movement does not turn it);
-\   * slot 1 is the space station (the safe zone: the station has replaced
-\     the sun): LV keeps being rotated, so the light stays continuous, and is
-\     re-seeded from the sun when it is back;
+\   * slot 1 (FRIN+1) is the sun (type 129), or the space station with the
+\     sun parked in SUNPK (the safe zone: bit 7 of SUNPF, SUNUP): LV = the
+\     sun's position, normalised, when it has just appeared and every 32nd
+\     iteration; on the others LV is rotated by our roll and pitch as MV40
+\     rotates the planet and sun (the sun is so far away that our own
+\     movement does not turn it);
+\   * slot 1 is anything else (a ship in witchspace): LV keeps being
+\     rotated;
 \   * slot 1 is empty (the title screen, no local universe): the fixed light
 \     (1, 1, -1) / sqrt 3, from the top right into the screen.
 \
@@ -76,7 +77,12 @@ IF LIGHTPASS = 4        \ (elite-layout.asm: at bank 4's end, in game context)
  LDA FRIN+1
  BEQ ls_fix             \ no slot 1 (title screen): the fixed light
  CMP #129
- BNE ls_rot             \ the station: keep rotating LV
+ BEQ ls_sun             \ the sun in slot 1
+ CMP #SST
+ BNE ls_rot             \ a ship (witchspace): keep rotating LV
+ BIT SUNPF
+ BPL ls_rot             \ the station and no parked sun: keep rotating LV
+.ls_sun
  BIT lv_ok              \ the sun: seed LV from it when it has just appeared
  BVC ls_seed            \ (bit 6 clear) and every 32nd iteration
  INC lv_cnt
@@ -111,10 +117,19 @@ IF LIGHTPASS = 4        \ (elite-layout.asm: at bank 4's end, in game context)
 .lv_defl EQUB LO(&24F3), LO(&24F3), LO(-&24F3)    \ &4000 / sqrt 3
 .lv_defh EQUB HI(&24F3), HI(&24F3), HI(-&24F3)
 
-.ls_seed                \ LV = the sun's position (K% + NI%), normalised
- STZ lv_cnt
+.ls_seed                \ LV = the sun's position (K% + NI%, or SUNPK while the
+ STZ lv_cnt             \ station holds slot 1), normalised
+ LDA #LO(K%+NI%)
+ LDY #HI(K%+NI%)
+ BIT FRIN+1
+ BMI lse0
+ LDA #LO(SUNPK)
+ LDY #HI(SUNPK)
+.lse0
+ STA lse1+1
+ STY lse1+2
  LDX #8                 \ |x|, |y|, |z| as 24-bit (lo, hi, top) in lv_w,
-.lse1                   \ their signs in lv_sg
+.lse1                   \ their signs in lv_sg (the address set above)
  LDA K%+NI%,X
  STA lv_w,X
  DEX

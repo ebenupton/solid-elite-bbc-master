@@ -1,10 +1,11 @@
-// Where the sun near the planet costs time: fly the gate's pilot (as
-// 6-harness/verify.sh's mcompare.mjs run) and, from iteration FROM to TO, record
-// per frame: S_SUN's cycles (gfx-ssun.asm, from its entry to F_FRAME's), the
-// disc layer (f_discs), the secondary disc (f_disc2), the lens flare's step
-// (f_flt to f_text2) and the whole frame (F_FRAME to the flip's queue), with
-// GSUNON, GSUNR, the planet's radius, which disc is secondary (f_sec) and
-// VIEW. A build without S_SUN (the baseline) is measured the same way.
+// Where the sun costs time: fly the gate's pilot (as 6-harness/verify.sh's
+// mcompare.mjs run) and, from iteration FROM to TO, record per frame: the
+// cycles in the game's SUN during the iteration before it (from each entry
+// until the stack is back above it: the sun's record, in slot 1 or parked,
+// SUNSC), the disc layer (f_discs), the secondary disc (f_disc2), the lens
+// flare's step (f_flt to f_text2) and the whole frame (F_FRAME to the flip's
+// queue), with GSUNON, GSUNR, the planet's radius, which disc is secondary
+// (f_sec), VIEW and slot 1.
 //
 // node 6-harness/msunprof.mjs [--tree T] [--from 4700] [--to 5300] [--out file.json]
 //      [--seedfile 6-harness/work/verify/compare/seeded.json] (the gate's boot leftovers)
@@ -37,13 +38,15 @@ const res = await runElite({ disc: `${TREE}/5-compiled-game-discs/elite-master-s
         const cpu = r.cpu;
         const cyc = () => (cpu.cycleSeconds + cpu.currentCycles / 2e6) * 2e6;
         const b6 = x => physRead(cpu, M6, x);
-        let t = {}, f = null;
+        let t = {}, f = null, sunAt = null, sunCyc = 0;
+        const SUNB = sy.__bank.SUN;
         cpu.debugInstruction.add(pc => {
             if (cur < FROM || cur > TO) return false;
             const bank = cpu.romsel & 15;
-            if (bank === ((sy.__bank.S_SUN ?? 7) & 15) && sy.S_SUN !== undefined && pc === sy.S_SUN) t.ss = cyc();
+            if (sunAt && cpu.s > sunAt.sp) { sunCyc += cyc() - sunAt.t; sunAt = null; }
+            if (pc === sy.SUN && !sunAt && (SUNB === undefined || bank === (SUNB & 15))) sunAt = { t: cyc(), sp: cpu.s };
             else if (bank === 6) {
-                if (pc === sy.F_FRAME) { f = { i: cur, ss: t.ss ? Math.round(cyc() - t.ss) : 0 }; t = { ff: cyc() }; }
+                if (pc === sy.F_FRAME) { f = { i: cur, suncyc: Math.round(sunCyc) }; sunCyc = 0; t = { ff: cyc() }; }
                 else if (!f) return false;
                 else if (pc === sy.f_discs) t.d1 = cyc();
                 else if (pc === AFT.discs) { f.discs = Math.round(cyc() - t.d1); t.d2 = cyc(); }
@@ -69,6 +72,6 @@ if (a.out) writeFileSync(a.out, JSON.stringify(out));
 const sum = k => frames.reduce((s, f) => s + (f[k] || 0), 0);
 const withSun = frames.filter(f => f.sun >= 0), both = frames.filter(f => f.sun >= 0 && f.pr >= 0);
 console.log(`iterations ${FROM}-${TO}: ${rate(FROM, TO).toFixed(3)} it/s; ${frames.length} frames, ${withSun.length} with the sun, ${both.length} with the sun and the planet, ${frames.filter(f => f.sun >= 0 && f.view === 0).length} in the front view`);
-console.log(`cycles per frame: S_SUN ${(sum("ss") / frames.length).toFixed(0)}, discs ${(sum("discs") / frames.length).toFixed(0)}, disc2 ${(sum("disc2") / frames.length).toFixed(0)}, flt ${(sum("flt") / frames.length).toFixed(0)}, frame ${(sum("frame") / frames.length).toFixed(0)}`);
+console.log(`cycles per frame: SUN ${(sum("suncyc") / frames.length).toFixed(0)}, discs ${(sum("discs") / frames.length).toFixed(0)}, disc2 ${(sum("disc2") / frames.length).toFixed(0)}, flt ${(sum("flt") / frames.length).toFixed(0)}, frame ${(sum("frame") / frames.length).toFixed(0)}`);
 for (const f of frames) if (f.i % 10 === 0 || f.sun >= 0) console.log(JSON.stringify(f));
 process.exit(0);

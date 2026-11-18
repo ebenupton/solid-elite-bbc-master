@@ -21,10 +21,9 @@
 .gA EQUB 0
 
 .G_FRAME                \ (from hframe only, with bank 4 paged, which keeps A;
- JSR S_SUN              \ F_FRAME does not read it) the sun near the planet
- LDA QQ11               \ first (S_SUN, gfx-ssun.asm), then in a space view the
- BNE P%+5               \ light for the next iteration's ships (L_SUN,
- JSR L_SUN              \ gfx-light.asm): both at bank 4's end
+ LDA QQ11               \ F_FRAME does not read it) in a space view the light
+ BNE P%+5               \ for the next iteration's ships first (L_SUN,
+ JSR L_SUN              \ gfx-light.asm, at bank 4's end)
  LDA #GFXBANK
  STA &F4
  STA &FE30

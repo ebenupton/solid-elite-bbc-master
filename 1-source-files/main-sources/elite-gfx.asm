@@ -105,13 +105,10 @@ R_PTB = R_NDISCL
 ASSERT LO(R_PTA) <> LO(R_PTB) AND LO(R_PTA) + 191 < 256   \ (k_pre tells them apart)
 .R_SN       SKIP 1          \ star count 0..NDSTAR
 .R_SCOL     SKIP 1          \ star colour byte (R_INIT: &FF)
-.ss_pl      SKIP 9          \ S_SUN's ss_dif: the planet's and the sun's
-.ss_su      SKIP 9          \ coordinates (INWK's, sign-magnitude; gfx-ssun.asm)
-.ss_zs      SKIP 37         \ S_SUN's: the zero page kept round MV40 and SOLAR
 .F_DROK     SKIP 1          \ bit 7: R_NDISCL/R still hold the disc rows that
                             \ f_discspans made last (R_POLY, whose edge tables
                             \ share them, clears it)
-.WS_KGAP                    \ (gfx-ssun.asm: NI% <= 37)
+.WS_KGAP
 ALIGN &100
 .KF         SKIP 192        \ the kept solid rows (gfx-raster_kept.asm), per row:
                             \ bit b set if the row is kept in buffer b, bit 7 if
@@ -127,14 +124,10 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
                             \ %01100000 as TIDY's (L_REC, f_winding)
 .GSPLV      SKIP 4          \ part 5's XX2 for the splinter's faces (SPLV)
 .GSHT       SKIP 4          \ SHAND's workspace
-.F_SUX      SKIP 2          \ the sun's centre this frame (F_PLANET from SUN, or
-.F_SUY      SKIP 2          \ S_SUN: gfx-ssun.asm), with GSUNR and GSUNON
+.F_SUX      SKIP 2          \ the sun's centre this frame (F_PLANET from SUN),
+.F_SUY      SKIP 2          \ with GSUNR and GSUNON
 .FL_BEH     SKIP 1          \ bit 7: the sun is behind the planet (f_flt, for
                             \ R_FLARE's probes)
-.SS_OK      SKIP 1          \ bit 7: S_SUN knows where the sun is from the planet
-                            \ (F_DIRECT clears it while we are docked)
-.ss_d       SKIP 9          \ S_SUN's D = sun - planet (x, y, z: lo, hi, top, two's
-                            \ complement), then, as ss_turn (MV40) turns both alike,
 .WS_GAP                    \ (free to the main code)
 SKIP CODE% - P%
 .WS_END

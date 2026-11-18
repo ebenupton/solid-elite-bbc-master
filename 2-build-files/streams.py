@@ -39,11 +39,12 @@
 #   * ", again" after any of these ("Area: cold, again"): the block is also
 #     emitted a second time into 3-assembled-output/elite-source-again.asm (every other
 #     line blank, so line numbers stay), with no stubs, and with its own
-#     labels and the targets of its JSRs and JMPs named A_<name>: the
-#     renderer INCLUDEs it, and says where each call goes (the original
-#     routine, A_X = X, or a stand-in of its own). gfx-ssun.asm runs SOLAR's
-#     placing of the planet and the sun this way, with SOS1 and NWSHP noting
-#     INWK instead of making ships.
+#     labels and the targets of its JSRs and JMPs named A_<name>: the file
+#     that INCLUDEs it says where each call goes. The port's own routines
+#     that the reference must run too (the sun's parking, SUNUP ...) are
+#     emitted so: 2-build-files/sunref/sunref.py assembles them for the released
+#     SNG47, with each A_X bound to SNG47's X, as the harness's patch to the
+#     reference.
 #   * ", runs on" after any of these ("Area: hot, runs on"): a table that code
 #     reads past its end into the next block (DETOK2 reads TKN2 on into QQ16),
 #     so the next block must follow it, in the same pass and unit, as if it
@@ -1037,7 +1038,7 @@ def main():
         conts = [["hot1", sy["LOW_END%"], 0x4000, []], ["hot2", sy["QS_RUN%"], 0x8000, []],
                  ["hot3", 0x8000, 0xC000 - b4 - (sy["R4_END%"] - sy["R4_START%"]), []]]
         # (bank 4 ends with the hot data HAZEL has no room for, b4, then the
-        # renderer's game-context routines, S_SUN and L_SUN: elite-layout.asm)
+        # renderer's game-context routine, L_SUN: elite-layout.asm)
         used = {c[0]: 0 for c in conts}
         cur = 0
         for u0, u1 in units:

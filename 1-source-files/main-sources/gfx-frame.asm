@@ -1717,7 +1717,7 @@ f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
  RTS
 
 \ f_disc2: the secondary disc (both the sun and the planet on screen: more
-\ often since the sun near the planet is drawn too, gfx-ssun.asm). It is the
+\ often since the sun stays near the planet, SUNSC). It is the
 \ smaller disc, and the sun and the planet are the same size (PLANET's radius
 \ 24576 / z for both), so it is the further: R_DISC2 (gfx-raster_disc2.asm)
 \ draws what the layer's span (this buffer's R_DISCL/R, as T_DISCROWS has

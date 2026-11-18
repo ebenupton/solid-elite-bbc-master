@@ -1,10 +1,9 @@
-// The sun near the planet (1-source-files/main-sources/gfx-ssun.asm): a posed scene, as
-// mstation.mjs and mflarevis.mjs pose theirs. Boots the build
-// (SHIFT+BREAK, a new commander, launch with f0: the station is in slot 1, so
-// the game has no sun and S_SUN draws it), then at each MLOOP puts the planet,
-// the station and the sun where the script says, with the speed 0 and no keys
-// (so S_SUN does not turn D): the sun as S_SUN's D = sun - planet (ss_d, in
-// the shared workspace) and SS_OK. At each frame's end (F_FRAME's ff_stars9, after the stars,
+// The sun near the planet: a posed scene, as 6-harness/mstation.mjs and
+// 6-harness/mflarevis.mjs pose theirs. Boots the build (SHIFT+BREAK, a new
+// commander, launch with f0: the station is in slot 1 and the sun is parked
+// in SUNPK, SUNLAU, which the game moves and draws once an iteration, SUNSC),
+// then at each MLOOP puts the planet, the station and the parked sun where the
+// script says, with the speed 0 and no keys. At each frame's end (F_FRAME's ff_stars9, after the stars,
 // bank 6) the back buffer is dumped, with the sun and the planet as recorded
 // and the lens flare's probes in sight (fl_vn at fl_seen, in the flare's
 // bank).
@@ -28,8 +27,8 @@
 // --spawn: no script. The game's own sun is put in slot 1, in view beside the
 // planet, with the planet placed so that part 15 spawns the station 40000
 // ahead within 32 iterations; then the game runs untouched (speed 0, no
-// keys). Prints the sun as drawn each frame: the game's (SUN) until the
-// station takes the slot, then S_SUN's, which must carry on from it.
+// keys). Prints the sun as drawn each frame: in slot 1 until the station
+// takes the slot, then parked (SUNUP), which must carry on from it.
 // Writes <out>/frame-NNNNNN.bin (the back buffer, &4000-&6FFF) and
 // <out>/frames.json; 2-build-files/sunnear.py renders them.
 import { MachineSession, BBC } from "./jsbeeb.mjs";
@@ -82,17 +81,15 @@ await secs(28); await key("N"); await secs(3); await key("SPACE"); await secs(4)
 await key("F0", 0.2, 12);
 
 const ram = cpu.ramRomOs;
-const SSB = (sy.__bank.S_SUN ?? 7) & 15, FLB = (sy.__bank.fl_seen ?? 5) & 15;   // (S_SUN's bank, the flare's)
-const b7 = addr => addr < 0x8000 ? addr : cpu.romOffset + SSB * 16384 + addr - 0x8000;   // S_SUN's variables (ss_d: main RAM)
+const FLB = (sy.__bank.fl_seen ?? 5) & 15;          // (the flare's bank)
 const put = (base, o, v) => { const m = Math.abs(v); ram[base + o] = m & 255; ram[base + o + 1] = (m >> 8) & 255; ram[base + o + 2] = ((m >> 16) & 127) | (v < 0 ? 128 : 0); };
-const putTc = (addr, v) => { const u = v & 0xffffff; ram[b7(addr)] = u & 255; ram[b7(addr) + 1] = (u >> 8) & 255; ram[b7(addr) + 2] = (u >> 16) & 255; };
 const M6 = mapOfLabel(sy, "F_PLX");
 const b6 = x => physRead(cpu, M6, x);
 const w16m = x => { const v = ram[x] | ram[x + 1] << 8; return v > 32767 ? v - 65536 : v; };
 const w16 = x => { const v = b6(x) | b6(x + 1) << 8; return v > 32767 ? v - 65536 : v; };
 const cyc = () => (cpu.cycleSeconds + cpu.currentCycles / 2e6) * 2e6;
 
-let phase = 0, k = -1, atLoop = false, seen = -1, tff = 0, tss = 0, tssd = 0, t = {}, cy = {};
+let phase = 0, k = -1, atLoop = false, seen = -1, tff = 0, t = {}, cy = {};
 const loopAt = [];
 const frames = [], log = [];
 const K1 = sy["K%"] + 37;
@@ -162,10 +159,8 @@ function doPose() {
     const t = Math.min(1, k / (N - 1)), SZk = a.sz1 ? Math.round(SZ + (+a.sz1 - SZ) * t) : SZ;
     if (a.sx1) sun[0] = SX + (+a.sx1 - SX) * t;
     const S = [Math.round((sun[0] - 128) * SZk / 256), Math.round((96 - sun[1]) * SZk / 256), SZk];
-    if (sy.ss_d !== undefined) {                        // (a build without S_SUN: no sun)
-        for (let j = 0; j < 3; j++) putTc(sy.ss_d + 3 * j, S[j] - P[j]);
-        ram[sy.SS_OK] = 0xff;
-    }
+    for (let j = 0; j < 3; j++) put(sy.SUNPK, 3 * j, S[j]);     // (the parked sun)
+    ram[sy.SUNPF] = 0x80;
     // the station: off to the side until it crosses, facing us, rolling
     const tx = st === null ? (k < HOLD + RISE + HOLD ? TX0 : TX1) : st;
     put(K1, 0, Math.round((tx - 128) * TZ / 256)); put(K1, 3, Math.round((96 - TY) * TZ / 256)); put(K1, 6, TZ);
@@ -188,8 +183,7 @@ cpu.debugInstruction.add(pc => {
     }
     if (at(pc, "MLOOP")) { loopAt.push(cyc()); k++; if (k < N) doPose(); return false; }
     const bank = cpu.romsel & 15;
-    if (bank === SSB && pc === sy.S_SUN) tss = cyc();
-    else if (bank === 6 && pc === sy.F_FRAME) { tssd = sy.S_SUN !== undefined ? Math.round(cyc() - tss) : 0; tff = cyc(); seen = -1; cy = {}; }
+    if (bank === 6 && pc === sy.F_FRAME) { tff = cyc(); seen = -1; cy = {}; }
     else if (bank === 6 && pc === sy.f_discs) t.d1 = cyc();
     else if (bank === 6 && pc === AFT.discs) { cy.discs = Math.round(cyc() - t.d1); t.d2 = cyc(); }
     else if (bank === 6 && pc === AFT.disc2) cy.disc2 = Math.round(cyc() - t.d2);
@@ -203,7 +197,7 @@ cpu.debugInstruction.add(pc => {
         for (let q = 0; q < 0x3000; q++) buf[q] = ram[base + 0x4000 + q];
         const pal = Array.from(s._machine.processor.video.ulaPal.slice(0, 16));
         frames.push({ k, back, sun: [w16m(sy.F_SUX), w16m(sy.F_SUY), ram[sy.GSUNR], ram[sy.GSUNON]],
-            planet: [w16(sy.F_PLX), w16(sy.F_PLY), b6(sy.F_PLR), b6(sy.F_PLON)], seen, ssun: tssd, frame: Math.round(cyc() - tff), ...cy,
+            planet: [w16(sy.F_PLX), w16(sy.F_PLY), b6(sy.F_PLR), b6(sy.F_PLON)], seen, frame: Math.round(cyc() - tff), ...cy,
             slot1: ram[sy.FRIN + 1], pal, ...(WATCH.length ? { w: wacc } : {}) });
         wacc = {};
         writeFileSync(`${OUT}/frame-${String(k).padStart(6, "0")}.bin`, buf);
@@ -220,5 +214,5 @@ const span = (p, q) => ((q - p) / ((loopAt[q] - loopAt[p]) / 2e6)).toFixed(3);
 const parts = [["hidden", 0, HOLD + 30], ["rising", HOLD + 30, HOLD + RISE], ["clear", HOLD + RISE, HOLD + RISE + HOLD], ["flyby", HOLD + RISE + HOLD, HOLD + RISE + HOLD + FLY], ["all", 0, N]];
 console.log("it/s: " + parts.map(([n, p, q]) => `${n} ${span(p, Math.min(q, loopAt.length - 1))}`).join(", "));
 console.log(`${frames.length} frames of ${N}`); for (const l of log.slice(0, 20)) console.log(l);
-for (const f of frames) console.log(f.k, "slot1", f.slot1, "sun", f.sun.join(" "), "planet", f.planet.join(" "), "seen", f.seen, "S_SUN", f.ssun, "discs", f.discs, "disc2", f.disc2, "flt", f.flt);
+for (const f of frames) console.log(f.k, "slot1", f.slot1, "sun", f.sun.join(" "), "planet", f.planet.join(" "), "seen", f.seen, "discs", f.discs, "disc2", f.disc2, "flt", f.flt);
 process.exit(0);

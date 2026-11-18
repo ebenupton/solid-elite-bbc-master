@@ -122,8 +122,11 @@ export function regionsFor(sy, refPatch = null) {
         [sy["NA%"], sy["NAEND%"] - sy["NA%"], "NA%"],           // last saved commander (template) and checksums
         [sy.SOFLG, sy.SFXPR - sy.SOFLG, "SOUND"],               // sound buffers (written by the IRQ)
     ];
-    // and a patched original's own (its patch's region: mlib's applyRefPatch)
-    if (refPatch && refPatch.region) r.push(refPatch.region);
+    // the sun, parked while the space station holds its slot (SUNPK and SUNPF,
+    // after WP's dashboard variables), or a patched original's own (its patch's
+    // region: mlib's applyRefPatch), which is the same
+    if (sy.SUNPK !== undefined) r.push([sy.SUNPK, sy.SUNPF + 1 - sy.SUNPK, "SUNPK"]);
+    else if (refPatch && refPatch.region) r.push(refPatch.region);
     return r;
 }
 
@@ -146,8 +149,13 @@ export function canonFor(sy, regions, refPatch = null) {
     const offs = [sy.INWK + 33, ...Array.from({ length: 12 }, (_, i) => sy["K%"] + 37 * i + 33)].map(offOf).filter(o => o >= 0);
     const from = [sy.LSO, refPatch && refPatch.lso].filter(a => a !== undefined && a !== null && a !== LSO_ORIG);
     const xx0 = sy.XX0 === undefined ? -1 : offOf(sy.XX0);
+    // INF, once the parked sun has been moved (SUNSC), points to SUNPK, which
+    // is at another address in each machine: it is held as K% + 12 * 37, as
+    // if SUNPK were the block of a slot after the last
+    const pk = sy.SUNPK ?? (refPatch && refPatch.region ? refPatch.region[0] : undefined), oInf = offOf(sy.INF), vInf = sy["K%"] + 12 * 37;
     return buf => {
         for (const o of offs) if (from.includes(buf[o] | buf[o + 1] << 8)) { buf[o] = LSO_ORIG & 255; buf[o + 1] = LSO_ORIG >> 8; }
+        if (pk !== undefined && oInf >= 0 && (buf[oInf] | buf[oInf + 1] << 8) === pk) { buf[oInf] = vInf & 255; buf[oInf + 1] = vInf >> 8; }
         if (sy.XX21 !== undefined && sy.XX21 !== XX21_ORIG && sy.SNE !== undefined && xx0 >= 0) {
             const v = buf[xx0] | buf[xx0 + 1] << 8;
             if (v >= sy.XX21 && v < sy.SNE) { const w = v - sy.XX21 + XX21_ORIG; buf[xx0] = w & 255; buf[xx0 + 1] = w >> 8; }

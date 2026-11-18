@@ -80,10 +80,6 @@
 \ clears the text map): no direct text or stars
 
 .F_DIRECT
- LDA QQ12               \ docked: S_SUN forgets where the sun is (after a
- BEQ fdr0               \ launch it takes it from the system's seeds)
- STZ SS_OK
-.fdr0
  ASL GWARP              \ LOOK1's TT66 for an in-system jump (WARP) in space
  BCC fdr1               \ mode: keep double buffering and the view on show (the
  BIT GMODE              \ blank screen was all a held J ever showed). As

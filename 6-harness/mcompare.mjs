@@ -229,6 +229,28 @@ if (ok) {
         }
     }
 }
+// the sun's parking (SUNPK, SUNPF: elite-source.asm's SUNSC), in
+// each run with the parked sun's region: at every MLOOP in flight in a system
+// with a planet, with the station present (SSPR), bit 7 of SUNPF is set (the
+// sun is parked) and bit 6 clear (SUNSC's two visits in each pass through the
+// slots); SUNPF is read only then (its bits are the boot's until the first
+// launch, and stay as they were after RES2)
+for (const [who, run, sy, patch] of [["ref", ref, rsy, RPATCH], ["cand", cand, csy, CPATCH]]) {
+    if (patch && /passive/.test(patch.name)) continue;      // (the passive variant never parks the sun)
+    let o = 0; const off = {};
+    for (const [ra, len, name] of run.regions) { if (name === "SUNPK") off.pf = o + len - 1; o += len; }
+    if (off.pf === undefined) continue;
+    const at = x => { let q = 0; for (const [ra, len] of run.regions) { if (x >= ra && x < ra + len) return q + x - ra; q += len; } return -1; };
+    const [oS, oD, oM, oF] = [sy.SSPR, sy.QQ12, sy.MJ, sy.FRIN].map(at);
+    let bad = 0, parked = 0;
+    run.snaps.forEach((sn, i) => {
+        const fly = !sn[oD] && !sn[oM] && (sn[oF] & 0x80);
+        if (fly && sn[oS] && (sn[off.pf] & 0xc0) !== 0x80) { if (!bad++) log(`SUN PARKING CHECK FAILED (${who}) at iteration ${i}: SUNPF &${sn[off.pf].toString(16)}, SSPR ${sn[oS]}`); }
+        if (fly && sn[oS]) parked++;
+    });
+    log(`The sun's parking (${who}): ${parked} iterations with the station present and the sun parked${bad ? `, ${bad} FAILED` : ""}`);
+    if (bad) ok = false;
+}
 if (cand.page0d && cand.page0d.length) {
     log(`PAGE &0D WRITTEN by the game (off limits, docs/MASTER-MEMORY.md): ${cand.page0d.map(([i, pc, a]) => `iteration ${i} PC &${pc.toString(16)} -> &${a.toString(16)}`).join(", ")}`);
     ok = false;
