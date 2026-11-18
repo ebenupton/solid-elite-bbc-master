@@ -114,15 +114,11 @@
   LDA #HI(r_ta)
   STA r_lsh_t+2
   STA r_lz_t+2
-  LDA r_n
-  STA r_cc
-  LDX r_top
-.ca
-  LDA R_PYL,X
+  LDX r_top               \ (from the top vertex, a vertex at ymax, the
+.ca                       \ largest of the vertices' y, comes within n - 1
+  LDA R_PYL,X             \ edges either way: no count is needed)
   CMP r_ymaxL
   BEQ cad
-  DEC r_cc
-  BMI cad
   STX r_i0
   INX
   CPX r_n
@@ -143,15 +139,11 @@
   LDA #HI(r_tb)
   STA r_lsh_t+2
   STA r_lz_t+2
-  LDA r_n
-  STA r_cc
   LDX r_top
 .cb
   LDA R_PYL,X
   CMP r_ymaxL
   BEQ cbd
-  DEC r_cc
-  BMI cbd
   STX r_i0
   DEX
   BPL cb1

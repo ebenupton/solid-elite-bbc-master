@@ -101,3 +101,4 @@ the bytes, and the rate (cycles saved per byte spent).
 | COMPAS removes the old compass dot only when the new one differs (cpdot), else sets what DOT leaves from a copy | -348 | +139 (bank 4) | 2.5 |
 | MLTU2 returns 0 at once when Q = 0 (MVEIT's position rotation with a zero roll or pitch) | -71 | +12 (main) | 5.9 |
 | f_discspans' slow path: the rows about cy in pairs, clipped by thresholds on the half-width (fcs) | -1182 | +327 (bank 6) | 3.6 |
+| R_POLY's phase A without its edge count (r_cc): the walk from the top vertex meets ymax within n - 1 edges | -17 | -22 (ANDY; r_cc's byte in bank 5 goes to the padding after it) | - |
