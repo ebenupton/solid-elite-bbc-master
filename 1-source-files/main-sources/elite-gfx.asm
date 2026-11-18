@@ -108,6 +108,9 @@ ASSERT LO(R_PTA) <> LO(R_PTB) AND LO(R_PTA) + 191 < 256   \ (k_pre tells them ap
 .ss_pl      SKIP 9          \ S_SUN's ss_dif: the planet's and the sun's
 .ss_su      SKIP 9          \ coordinates (INWK's, sign-magnitude; gfx-ssun.asm)
 .ss_zs      SKIP 37         \ S_SUN's: the zero page kept round MV40 and SOLAR
+.F_DROK     SKIP 1          \ bit 7: R_NDISCL/R still hold the disc rows that
+                            \ f_discspans made last (R_POLY, whose edge tables
+                            \ share them, clears it)
 .WS_KGAP                    \ (gfx-ssun.asm: NI% <= 37)
 ALIGN &100
 .KF         SKIP 192        \ the kept solid rows (gfx-raster_kept.asm), per row:

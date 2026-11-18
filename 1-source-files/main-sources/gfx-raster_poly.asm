@@ -14,7 +14,8 @@
 \ ============================================================================
 .R_POLY
 {
-  LDA R_PN
+  STZ F_DROK              \ (its edge tables are R_NDISCL/R: f_discspans' rows
+  LDA R_PN                \ are not kept)
   BNE pn1
   RTS
 .pn1

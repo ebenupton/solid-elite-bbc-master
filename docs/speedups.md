@@ -105,3 +105,4 @@ the bytes, and the rate (cycles saved per byte spent).
 | DIL takes each bar's cache index from DIALS (a fixed slot per bar) rather than working it out from SC | -144 | +4 (bank 4, from the log tables' alignment padding: no free byte lost) | 36 |
 | MLSB, the stardust's pitch product, skipped when BET1 = 0 (stl_pat patches a BRA to mlbkj over its first instruction) | -92 | +29 (main and bank 4: the flow moved FEED..BELL from the first container on) | 3.2 |
 | PF_HOOK without its copy of the planet's centre into pf_cx and pf_cy, which only the planet's ring read | -71 | -14 (bank 7) | - |
+| f_discspans keeps the disc rows it made when the disc, its centre, its radius and the window are as last time and no polygon has been drawn since (F_DROK, which R_POLY clears); a moving disc notes only cy, cx and r | -507 | +167 (bank 6 163, ANDY 3, the shared workspace 1) | 3.0 |

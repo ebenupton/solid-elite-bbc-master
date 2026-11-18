@@ -1091,13 +1091,95 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
  STA fpr_ld2+2
  JMP f_discspans
 
+\ f_discspans: the disc's rows, as fdk_build makes them, or those it made
+\ last time when nothing they depend on has changed: the same disc (its
+\ half-width table), centre (f_cx, f_cxh, f_cy) and radius, the same window
+\ (R_CL, R_CR, R_CT, R_CB), and no polygon since (R_POLY's edge tables share
+\ R_NDISCL/R: it clears F_DROK). Rows NDT..NDB are then as fdk_build left
+\ them (R_DISCROWS and f_disc2 write only the rows outside them), and R_NDT
+\ and R_NDB are put back. (The planet's position, size and window are the
+\ same in a quarter of the builds of the gate's run.) What changes as a disc
+\ moves (the low bytes of cy and cx, and r) is compared first and, when it
+\ has changed, is all that is noted, with F_DROK clear: the rest of the key
+\ is noted by the next build, if the disc has not moved by then
+
+.f_discspans
+ LDA f_cy               \ cy, cx (low bytes) and r as last time? If not, the
+ CMP fdk_y              \ disc has moved
+ BNE fdk_mv
+ LDA f_cx
+ CMP fdk_x
+ BNE fdk_mv
+ LDA f_r
+ CMP fdk_r
+ BNE fdk_mv
+ BIT F_DROK             \ the rest of the key noted, the rows kept?
+ BPL fdk_new
+ LDA f_cy+1
+ CMP fdk_k
+ BNE fdk_new
+ LDA f_cxh
+ CMP fdk_k+1
+ BNE fdk_new
+ LDA fpr_ld2+2          \ the half-width table (the planet's or the sun's)
+ CMP fdk_k+2
+ BNE fdk_new
+ LDX #3                 \ the window
+.fdk1
+ LDA R_CL,X
+ CMP fdk_k+3,X
+ BNE fdk_new
+ DEX
+ BPL fdk1
+ LDA fdk_t              \ the rows are as they were made: R_NDT and R_NDB
+ STA R_NDT
+ LDA fdk_b
+ STA R_NDB
+ RTS
+.fdk_mv                 \ moved: note cy, cx and r only, no rows kept
+ LDA f_cy
+ STA fdk_y
+ LDA f_cx
+ STA fdk_x
+ LDA f_r
+ STA fdk_r
+ STZ F_DROK
+ JMP fdk_build
+.fdk_new                \ not moved: make the rows, and note the rest
+ JSR fdk_build
+ LDA f_cy+1
+ STA fdk_k
+ LDA f_cxh
+ STA fdk_k+1
+ LDA fpr_ld2+2
+ STA fdk_k+2
+ LDX #3
+.fdk2
+ LDA R_CL,X
+ STA fdk_k+3,X
+ DEX
+ BPL fdk2
+ LDA R_NDT
+ STA fdk_t
+ LDA R_NDB
+ STA fdk_b
+ LDA #&80
+ STA F_DROK
+ RTS
+.fdk_y EQUB 0           \ the last build's cy, cx (low bytes) and r
+.fdk_x EQUB 0
+.fdk_r EQUB 0
+.fdk_k SKIP 7           \ the last kept rows' cy and cx (high bytes), table, window
+.fdk_t EQUB 0           \ and their R_NDT and R_NDB
+.fdk_b EQUB 0
+
 .fds_none
  LDA #1
  STA R_NDT
  STZ R_NDB
  RTS
 
-.f_discspans            \ rows of the disc (f_cx, f_cy, f_r) within the window
+.fdk_build              \ rows of the disc (f_cx, f_cy, f_r) within the window
                         \ (every exit sets R_NDT and R_NDB)
  LDA f_cy               \ fz_p = top row = cy - r, fz_q = bottom row = cy + r
  SEC

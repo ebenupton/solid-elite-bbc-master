@@ -44,6 +44,7 @@
  STA F_NLINE
  STA F_NDOT
  STA F_PLON
+ STA F_DROK              \ (no disc rows kept: f_discspans)
  LDX #NDSTAR-1          \ no stars recorded, no direct-mode stars noted
 .fin1
  STA R_SS,X
