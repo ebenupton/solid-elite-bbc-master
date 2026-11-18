@@ -112,7 +112,7 @@ included. Routines with fewer than about 15 lines are grouped.
 
 **1 Memory map and build** (68, 48)
 
-* (configuration) 50, 4: CODE% &1300 to &1F08, LOAD% = CODE%. The
+* (configuration) 50, 4: CODE% &1300 to &1F42, LOAD% = CODE%. The
   data addresses (XX21, E%, KWL%, KWH%, QQ18, SNE, ACT, TKN1, and RUPLA, RUGAL and
   RUTOK with their _COMPACT branch) are deleted, as elite-data.asm is assembled in
   the same pass; commbuf moved; HOMEBANK and COLDBANK added.

@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1F08
+ CODE% = &1F42
                         \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
