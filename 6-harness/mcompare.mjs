@@ -5,7 +5,7 @@
 //
 // node 6-harness/mcompare.mjs [--iters 5000] [--ref disc] [--rsyms file]
 //                           [--cand disc] [--csyms file] [--seed boot|rand|none]
-//                           [--loose] [--window 200] [--out dir] [--shots N]
+//                           [--loose] [--deadregs] [--window 200] [--out dir] [--shots N]
 //                           [--maxsecs S] [--nopatch] [--norefcache] [--views] [--crater]
 //                           [--refpatch file|none] [--candpatch file]
 //                           [--trace FROM,TO,LABEL+LABEL,VAR+VAR~OFFSET]
@@ -37,6 +37,9 @@
 // data (mlib.RELOC_EXCLUDE). --loose also excludes drawing temporaries and line heaps
 // (mlib.DRAW_EXCLUDE), for candidates whose drawing differs. The first
 // divergence is reported with symbol names, then per-address counts.
+// --deadregs: in the candidate, the registers and flags its port claims dead at
+// the return from the routines in mlib.DEAD_AFTER are scrambled there, so a
+// read of any of them diverges.
 //
 // --seed boot (the default): at TT170, every byte of the compared state that the
 // candidate has not written since its entry point S% (by its own code or by
@@ -60,7 +63,7 @@ import { writeFileSync, mkdirSync } from "fs";
 import { makeTracer } from "./mtrace.mjs";
 import { parseArgs } from "./args.mjs";
 
-const args = parseArgs({ iters: "value", ref: "value", rsyms: "value", cand: "value", csyms: "value", seed: "value", loose: "flag", window: "value",
+const args = parseArgs({ iters: "value", ref: "value", rsyms: "value", cand: "value", csyms: "value", seed: "value", loose: "flag", deadregs: "flag", window: "value",
     out: "value", shots: "value", maxsecs: "value", nopatch: "flag", norefcache: "flag", views: "flag", trace: "value", screen: "flag", crater: "flag",
     refpatch: "value", candpatch: "value" });
 for (const [d, s] of [["ref", "rsyms"], ["cand", "csyms"]])       // (a disc with another build's symbols hooks the wrong addresses)
@@ -90,11 +93,12 @@ async function run(label, disc, sy, seed, seedBoot, refPatch) {
     const tracer = args.trace ? makeTracer(args.trace, sy, traceOut) : null;
     const t0 = Date.now();
     const r = await runElite({
-        disc, syms: sy, pilot, refPatch, iters: ITERS, maxSecs: +(args.maxsecs || 4 * ITERS),
+        disc, syms: sy, pilot, refPatch, deadRegs: !!args.deadregs && label === "cand", iters: ITERS, maxSecs: +(args.maxsecs || 4 * ITERS),
         patch: args.nopatch ? null : args.crater ? (o => { patchCommander(o); o.wr(o.sy.tek, [o.rb(o.sy.tek) | 2]); }) : patchCommander, seed, seedBoot, screen: !!args.screen,
         onIter: (i, s, res) => { phases.push(pilot.P.phase); if (tracer) tracer(i, s, res); },
         shots: SHOTS, onShot: async (s, i) => writeFileSync(`${OUT}/${label}-${String(i).padStart(6, "0")}.png`, await s.screenshotActive({ scale: 1 })),
     });
+    if (Object.keys(r.deadN || {}).length) console.log(`${label}: registers scrambled after ${Object.entries(r.deadN).map(([n, c]) => n + " " + c).join(", ")}`);
     r.phases = phases; r.stats = pilot.P.stats; r.wall = (Date.now() - t0) / 1000;
     if (tracer) writeFileSync(`${OUT}/trace-${label}.txt`, traceOut.join("\n") + "\n");
     console.log(`${label}: ${r.iters} iterations (${r.tt100} in flight), emulated ${r.emuSecs.toFixed(1)} s, wall ${r.wall.toFixed(1)} s${r.error ? ", STOPPED: " + r.error : ""}`);

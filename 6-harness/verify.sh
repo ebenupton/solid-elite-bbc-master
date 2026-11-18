@@ -15,7 +15,9 @@
 #     (5-compiled-game-discs/elite-master-sng47.ssd, with its own symbols),
 #     both flown by the same pilot; FAIL on a divergence of game state, a run
 #     that stops early, or a write to page &0D. MODE (below) says how strict
-#     the comparison is.
+#     the comparison is. Once the build claims registers dead at the return
+#     from some routines (6-harness/mlib.mjs DEAD_AFTER), the build runs with
+#     --deadregs: those registers and flags are scrambled there.
 #  3. regressions, with real key presses: dock, launch, dock again
 #     (mredock.mjs); save, load, a failed load and a catalogue through the
 #     game's disc menu (msavetest.mjs, once the build has DOSCLI, its disc
@@ -82,6 +84,7 @@ fi
 OPTS=
 case "$MODE" in *strict*) ;; *) OPTS="--loose" ;; esac
 case "$MODE" in *screen*) OPTS="$OPTS --screen" ;; esac
+grep -q "'cpdot'" "$CSYMS" && OPTS="$OPTS --deadregs"
 node 6-harness/mcompare.mjs --iters "$ITERS" $OPTS --cand "$CAND" --csyms "$CSYMS" \
     --out "$LOG/compare" "$@" > "$LOG/compare.log" 2>&1
 CST=$?

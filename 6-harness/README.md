@@ -129,6 +129,12 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
   `ADC #0` and `SBC K2` is `SBC #0` (two sites in SNG47, each found once in
   `MV40` at `TT170`): the planets' and suns' y rounds without the stray
   carry, at most one unit in y_lo.
+* **Dead registers.** Some port routines return with registers or flags
+  other than the original's and claim them dead there (`DIALS`, `SUN`,
+  `PLANET`, `PTCLS`, `BOMBOFF`, `PIXEL2`, `WPLS`: `DEAD_AFTER` in
+  `mlib.mjs`). With `--deadregs` (the gate's compare and views runs, and
+  `msunslot.mjs` in every scene) those registers and flags are scrambled at
+  each return in the build, so a read of any of them shows as a divergence.
 * **Boot leftovers.** At `TT170`, any byte of the compared state that the
   new build has not yet written is seeded from the reference (`--seed
   boot`). Such a byte was left by the loader, not by the game.

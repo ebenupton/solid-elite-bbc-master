@@ -45,6 +45,11 @@
 //             and the E.C.M.; the galactic hyperdrive; each followed by the
 //             pilot's own flying
 //
+// In every scene the build runs with mlib's deadRegs: the registers and flags
+// the port claims dead after DIALS, SUN, PLANET, PTCLS, BOMBOFF, PIXEL2 and WPLS
+// (DEAD_AFTER) are scrambled at each return, so the comparison fails if any is
+// read (the events scene, through RES2's paths, must reach DIALS)
+//
 // node 6-harness/msunslot.mjs [--scene zone,full,handback,events] [--iters N]
 //      [--cand disc --csyms syms] [--out dir]
 // Prints per scene the routines' entry counts in each machine, the checks'
@@ -264,7 +269,7 @@ async function fly(scene, who, disc, sy, ref, seedBoot) {
     const dks = c => (misjump >= iter && c.key === 0x01 && c.site === "ee5") || (ghyp >= iter && c.key === 0x01 && c.site !== "ee5") ? true
         : pilot.dks ? pilot.dks(c) : false;
     const r = await runElite({ disc, syms: sy, pilot: { keys, dks, observe: pilot.observe, P }, iters: ITERS[scene] * (+(a.iters || 1)), maxSecs: 6 * ITERS[scene],
-        patch: patchCommander, refPatch: ref ? RP : null, onIter, seedBoot });
+        patch: patchCommander, refPatch: ref ? RP : null, deadRegs: !ref, onIter, seedBoot });
     if (strays.length) fail.push(`${who}: the patch's memory written by other code: ${strays.join(", ")}`);
     return { r, fail, count, sunPos, arrivals: Object.keys(arrivals).length };
 }
@@ -316,8 +321,10 @@ for (const scene of SCENES) {
     if (scene === "full" && !(R.count.DOEXP > 0)) fails.push("no explosion cloud (DOEXP): the clouds' seed is not exercised");
     if (scene === "events") for (const n of ["ESCAPEParked", "MJPParked", "DEATHParked", "TITLE", "TT18Parked", "DOENTRY", "GhyParked", "BOMBONParked", "ECBLB2Parked"])
         if (!R.count[n]) fails.push(`no ${n}`);
+    if (scene === "events" && !(C.r.deadN && C.r.deadN.DIALS > 0)) fails.push("no return from DIALS with its dead registers scrambled");
     if (scene === "zone" && !(R.count.launchChecked > 0)) fails.push("no launch from a system the scene arrived at (SUNLAU against SOLAR)");
     console.log(`${scene}: ${R.r.iters} iterations, ${((Date.now() - t0) / 1000).toFixed(0)} s; ref ${JSON.stringify(R.count)}; cand ${JSON.stringify(C.count)}; arrivals ${R.arrivals}`);
+    console.log(`  registers scrambled in the build after (mlib DEAD_AFTER): ${Object.entries(C.r.deadN || {}).map(([n, c]) => n + " " + c).join(", ")}`);
     if (scene === "handback") console.log(`  the sun on the screen (iteration, slot 1, x, y, r, on): ${C.sunPos.map(p => p.join(",")).join(" ")}`);
     for (const f of fails.slice(0, 20)) console.log(`  FAIL ${f}`);
     if (fails.length) ok = false;

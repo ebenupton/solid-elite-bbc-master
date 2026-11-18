@@ -319,6 +319,21 @@ function xTrace(s, file, disc) {
 // Returns { snaps (per iteration, regions concatenated), iterTimes, tt100Times
 //   ([emulated s, iteration] per TT100), init (snapshot at TT170), initRand, keyLog,
 //   events, iters, tt100, emuSecs, error }
+// The routines whose port leaves some registers or flags other than the
+// original leaves them, claiming them dead at the return (to the caller of
+// the JSR that entered them; a routine entered by a tail call returns to its
+// caller's caller): runElite's deadRegs scrambles them there in the build
+//   DIALS    A, X, C: cpdot, for an unmoved dot, sets only what DOT leaves for
+//            the dot (and the port's DOT leaves its own A, X and C)
+//   SUN      A, X, Y: the port's SUN ends after part 1 (C clear, as part 4)
+//   PLANET   A, Z: PL40 (CNT > TGT as CNT - 1 >= TGT)
+//   PTCLS    A, X, Y, C: the cloud is drawn in the frame (H_PTCLS, F_CLOUD)
+//   BOMBOFF  A, X: H_BOMB, H_LLINE draw nothing in record mode
+//   PIXEL2   A, N, Z: H_STAROFF (every caller reaches a DEY first)
+//   WPLS     A, X, C: the port's WPLS only empties the sun's heap
+export const DEAD_AFTER = [["DIALS", "axc"], ["SUN", "axy"], ["PLANET", "az"], ["PTCLS", "axyc"],
+    ["BOMBOFF", "ax"], ["PIXEL2", "anz"], ["WPLS", "axc"]];
+
 export async function runElite(opts) {
     const sy = opts.syms;
     const s = await bootMaster(opts.disc);
@@ -419,7 +434,35 @@ export async function runElite(opts) {
         cpu.x = rb(sy.KL);
     }
 
+    // opts.deadRegs (the candidate only): at the return from each routine in
+    // DEAD_AFTER, the registers and flags the port claims dead there are
+    // scrambled, so a read of any of them shows as a divergence
+    const DEAD = opts.deadRegs ? DEAD_AFTER.filter(([n]) => sy[n] !== undefined).map(([n, regs]) => ({ h: hook(n), regs, n })) : [];
+    const deadPend = [];
+    let deadSeed = 0x2545F491;
+    res.deadN = {};
+    const deadRnd = () => { deadSeed ^= deadSeed << 13; deadSeed ^= deadSeed >>> 17; deadSeed ^= deadSeed << 5; return deadSeed >>> 0; };
     const handler = pc => {
+        if (DEAD.length) {
+            for (let j = deadPend.length - 1; j >= 0; j--) {
+                const d = deadPend[j];
+                if (pc === d.ret && cpu.s === d.s) {
+                    for (const r of d.regs) {
+                        const v = deadRnd();
+                        if (r === "a" || r === "x" || r === "y") cpu[r] = v & 255;
+                        else cpu.p[r] = !!(v & 256);
+                    }
+                    res.deadN[d.n] = (res.deadN[d.n] || 0) + 1;
+                    deadPend.splice(j);
+                    break;
+                }
+            }
+            for (const d of DEAD) if (at(d.h, pc)) {
+                const ret = (stackWord(1) + 1) & 0xffff;
+                deadPend.push({ ret, s: (cpu.s + 2) & 255, regs: d.regs, n: d.n });
+                if (deadPend.length > 64) deadPend.shift();
+            }
+        }
         if (at(H_RDK, pc) && started) {
             const c = callerAt(2);
             const callSite = c.site;
