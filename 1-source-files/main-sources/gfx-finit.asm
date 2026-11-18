@@ -44,14 +44,6 @@
  STA F_NLINE
  STA F_NDOT
  STA F_PLON
- IF _PLANET_MOON        \ (no moon, no ring: gfx-planetv.asm is not loaded)
- STA MN_ON
- STA MO_ON              \ (and no moon drawn in either buffer)
- STA MO_ON+1
- ENDIF
- IF _PLANET_RINGS
- STA RG_N
- ENDIF
  LDX #NDSTAR-1          \ no stars recorded, no direct-mode stars noted
 .fin1
  STA R_SS,X

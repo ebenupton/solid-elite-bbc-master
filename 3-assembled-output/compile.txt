@@ -16925,7 +16925,7 @@ S.ELTH &B179  &B79F  &1F13  &B179
      BE80
 .R4_END%
 .BANK4_END%
-Bank 4: hot pass &8000-&B79E , hot data &B79F -&B79E , S_SUN, L_SUN (and MOONHIT) &B79F -&BE81  free 382 
+Bank 4: hot pass &8000-&B79E , hot data &B79F -&B79E , S_SUN, L_SUN &B79F -&BE81  free 382 
 Saving file '3-assembled-output/BANK4.bin'
 .COLD_START%
 .SETINTS_C

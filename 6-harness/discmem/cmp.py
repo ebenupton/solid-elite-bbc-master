@@ -64,7 +64,7 @@ for d in sorted(glob.glob(os.path.join(A, 'pl-*'))) + [os.path.join(A, n) for n 
         keys = ['discs', 'disc2', 'frame']
         get = lambda f, k: f.get(k, 0)
     else:
-        keys = [k for k in ['T_DISCROWS', 'T_CAPS', 'f_moon', 'T_MCAPS', 'F_FRAME'] if k in ja[0]['cyc']]
+        keys = [k for k in ['T_DISCROWS', 'T_CAPS', 'F_FRAME'] if k in ja[0]['cyc']]
         get = lambda f, k: f['cyc'].get(k, 0)
     # frames by their key (k, or the iteration), both sides, every routine
     # timed on both (a hook the emulator skipped leaves one out: not compared)

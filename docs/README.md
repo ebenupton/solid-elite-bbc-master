@@ -50,10 +50,7 @@ Master Elite (the Acornsoft SNG47 release), in six parts:
    as the MOS set them, and BREAK now clears memory, so SHIFT-BREAK boots
    the game again.
 6. **Planets** ([renderer.md](renderer.md)). One circle engine draws every
-   planet's surface: the beach ball, true spherical craters, and banded
-   planets, rings and moons behind the `bands=on`, `rings=on` and `moon=on`
-   build options (with moons, a quarter of the systems have one, fixed in
-   space and solid); the sun is drawn near the planet while the station has its slot; every disc is
+   planet's surface: the beach ball and true spherical craters; the sun is drawn near the planet while the station has its slot; every disc is
    drawn incrementally; and stars go only into wholly black screen bytes.
    The disc layer packs each row's boundary count and colour into a byte
    and writes a changed row as strips between its old and new boundaries
@@ -77,9 +74,6 @@ line, and sets out a plan to bring it back.
 
     make                        (BeebAsm 1.11 and Python 3, as upstream)
     make verify                 (the gate: Node.js, jsbeeb and py65, see 6-harness)
-    make bands=on               (banded planets, an option: renderer.md)
-    make rings=on               (planet rings, an option: renderer.md)
-    make moon=on                (moons, an option: renderer.md)
 
 `make` writes the disc to `5-compiled-game-discs/elite-master-sng47.ssd`,
 copies it to `solid-elite-bbc-master.ssd` in the repository's root (the

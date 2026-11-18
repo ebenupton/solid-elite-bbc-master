@@ -1,4 +1,4 @@
-// Planet scenes: the planet's surface detail (caps, bands, moon, rings) posed
+// Planet scenes: the planet's surface detail (the beach ball, craters) posed
 // on the screen. Flies the gate's pilot to iteration FROM, then holds the keys
 // off and, each iteration from FROM, puts the planet (slot 0) at a screen
 // position and radius (--x --y --r, or a path --x0 --y0 --x1 --y1 --r0 --r1
@@ -10,8 +10,8 @@
 // it (with --pose free: the gate's own frames, measured). At each frame's
 // end (F_FRAME's ff_stars9, after the stars, bank 6) the back buffer is dumped, with the
 // frame's cycles in the planet's routines: G_PFHOOK (the game-context hook),
-// T_CAPS (the detail's rows), T_DISCROWS (the disc layer), f_moon, T_MCAPS
-// and f_ring when the build has them, and the whole F_FRAME.
+// T_CAPS (the detail's rows), T_DISCROWS (the disc layer) and the whole
+// F_FRAME.
 //
 // node 6-harness/mplanet.mjs [--tree T] --out D [--from 300] [--n 20] ...
 //      [--hidesun] [--seedfile 6-harness/work/verify/compare/seeded.json]
@@ -76,7 +76,7 @@ const seed = a.seedfile ? JSON.parse(readFileSync(a.seedfile, "utf8")) : null;
 // the routines whose cycles are counted: entry address (and bank, for the
 // banked ones), until the stack pointer is back above its entry value
 // (MPWATCH=name,name...: more routines, for a profile of the disc layer)
-const WATCH = ["PL9", "f_bounds", "G_PFHOOK", "T_CAPS", "T_DISCROWS", "T_MOON", "T_RING", "f_moon", "f_ring", "T_MCAPS", "F_FRAME", "G_MERHOOK", "T_MERID",
+const WATCH = ["PL9", "f_bounds", "G_PFHOOK", "T_CAPS", "T_DISCROWS", "F_FRAME", "G_MERHOOK", "T_MERID",
     ...(process.env.MPWATCH ? process.env.MPWATCH.split(",") : [])].filter(n => sy[n] !== undefined);
 const res = await runElite({ disc: `${TREE}/5-compiled-game-discs/elite-master-sng47.ssd`, syms: sy, pilot, iters: FROM + N + 2, patch: patchCommander, seed,
     onIter: (i, s, r) => {

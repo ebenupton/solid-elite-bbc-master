@@ -45,16 +45,14 @@
 \
 \ ******************************************************************************
 
- CODE% = &1F13 - (&2B AND _PLANET_MOON)
+ CODE% = &1F13
                         \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
                         \ starts here and the low pass follows it, and the low
                         \ byte is chosen so that the font, at its place in the
                         \ low pass, starts a page with no padding: the build prints
-                        \ the padding, FONTPAD%; with the moon, make moon=on, the
-                        \ glue area is &2B bytes longer, so it starts that
-                        \ much lower)
+                        \ the padding, FONTPAD%)
 
  LOAD% = CODE%          \ The address where the code will be loaded
 
@@ -11244,15 +11242,6 @@ ENDIF
  BNE MA23S              \ the following, as there are no planets or suns to
                         \ bump into in witchspace
 
- IF _PLANET_MOON
-
-  JSR MOONHIT           \ Port: the moon (the planet's scenery, gfx-planet7.asm,
-  BCS MA28              \ in a moon=on build) is solid: if we have flown into
-                        \ it, jump to MA28 to crash as into the planet
-                        \ (elite-moon.asm: in the systems with a moon, on this
-                        \ iteration of 32)
-
- ENDIF
 
  LDA MCNT               \ Fetch the main loop counter and calculate MCNT mod 32,
  AND #31                \ which tells us the position of this loop in each block

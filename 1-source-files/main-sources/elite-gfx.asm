@@ -124,9 +124,6 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
                             \ %01100000 as TIDY's (L_REC, f_winding)
 .GSPLV      SKIP 4          \ part 5's XX2 for the splinter's faces (SPLV)
 .GSHT       SKIP 4          \ SHAND's workspace
-INCLUDE "1-source-files/main-sources/gfx-planetv.asm"   \ the moon's and the ring's, with moon=on and
-                            \ rings=on (bank 7 writes them in game context, the
-                            \ frame layer reads them)
 .F_SUX      SKIP 2          \ the sun's centre this frame (F_PLANET from SUN, or
 .F_SUY      SKIP 2          \ S_SUN: gfx-ssun.asm), with GSUNR and GSUNON
 .FL_BEH     SKIP 1          \ bit 7: the sun is behind the planet (f_flt, for
@@ -135,13 +132,6 @@ INCLUDE "1-source-files/main-sources/gfx-planetv.asm"   \ the moon's and the rin
                             \ (F_DIRECT clears it while we are docked)
 .ss_d       SKIP 9          \ S_SUN's D = sun - planet (x, y, z: lo, hi, top, two's
                             \ complement), then, as ss_turn (MV40) turns both alike,
-IF _PLANET_MOON             \ (the moon: make moon=on)
-.MN_E       SKIP 9          \ the moon's place, E = moon - planet, the same way, in
-                            \ the coordinates (MN_TURN, gfx-ssun.asm; pf_moon
-                            \ and MOONHIT read it)
-.MN_OK      SKIP 1          \ bit 7: MN_E is this system's (F_DIRECT clears it
-                            \ while we are docked)
-ENDIF
 .WS_GAP                    \ (free to the main code)
 SKIP CODE% - P%
 .WS_END
@@ -168,8 +158,7 @@ INCLUDE "1-source-files/main-sources/gfx-raster_reset.asm"   \ R_RESETBUF
 ASSERT B5_GAP <= R_S2L0       \ (the second disc's spans' left ends follow it)
 ASSERT R_S2L1 + 192 <= r_tables AND R_S2R1 + 192 <= &C000 AND R_S2L0 + 192 <= R_S2L1
 ASSERT LO(R_S2L0) = LO(R_S2L1) AND LO(R_S2R0) = LO(R_S2R1) AND LO(R_S2L0) <= &40 AND LO(R_S2R0) <= &40
-ORG R_S2L0 + 192        \ between the second disc's left ends: the moon's
-INCLUDE "1-source-files/main-sources/gfx-raster_wspan.asm"   \ R_WSPAN (make moon=on)
+ORG R_S2L0 + 192        \ between the second disc's left ends (free)
 .B5_GAP2
 ASSERT B5_GAP2 <= R_S2L1
 ORG &8000
@@ -225,9 +214,7 @@ F_SZH = F_RP + 7 * MAXSH
 .f_tcol SKIP 1          \ (f_char1's column)
 .F_HW   SKIP 256        \ planet half-widths (the disc rows read F_HW,X: a
 .F_HW2  SKIP 256        \ sun half-widths      low byte near 0 crosses no page;
-IF _PLANET_MOON         \                      the data above sets it)
-.F_HW3  SKIP 64         \ moon half-widths (moon=on)
-ENDIF
+                        \                      the data above sets it)
 .f_zsv  SKIP &22 + 16   \ F_FRAME's keep of &06-&27 and FZ's &D2-&E1
 F_SRN = MAXSH * 15      \ (the most faces is 15)
 .F_SR                   \ the ships' faces' levels (F_SHIP)

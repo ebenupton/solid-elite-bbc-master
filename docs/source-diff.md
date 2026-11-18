@@ -67,10 +67,9 @@ Lines removed or changed in the original, and lines added:
 | Allowed: Area: tags                              |               - |   256 |
 | Allowed: Port: notes                             |               - |   620 |
 | Allowed: hooks (inserted calls, minimal glue)    |               - |    34 |
-| Allowed: IF/ENDIF (the moon, make moon=on)      |               - |     2 |
 | Allowed: comment reworded, statement unchanged   |             533 |   228 |
 | Allowed: blank lines outside edits               |               7 |    35 |
-| **Allowed, total**                               |         **540** | **1,175** |
+| **Allowed, total**                               |         **540** | **1,173** |
 | Real: statements removed or changed / added      |           1,717 |  1,772 |
 | Real: redirected calls                           |              26 |    26 |
 | Real: IF/ELIF/ENDIF removed (_COMPACT branches)  |              26 |     - |
@@ -113,7 +112,7 @@ included. Routines with fewer than about 15 lines are grouped.
 
 **1 Memory map and build** (68, 48)
 
-* (configuration) 50, 4: CODE% &1300 to &1F13 (less &2B with the moon), LOAD% = CODE%. The
+* (configuration) 50, 4: CODE% &1300 to &1F13, LOAD% = CODE%. The
   data addresses (XX21, E%, KWL%, KWH%, QQ18, SNE, ACT, TKN1, and RUPLA, RUGAL and
   RUTOK with their _COMPACT branch) are deleted, as elite-data.asm is assembled in
   the same pass; commbuf moved; HOMEBANK and COLDBANK added.

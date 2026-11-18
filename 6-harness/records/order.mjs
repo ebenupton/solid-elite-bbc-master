@@ -1,7 +1,7 @@
 // order.mjs: does every frame draw each ship it recorded exactly once? And of
 // the ships handed to f_ship, how many it projects (fpj0, past FC_MINVIS's
 // test) and how many it draws (fsh_nf0, past f_behind's: not hidden behind the
-// planet or the moon). Flies
+// planet). Flies
 // the gate's pilot (as mcompare, the boot leftovers seeded from the
 // reference) for --iters iterations and, per frame, compares the ships
 // f_ships hands to f_ship (its A) with 0 .. F_NSHIP - 1.

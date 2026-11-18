@@ -46,11 +46,7 @@ planets)
     pl caps200 --type 130 --qq2 $LEESTI --x 128 --y 96 --r 200 --pose 0,60,20 --spin 5 --n 16
     pl capspath --type 130 --qq2 $LEESTI --x0 200 --y0 40 --x1 100 --y1 120 --r0 30 --r1 120 --pose 0,60,20 --spin 5 --n 24
     pl beachtop --type 128 --x0 128 --y0 -60 --x1 140 --y1 20 --r0 120 --r1 125 --pose 20,30,0 --spin 5 --n 16     # (its centre above the screen)
-    pl beachleft --type 128 --x0 8 --y0 100 --x1 40 --y1 90 --r0 100 --r1 110 --pose 20,30,0 --spin 5 --n 16      # (by the window's left side)
-    pl moon1 --type 128 --qq2 76,70,EB,94,0B,D5 --x 93 --y 97 --r 33 --pose 59,28,24 --spin 2 --n 16
-    pl moon2 --type 130 --qq2 DA,1C,F6,BA,66,D3 --x 110 --y 90 --r 31 --pose 40,76,2 --spin 11 --n 16
-    pl moon3 --type 130 --qq2 38,AD,9C,15,1D,A9 --x 70 --y 100 --r 30 --pose 0,150,30 --n 16
-    pl moonpath --type 128 --qq2 76,70,EB,94,0B,D5 --x0 60 --y0 80 --x1 160 --y1 110 --r0 20 --r1 60 --pose 59,28,24 --spin 2 --n 24 ;;
+    pl beachleft --type 128 --x0 8 --y0 100 --x1 40 --y1 90 --r0 100 --r1 110 --pose 20,30,0 --spin 5 --n 16 ;;    # (by the window's left side)
 sunnear)
     sn() {
         n=$1; shift

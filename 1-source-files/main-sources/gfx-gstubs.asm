@@ -135,10 +135,7 @@
  JSR F_BOMB
  JMP gback
 
-.G_PFHOOK               \ (the planet's detail, gfx-planet7.asm, after the
- IF _PLANET_MOON        \ moon's place for this iteration with moon=on,
- JSR MN_TURN            \ gfx-ssun.asm, in bank 4: H_CIRC keeps nothing in
- ENDIF                  \ A, X, Y or the flags)
+.G_PFHOOK               \ (the planet's detail, gfx-planet7.asm)
  LDA #MERIDBANK
  STA &F4
  STA &FE30

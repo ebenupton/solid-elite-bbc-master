@@ -25,8 +25,7 @@ reads):
     colours LT_FIX that the ships' polygon details use, and the hangar's
     wall and floor (HPWL/HPWH);
   * the colours loaded as immediates (the discs: FC_PLANE/O, FC_SUNE/O,
-    colour B's land pair; the second disc), the moon's (mn_ce/mn_co, in a
-    build with moons, make moon=on), the
+    colour B's land pair; the second disc), the
     distant-dot colours (FC_DOTE/O) and F_CPE/F_CPO's fixed colours;
 and requires every row byte of each to be non-zero, except the pure black
 fills it names, each with how stars are kept off it:
@@ -90,7 +89,6 @@ WRITERS = {
     ('gfx-frame.asm', 'EOR fc_row+2'): 'ramp', ('gfx-frame.asm', 'EOR fc_row+3'): 'ramp',
     ('gfx-frame.asm', 'LDA FC_DOTE,Y'): 'dot', ('gfx-frame.asm', 'LDA FC_DOTO,Y'): 'dot',
     ('gfx-hangar.asm', 'LDA #FC_BLACK'): 'fixed',           # (f_setcol's A, black)
-    ('gfx-frame.asm', 'LDA mn_ce,X'): 'moon', ('gfx-frame.asm', 'LDA mn_co,X'): 'moon',  # f_moon
     ('gfx-raster_disc.asm', 'LDY R_DBE'): 'swap', ('gfx-raster_disc.asm', 'LDY R_DBO'): 'swap',  # A <-> B
 }
 wpat = re.compile(r'^\s*(?:\.\S+\s+)?ST[AXYZ]\s+(%s)\b' % COLS)
@@ -221,13 +219,6 @@ de, do = b6('FC_DOTE', NT + 1), b6('FC_DOTO', NT + 1)
 for t in range(1, NT + 1):
     rows_ok('type %d distant dot' % t, [de[t], do[t]])
 print('distant dots: %d types' % NT)
-if 'mn_ce' in SY:                                       # (a build with moons, make moon=on)
-    mce, mco = b6('mn_ce', 2), b6('mn_co', 2)
-    for i in range(2):
-        rows_ok('moon colour %d' % i, [mce[i], mco[i]])
-    print('the moon: light grey &%02X/&%02X, dark grey &%02X/&%02X' % (mce[0], mco[0], mce[1], mco[1]))
-else:
-    print('the moon: none (make moon=on builds it)')
 NCP = SY['FC_STAR'] + 1
 cpe = b6('F_CPE', NCP)
 for i in range(NCP):
