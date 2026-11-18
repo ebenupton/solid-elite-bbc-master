@@ -896,3 +896,36 @@ is on screen, which is about half the gate's run, as the pilot starts at
 Lave. Flight with no beach ball on screen runs as fast as before. The big planet and the space station close up are the slowest
 views, as their discs and faces cover most of the screen; the kept solid
 rows speed up the station's last seconds.
+
+### Frozen scenes
+
+The gate's speed figure is its piloted run's, and that run is the game's
+own: when a change alters the game's random numbers (as the reference's
+patches do, the sun's edge first), the pilot flies a different run, and the
+figure no longer compares with one measured before. So the speed is also
+quoted from frozen scenes, `6-harness/mbench.mjs`: the build is booted and
+launched, each scene's state is put in (the planet, slot 1's sun or
+station, the parked sun, the ships, the view, our speed and rotation), and
+after 8 iterations the game state is snapshotted. It then runs 128
+iterations in windows of 32: the snapshot goes back at each window's start,
+so the scene starts the same in any build and moves for 32 iterations;
+within a window, at every `MLOOP`, `RAND` is put back and every slot after
+the scene's ships emptied, so no ship spawns and no random number taken
+differently changes what follows. The figure is the emulated cycles from
+one `MLOOP` to the next. The scenes: flight (three ships ahead, the planet
+far off), combat (five ships close, turning), beachball (the planet's beach
+ball filling the view), sun (a radius 32 sun beside a radius 60 planet),
+docking (the station ahead at 1500), zone (the safe zone, the sun parked
+behind us) and rear (the beach ball in the rear view).
+
+| Scene | After the CPC findings (37e61f7) | The sun's parking (c7b8519) | The sun's edge (a1b7a72) |
+|---|---:|---:|---:|
+| Flight | 175,589 | 175,472 | 173,759 |
+| Combat | 104,982 | 104,945 | 103,637 |
+| Beach ball | 189,112 | 190,871 | 190,622 |
+| Sun | 203,384 | 203,290 | 146,546 |
+| Docking | 346,017 | 337,000 | 335,179 |
+| Zone | 314,781 | 302,995 | 300,973 |
+| Rear | 189,406 | 189,199 | 189,992 |
+
+(Cycles a frozen iteration; iterations a second = 2,000,000 / cycles.)
