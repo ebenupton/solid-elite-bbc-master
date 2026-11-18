@@ -45,7 +45,7 @@
 \
 \ ******************************************************************************
 
- CODE% = &1F13
+ CODE% = &1F08
                         \ The address where the code will be run (Port: the
                         \ renderer's shared workspace is below it, elite-gfx.asm,
                         \ docs/memory-map.md; the glue area, elite-glue.asm,
@@ -2970,6 +2970,11 @@ ENDIF
 
  JSR H_VSYNC            \ Port: the renderer's flip: show the front buffer
                         \ (ACCCON D; gfx-hooks.asm)
+
+ LDA SOFLG              \ Port: if no channel has a sound buffered (all three
+ ORA SOFLG+1            \ SOFLG bytes zero, most of the time), SOINT would only
+ ORA SOFLG+2            \ test them, so skip the call (A and the flags are put
+ BEQ P%+7               \ back by the PLA and RTI below, X and Y are untouched)
 
  PHX                    \ Call SOINT to send the current sound data to the
  JSR SOINT              \ 76489 sound chip, stashing X on the stack so it gets

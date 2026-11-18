@@ -84,3 +84,15 @@ products and the planet's curves, where the logs of fixed arguments are
 patched in once. Then come divisions that take their common case first
 (DVID4, DVID3B2), the unrolled copies of the ship blocks, and the keyboard
 scan, which tests 13 columns instead of 112 keys.
+
+## The CPC port's findings
+
+The Amstrad CPC port of Solid Elite, written from this one, sent back the
+ideas it had found for the BBC. Those that paid were made on the filled
+port one per commit, each measured with `6-harness/profile.mjs` on its
+commit and its parent: the cycles per flight iteration of the gate's run,
+the bytes, and the rate (cycles saved per byte spent).
+
+| Change | Cycles per iteration | Bytes | Rate |
+|---|---:|---:|---:|
+| LINSCN calls SOINT only when a channel has a sound | -127 | +11 (low pass: CODE% 11 lower, the shared workspace's gap) | 11.5 |
