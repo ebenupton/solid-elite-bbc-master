@@ -181,7 +181,7 @@ hangar are recorded for the frame layer instead of being drawn.
   record-mode test is patched into PIX1, H_STAR and H_STAROFF once per pass. FLIP,
   nWq, STARS2 and STARS6 call pxpat or pxpatd (nWq adds a NOP to keep its size).
 * CHPR 9, 12, TTX66 4, 13, CLYNS 4, 6, HLOIN 6, 12 and PIXEL 6, 12: hooks (H_CHAR,
-  H_DEL, G_DIRECT, H_CLYNS, H_HLOIN, H_DOT) together with the TSB/TRB edits.
+  H_DEL, G_DIRECT, H_CLYNS, H_DOT) together with the TSB/TRB edits.
   `JSR TTX66` becomes TTX66M in CHPR and cls, as TTX66 is now in bank 4.
 * Small edits: DOEXP 3, 3 (PTCLS becomes H_PTCLSE, and a branch to an RTS in the
   other pass), SIGHT 3, 7 (H_SIGHT, and its own RTS in place of LO2), BOMBOFF
@@ -254,6 +254,12 @@ written into these blocks (189 added lines), and the H_MERID hook in PL9 part 2
 therefore assemble nothing. PLS22 can go back to the original text now, and PLL4F and
 pl4pat can come out of the file. The binary changes only by the two stub RTSs those
 blocks emit.
+
+The sun's edge: SUN's parts 2 to 4, HLOIN2, EDGES and the orange table are `Area: none`
+(the rows, which took the only random numbers, are gone: the reference's patch takes
+SUN's JSR DORND out too); SUN's part 1 loses its fringe size and its set-up for the rows
+(ending with K2, SUNX and an RTS), HLOIN its own entry, and WPLS and FLFLLS their line
+heap work, each with a `Port:` note.
 
 ## Step 0: trivial fixes (done)
 

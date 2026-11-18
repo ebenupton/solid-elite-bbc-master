@@ -670,6 +670,23 @@ flare and its probes are as for a sun in slot 1. `L_SUN` seeds the light
 from `SUNPK` while the sun is parked, so the light follows the real sun
 throughout.
 
+**The sun's edge.** The original's `SUN` draws the sun as horizontal lines,
+one a row, each row's half-width the circle's plus a random fringe
+(`DORND` ANDed with `CNT`), and keeps the half-widths in the sun line heap
+(`LSO`) to erase them. The renderer fills the sun as a disc from the record
+`H_SUN` makes, and the sun's edge takes no random numbers, in the game and in
+the comparison's reference alike (the reference's patch turns `SUN`'s one
+`JSR DORND` into `LDA #0 : NOP`). With no random numbers taken, all the rows
+left in the game's state is what `SUN`'s part 1 computes before them (`TGT`,
+`LSX`, `COL`, and `K2`, which `MV40` reads) and what part 4 ends with (`SUNX`
+and the C flag clear). So the port's `SUN` is part 1, then `K2`, `SUNX` and
+an `RTS`; parts 2 to 4, `HLOIN2`, `EDGES` and the orange table are `Area:
+none`, and the fringe size, `PLF3` and `PLF17`, `HLOIN`'s own entry and the
+renderer's `H_HLOIN` went with them. `WPLS` and `FLFLLS` keep only `LSX`.
+A visible sun no longer costs its rows: `msunnear.mjs`'s posed scene (a
+radius 16 sun beside a planet of radius 120) runs at 6.53 it/s against
+5.96.
+
 **Two discs.** `PLANET` gives the sun and the planet the same radius at the
 same z, so the bigger disc is the nearer. `f_discs` makes the bigger one
 the disc layer, and `f_disc2` draws the smaller one only where the layer's

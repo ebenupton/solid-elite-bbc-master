@@ -107,6 +107,14 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
   SNG47's memory only at its code and its sites, and that its passive
   variant (part 14 and `TT110` calling `WPLS` and `NWSPS`) leaves SNG47's
   game state identical over the gate's run and the views run.
+* **The sun's edge.** The original's `SUN` takes a random number for each
+  row of the sun it draws (its fringe). The port draws no rows, and the
+  sun's edge takes no random numbers in either machine: the reference's
+  patch turns `SUN`'s one `JSR DORND` into `LDA #0 : NOP` (found once in
+  `SUN` at `TT170`). `msunref.mjs` proves it changes nothing but the random
+  numbers: with the site alone and `randAt`, at which the harness advances
+  `RAND` exactly as the replaced `DORND` would, SNG47 against SNG47 with it
+  is identical over the gate's run and the views run.
 * **Boot leftovers.** At `TT170`, any byte of the compared state that the
   new build has not yet written is seeded from the reference (`--seed
   boot`). Such a byte was left by the loader, not by the game.
@@ -144,7 +152,7 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
 | `discmem/mdprof.mjs`, `discmem/pagex.py` | The disc layer profiled over windows of a replayed session: each routine's cycles on and at the top of the call stack, its calls, and each call of the strip encoders (`r_dpe`, `r_dq`): what it was given (no old span, the same count and colour, one more or fewer boundary, the colour flipped, the old count unknown), how it ended and its cycles before its first write, in the pixels and in the repaints. `pagex.py` lists a listing's branches whose taken path crosses a page (by default the disc window's). |
 | `msunprof.mjs` | Profiles a stretch of the gate's run frame by frame: the game's `SUN` (slot 1's sun or the parked one), the disc layer, the second disc, the lens flare and the whole frame. |
 | `msunslot.mjs` | The sun's parking in scenes the gate's run never reaches, in the gate: the patched reference and the build compared at every `MLOOP` in four scenes (`zone`: the safe zone left and entered again and again, with fights, docking, launches and jumps; `full`: the sun parked below every other slot filled; `handback`: flying at the sun as the station goes; `events`: the escape pod, a mis-jump, a crash into the station, a jump, the energy bomb, the E.C.M. and the galactic hyperdrive from the zone with the sun parked), with checks on both machines that `SUNPF` is `&80` whenever the station is present in flight, that `MVEIT` moves the sun exactly once an iteration with a sun, and that only the patch writes its code. |
-| `msunref.mjs` | The reference's patch, in the gate: its bytes (SNG47's main RAM before and after it is written differs only at its code and its sites) and its passive variant (SNG47 against SNG47 with it, game state identical over the gate's run and the views run). |
+| `msunref.mjs` | The reference's patch, in the gate: its bytes (SNG47's main RAM before and after it is written differs only at its code and its sites), its passive variant (SNG47 against SNG47 with it, game state identical over the gate's run and the views run), and the sun's edge alone with `randAt` (likewise identical). |
 | `mstarocc.mjs` | Stars behind fills: puts a grid of stars over a scene (the planet's sea, dark ship faces, a station's docking slot, the sun beside the planet) and screenshots it, to see that none shows through a fill, as `2-build-files/starocc.py` proves. |
 | `mplanetshot.mjs` | Planet stills for the README: poses a planet (and optionally its sun) as `mplanet.mjs` does and saves the screen, optionally cropped; its header gives the arguments of each README image. |
 | `mfbcmp.mjs` | The renderer's regression check: hashes both screen buffers at the end of every K-th iteration's frame over the gate's run, or with `--frames` at every frame the frame layer finishes (keyed iteration.n), for comparing two builds whose game state is identical, which must draw the same pixels; `--cmp` compares two runs, and `--dump N` writes an iteration's buffers. `--mask row,col0,col1` adds to each frame's hash one with those text cells blanked, so that `--cmp` fails only on frames that differ outside them. |

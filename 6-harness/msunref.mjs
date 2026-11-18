@@ -1,11 +1,12 @@
 // The proofs that the reference's patch (2-build-files/sunref/sunref.py:
-// 3-assembled-output/sunref.json, the sun's parking assembled for the released SNG47)
+// 3-assembled-output/sunref.json, the sun's parking assembled for the released SNG47, and
+// the sun's edge drawing no random numbers)
 // changes the original only as it should (docs/renderer.md, "The sun's
 // parking"):
 //
 //   1. the bytes: SNG47 booted to TT170, its main RAM (&0000-&7FFF) before and
 //      after the patch is written; every byte that differs must be in the
-//      patch's code (&0B80-, SNG47's unused &0B00-&0CFF) or at one of its
+//      patch's code (&0B9D-, SNG47's unused &0B9D-&0CFF) or at one of its
 //      sites, and each site's bytes before must be the patch's orig
 //      (applyRefPatch checks them, and finds the unlabelled ones);
 //   2. the passive variant (3-assembled-output/sunref-passive.json: part 14 and TT110 call
@@ -14,7 +15,12 @@
 //      iterations and over the views run (1500, --views), game state
 //      identical, and the parked sun's region unchanged throughout. So
 //      SUNSC, SUNBK's test, the moved station heap and the anchors change
-//      nothing unless a sun is parked.
+//      nothing unless a sun is parked;
+//   3. the sun's edge (3-assembled-output/sunref-edge.json: SUN's JSR DORND as LDA #0 :
+//      NOP alone, with the harness advancing RAND there as the DORND would):
+//      SNG47 against SNG47 with it, game state identical over the gate's run
+//      and the views run, so the edge patch changes nothing but the random
+//      numbers it no longer takes (the fringe it leaves is the line heap's).
 //
 // node 6-harness/msunref.mjs [--csyms 3-assembled-output/symbols.txt] [--out dir] [--skip passive]
 // Prints each proof's result and "SUNREF PASS" or "SUNREF FAIL"; exit status 0 only on PASS.
@@ -27,7 +33,8 @@ const a = parseArgs({ csyms: "value", out: "value", skip: "value" });
 const CSYMS = a.csyms || `${ROOT}3-assembled-output/symbols.txt`;
 const OUT = a.out || `${ROOT}6-harness/work/sunref`; mkdirSync(OUT, { recursive: true });
 const REF = `${ROOT}4-reference-binaries/sng47/elite-master-sng47.ssd`, RSYMS = `${ROOT}4-reference-binaries/sng47/symbols.txt`;
-const P = loadRefPatch(CSYMS.replace(/[^/]*$/, "sunref.json")), PP = CSYMS.replace(/[^/]*$/, "sunref-passive.json");
+const P = loadRefPatch(CSYMS.replace(/[^/]*$/, "sunref.json")), PP = CSYMS.replace(/[^/]*$/, "sunref-passive.json"),
+    PE = CSYMS.replace(/[^/]*$/, "sunref-edge.json");
 let ok = true;
 
 // ---- 1. the bytes
@@ -59,12 +66,14 @@ let ok = true;
     else console.log("bytes: PASS");
 }
 
-// ---- 2. the passive variant
-if (a.skip !== "passive") for (const [name, extra] of [["passive", ["--iters", "10000"]], ["passive-views", ["--iters", "1500", "--views", "--maxsecs", "400"]]]) {
+// ---- 2 and 3. the passive variant, and the sun's edge
+const runs = [["passive", PP, ["--iters", "10000"]], ["passive-views", PP, ["--iters", "1500", "--views", "--maxsecs", "400"]],
+    ["edge", PE, ["--iters", "10000"]], ["edge-views", PE, ["--iters", "1500", "--views", "--maxsecs", "400"]]];
+if (a.skip !== "passive") for (const [name, patch, extra] of runs) {
     const r = spawnSync(process.execPath, [`${ROOT}6-harness/mcompare.mjs`, ...extra, "--loose", "--ref", REF, "--rsyms", RSYMS, "--cand", REF, "--csyms", RSYMS,
-        "--refpatch", "none", "--candpatch", PP, "--out", `${OUT}/${name}`], { encoding: "utf8", maxBuffer: 1 << 28 });
+        "--refpatch", "none", "--candpatch", patch, "--out", `${OUT}/${name}`], { encoding: "utf8", maxBuffer: 1 << 28 });
     const out = (r.stdout || "") + (r.stderr || "");
-    const pass = r.status === 0 && /^MCOMPARE PASS/m.test(out) && /unchanged at every iteration/.test(out);
+    const pass = r.status === 0 && /^MCOMPARE PASS/m.test(out) && (name.startsWith("edge") || /unchanged at every iteration/.test(out));
     const line = l => (out.match(new RegExp(`^${l}.*$`, "m")) || [""])[0];
     console.log(`${name}: ${line("Game state identical") || line("FIRST DIVERGENCE") || line("MCOMPARE")}; ${line("region SUNPK").trim()}`);
     if (!pass) { console.log(out.split("\n").filter(l => /FIRST DIVERGENCE|^  \S|MCOMPARE|Error/.test(l)).slice(0, 20).join("\n")); ok = false; }

@@ -171,7 +171,9 @@ export function canonFor(sy, regions, refPatch = null) {
 // the new ones; or, for a site with no label, search: a routine's extent, in
 // which the original's bytes are found exactly once), all in main RAM; lso:
 // the station's line heap, if the patch moves it; region: [address, length,
-// name], more of the patched original's game state (regionsFor). A build's
+// name], more of the patched original's game state (regionsFor); randAt: a
+// site's name, at which runElite advances RAND as the call the site replaced
+// would (a proof's variant only). A build's
 // patch is for the reference it is compared against: the original, patched
 // so that it runs the same game logic (docs/renderer.md).
 //   refPatchPath(syms): the patch beside a build's symbols, or null
@@ -381,6 +383,11 @@ export async function runElite(opts) {
 
     // The half spin's patch (see the handler; its hooks: findHalfSpin, at TT170)
     let H_P8 = null, H_MV5 = null, p8vec = null;
+    // A patch's randAt (a proof: 2-build-files/sunref's sunref-edge.json): at
+    // that site RAND is advanced as the DORND call the patch replaced would
+    // advance it (DORND's sums, with the C flag the call would have had), so
+    // that the patch's only other effect, the value it leaves, is all that differs
+    let H_RAND = null;
     const res = { snaps: [], screens: [], iterTimes: [], tt100Times: [], tt100AtIter: [], init: null, keyLog: [], events: [], s, cpu, sy, regions };
     let started = false, done = false, armPatch = false, iter = 0, tt100 = 0, checked = false;
     const ctxBase = { rb, rd, sy, iterOf: () => iter, tt100Of: () => tt100 };
@@ -452,6 +459,11 @@ export async function runElite(opts) {
         } else if (p8vec && at(H_MV5, pc)) {
             for (let i = 0; i < 18; i++) cpu.ramRomOs[sy.INWK + 9 + i] = p8vec[i];
             p8vec = null;
+        } else if (H_RAND !== null && pc === H_RAND) {
+            const R = sy.RAND, f1 = rb(R), c = cpu.p.c ? 1 : 0;
+            const f2 = ((f1 << 1) | c) & 255, f3 = f2 + rb(R + 2) + (f1 >> 7);
+            const m1 = rb(R + 1), m2 = m1 + rb(R + 3) + (f3 >> 8);
+            wr(R, [f3 & 255, m2 & 255, f2, m1]);
         } else if (at(H_MLOOP, pc) && started) {
             res.snaps.push(snapshot());
             if (opts.screen) res.screens.push(screenHash());
@@ -485,6 +497,7 @@ export async function runElite(opts) {
             const hs = findHalfSpin(sy, cpu);
             if (hs) { H_P8 = hs.p8; H_MV5 = hs.mv5; }
             if (opts.refPatch) applyRefPatch(cpu.ramRomOs, opts.refPatch);
+            if (opts.refPatch && opts.refPatch.randAt) H_RAND = opts.refPatch.sites.find(st => st.name === opts.refPatch.randAt).addr;
             if (opts.seed) for (const [a, bytes] of opts.seed) wr(a, bytes);
             if (opts.seedBoot) { res.seeded = opts.seedBoot(regions, written, rb); for (const [a, bytes] of res.seeded) wr(a, bytes); }
             bootWrites.remove();

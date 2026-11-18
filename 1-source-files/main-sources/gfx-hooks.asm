@@ -327,8 +327,7 @@
  RTS
 
 \ H_SUN: SUN has found the sun on screen (CHKON): record its centre and
-\ radius (the frame fills a disc; SUN's fringe calculation carries on as
-\ before, for its random numbers and the LSO heap). Keeps X, Y and C
+\ radius (the frame fills a disc; SUN draws no rows). Keeps X, Y and C
 
 .H_SUN
  LDA QQ11
@@ -338,18 +337,6 @@
  JSR G_PLANET
  PLP
 .hsu9
- RTS
-
-\ H_HLOIN: HLOIN (the sun's rows, through HLOIN2 too) draws nothing in
-\ record mode: return from it at once (X and Y kept, as HLOIN keeps Y)
-
-.H_HLOIN
- LDA QQ11
- ORA GFORCE
- BEQ P%+3
- RTS
- PLA
- PLA
  RTS
 
 \ The energy bomb's lightning: BOMBOFF draws nine lines with LOIN (EOR), and

@@ -3,12 +3,18 @@
 harness writes at TT170 so that the original runs the same game logic as
 this build: the sun parked while the space station holds its slot (SUNUP,
 SUNSC, SUNBK, SUNLAU in src/elite-source.asm; docs/renderer.md, "The
-sun's parking"). Run by the Makefile; writes
+sun's parking"), and the sun's edge drawing no random numbers (SUN's JSR
+DORND as LDA #0 : NOP, the fringe 0: "The sun's edge"). Run by the Makefile
+from master/; writes
 
   3-assembled-output/sunref.json          the patch (6-harness/mlib.mjs's loadRefPatch, which
                              mcompare.mjs and agentplay give the reference
                              when it is beside the candidate's symbols)
   3-assembled-output/sunref-passive.json  its passive variant (below)
+  3-assembled-output/sunref-edge.json     the sun's edge's site alone, with randAt (the
+                             harness advances RAND there as the DORND would:
+                             6-harness/msunref.mjs's proof that it changes
+                             nothing else)
   3-assembled-output/sunref-symbols.txt   the patch's labels at their SNG47 addresses
                              (beebasm -d), for the harness's hooks
   3-assembled-output/sunref-syms.asm      the bindings sunref.asm assembles with
@@ -151,6 +157,14 @@ def lo_hi(a):
     return [a & 255, a >> 8]
 
 
+def edge(ref):
+    """the sun's edge draws no random numbers: SUN's one JSR DORND (part 3,
+    each row's fringe, ANDed with CNT and added to the row's half-width)
+    becomes LDA #0 : NOP, so the fringe is 0 and RAND is not touched"""
+    return {"name": "SUN: JSR DORND", "addr": None, "orig": [0x20] + lo_hi(ref["DORND"]), "new": [0xA9, 0x00, 0xEA],
+            "search": [ref["SUN"], ref["CIRCLE"]]}
+
+
 def patch(ref, sr, code, passive):
     def site(name, addr, orig, new):
         return {"name": name, "addr": addr, "orig": orig, "new": new}
@@ -174,7 +188,9 @@ def patch(ref, sr, code, passive):
     # has SNG47's symbols, not its code)
     for s_, rng in zip(sites[4:], (("TT110", "NLUNCH"), ("NWSPS", "NWSHP"), ("NWSPS", "NWSHP"))):
         s_["search"] = [ref[rng[0]], ref[rng[1]]]
-    return {"name": "the sun's parking" + (" (passive)" if passive else ""),
+    if not passive:
+        sites.append(edge(ref))
+    return {"name": "the sun's parking" + (" (passive)" if passive else ", the sun's edge"),
             "code": [[sr["SR_START"], list(code)]], "sites": sites, "lso": sr["SR_HEAP"],
             "region": [sr["SUNPK"], sr["SR_END"] - sr["SUNPK"], "SUNPK"],
             "hooks": {n: sr[n] for n in ("A_SUNUP", "A_SUNBK", "A_SUNSC", "A_SUNLAU", "A_SUNS1") if n in sr}}
@@ -228,6 +244,12 @@ def main():
         ok = audit(p, sr) and ok
         with open(name, "w") as f:
             json.dump(p, f)
+    # the sun's edge alone, with the harness advancing RAND at the site as the
+    # DORND it replaces would (randAt): the proof that the patch changes nothing
+    # but the random numbers' use (6-harness/msunref.mjs)
+    with open("3-assembled-output/sunref-edge.json", "w") as f:
+        json.dump({"name": "the sun's edge (RAND kept)", "code": [], "sites": [edge(ref)], "lso": None, "region": None,
+                   "randAt": "SUN: JSR DORND"}, f)
     with open("3-assembled-output/sunref-symbols.txt", "w") as f:
         f.write(dump)
     if not ok:

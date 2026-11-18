@@ -5985,17 +5985,10 @@ ENDIF
 
 .HLOIN
 
- JSR H_HLOIN            \ Port: in record mode the renderer fills the sun, so
-                        \ return at once (gfx-hooks.asm)
-
- LDA Y1                 \ Set A = Y1, the pixel y-coordinate of the line
-
- AND #3                 \ Set A to the correct order of red/yellow pixels to
- TAX                    \ make this line an orange colour (by using bits 0-1 of
- LDA orange,X           \ the pixel y-coordinate as the index into the orange
-                        \ lookup table)
-
- STA COL                \ Store the correct orange colour in COL
+ \ Port: HLOIN's own entry, which set COL to the sun's orange from Y1
+                        \ (through the orange table) for the sun's rows, is gone
+                        \ with them (the frame fills the sun from its record:
+                        \ SUN); HLOIN3 is still used
 
 .HLOIN3
 
@@ -6319,7 +6312,7 @@ ENDIF
 \       Type: Variable
 \   Category: Drawing pixels
 \    Summary: Lookup table for two-pixel mode 1 orange pixels for the sun
-\       Area: hot, ACCCON X
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -13657,6 +13650,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Remove a line from the sun line heap and draw it on-screen
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -32075,24 +32069,16 @@ ENDIF
 
 .FLFLLS
 
- LDY #2*Y-1+8           \ #Y is the y-coordinate of the centre of the space
-                        \ view, so this sets Y as a counter for the number of
-                        \ lines in the space view (i.e. 191) - which is also the
-                        \ number of lines in the LSO block - plus an extra 8
-                        \ bytes
+                        \ Port: the original zero-fills the LSO block here
+                        \ (LSO+1 to LSO+199: the sun's rows, which are gone,
+                        \ SUN, and the space station's line heap, which the
+                        \ frame does not read), then sets LSX to &FF; all that
+                        \ leaves in the game's state is LSX, with A = 0 and
+                        \ Y = &FF as the original returns them
 
- LDA #0                 \ Set A to 0 so we can zero-fill the LSO block
+ LDA #0                 \ Return with A = 0, as the original's fill leaves it
 
-.SAL6
-
- STA LSO,Y              \ Set the Y-th byte of the LSO block to 0
-
- DEY                    \ Decrement the counter
-
- BNE SAL6               \ Loop back until we have filled all the way to LSO+1
-
- DEY                    \ Decrement Y to value of &FF (as we exit the above loop
-                        \ with Y = 0)
+ LDY #&FF               \ Set Y to &FF, as the original's loop ends with it
 
  STY LSX                \ Set the first byte of the LSO block, which has its own
                         \ label LSX, to &FF, to indicate that the sun line heap
@@ -34408,33 +34394,9 @@ ENDIF
                         \ only get here via the BCS just after the SUN entry
                         \ point below, when there is no new sun to draw
 
-.PLF3
-
-                        \ This is called from below to negate X and set A to
-                        \ &FF, for when the new sun's centre is off the bottom
-                        \ of the screen (so we don't need to draw its bottom
-                        \ half)
-                        \
-                        \ This happens when the y-coordinate of the centre of
-                        \ the sun is bigger than the y-coordinate of the bottom
-                        \ of the space view
-
- TXA                    \ Negate X using two's complement, so X = ~X + 1
- EOR #%11111111
- CLC
- ADC #1
- TAX
-
-.PLF17
-
-                        \ This is called from below to set A to &FF, for when
-                        \ the new sun's centre is right on the bottom of the
-                        \ screen (so we don't need to draw its bottom half)
-
- LDA #&FF               \ Set A = &FF
-
- BNE PLF5               \ Jump to PLF5 (this BNE is effectively a JMP as A is
-                        \ never zero)
+                        \ Port: PLF3 and PLF17, which set V and V+1 for a sun
+                        \ whose centre is off or on the bottom of the screen, are
+                        \ gone with part 1's set-up for the rows (below)
 
 .SUN
 
@@ -34456,36 +34418,8 @@ ENDIF
                         \ screen, returning from the subroutine using a tail
                         \ call
 
- LDA #0                 \ Set A = 0
-
- LDX K                  \ Set X = K = radius of the new sun
-
- CPX #96                \ If X >= 96, set the C flag and rotate it into bit 0
- ROL A                  \ of A, otherwise rotate a 0 into bit 0
-
- CPX #40                \ If X >= 40, set the C flag and rotate it into bit 0
- ROL A                  \ of A, otherwise rotate a 0 into bit 0
-
- CPX #16                \ If X >= 16, set the C flag and rotate it into bit 0
- ROL A                  \ of A, otherwise rotate a 0 into bit 0
-
-                        \ By now, A contains the following:
-                        \
-                        \   * If radius is 96-255 then A = %111 = 7
-                        \
-                        \   * If radius is 40-95  then A = %11  = 3
-                        \
-                        \   * If radius is 16-39  then A = %1   = 1
-                        \
-                        \   * If radius is 0-15   then A = %0   = 0
-                        \
-                        \ The value of A determines the size of the new sun's
-                        \ ragged fringes - the bigger the sun, the bigger the
-                        \ fringes
-
-.PLF18
-
- STA CNT                \ Store the fringe size in CNT
+                        \ Port: the fringe size in CNT, from the radius (0, 1,
+                        \ 3 or 7), is gone with the rows (below)
 
                         \ We now calculate the highest pixel y-coordinate of the
                         \ new sun, given that P(2 1) contains the 16-bit maximum
@@ -34515,62 +34449,36 @@ ENDIF
  STA TGT                \ Set TGT to A, the maximum y-coordinate of the sun on
                         \ screen
 
-                        \ We now calculate the number of lines we need to draw
-                        \ and the direction in which we need to draw them, both
-                        \ from the centre of the new sun
+                        \ Port: the rest of SUN (here the rows' count and
+                        \ direction, V and V+1, and K2 = K^2; then parts 2 to 4:
+                        \ the old sun's rows erased, each new row's half-width
+                        \ from LL5 and its random fringe from DORND, its ends
+                        \ from EDGES, the line drawn by HLOIN and kept in the
+                        \ sun line heap at LSO) drew the sun as lines. The frame
+                        \ fills the sun from the record H_SUN makes, and the
+                        \ sun's edge draws no random numbers (in the reference
+                        \ too, the comparison's patch to SUN), so all the rows
+                        \ left in the game's state was what part 4 ends with:
+                        \ SUNX = K3, and the C flag clear, and K2 = K^2, which
+                        \ part 1 sets for the rows and MV40 reads (its step 3
+                        \ takes K2's low byte without setting it). Parts 2 to
+                        \ 4 are Area: none
 
- LDA Yx2M1              \ Set (A X) = y-coordinate of bottom of screen - K4(1 0)
- SEC                    \
- SBC K4                 \ Starting with the low bytes
- TAX
-
- LDA #0                 \ And then doing the high bytes, so (A X) now contains
- SBC K4+1               \ the number of lines between the centre of the sun and
-                        \ the bottom of the screen. If it is positive then the
-                        \ centre of the sun is above the bottom of the screen,
-                        \ if it is negative then the centre of the sun is below
-                        \ the bottom of the screen
-
- BMI PLF3               \ If A < 0, then this means the new sun's centre is off
-                        \ the bottom of the screen, so jump up to PLF3 to negate
-                        \ the height in X (so it becomes positive), set A to &FF
-                        \ and jump down to PLF5
-
- BNE PLF4               \ If A > 0, then the new sun's centre is at least a full
-                        \ screen above the bottom of the space view, so jump
-                        \ down to PLF4 to set X = radius and A = 0
-
- INX                    \ Set the flags depending on the value of X
- DEX
-
- BEQ PLF17              \ If X = 0 (we already know A = 0 by this point) then
-                        \ jump up to PLF17 to set A to &FF before jumping down
-                        \ to PLF5
-
- CPX K                  \ If X < the radius in K, jump down to PLF5, so if
- BCC PLF5               \ X >= the radius in K, we set X = radius and A = 0
-
-.PLF4
-
- LDX K                  \ Set X to the radius
-
- LDA #0                 \ Set A = 0
-
-.PLF5
-
- STX V                  \ Store the height in V
-
- STA V+1                \ Store the direction in V+1
-
- LDA K                  \ Set (A P) = K * K
+ LDA K                  \ Set K2(1 0) = K * K, as part 1 does for the rows
  JSR SQUA2
-
- STA K2+1               \ Set K2(1 0) = (A P) = K * K
+ STA K2+1
  LDA P
  STA K2
 
-                        \ By the time we get here, the variables should be set
-                        \ up as shown in the header for part 3 below
+ CLC                    \ Clear the C flag to indicate success in drawing the
+                        \ sun
+
+ LDA K3                 \ Set SUNX(1 0) = K3(1 0)
+ STA SUNX
+ LDA K3+1
+ STA SUNX+1
+
+ RTS                    \ Return from the subroutine
 
 \ ******************************************************************************
 \
@@ -34580,6 +34488,7 @@ ENDIF
 \    Summary: Draw the sun: Start from the bottom of the screen and erase the
 \             old sun line by line
 \  Deep dive: Drawing the sun
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34630,6 +34539,7 @@ ENDIF
 \    Summary: Draw the sun: Continue to move up the screen, drawing the new sun
 \             line by line
 \  Deep dive: Drawing the sun
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -34886,6 +34796,7 @@ ENDIF
 \    Summary: Draw the sun: Continue to the top of the screen, erasing the old
 \             sun line by line
 \  Deep dive: Drawing the sun
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
@@ -35273,35 +35184,14 @@ ENDIF
  LDA LSX                \ If LSX < 0, the sun line heap is empty, so return from
  BMI WPLS-1             \ the subroutine (as WPLS-1 contains an RTS)
 
- LDA SUNX               \ Set YY(1 0) = SUNX(1 0), the x-coordinate of the
- STA YY                 \ vertical centre axis of the sun that's currently on
- LDA SUNX+1             \ screen
- STA YY+1
+                        \ Port: the original redraws the sun's rows from the
+                        \ sun line heap at LSO here, to remove them (HLOIN2, for
+                        \ each row from 2 * #Y - 1 up); the frame draws the sun
+                        \ from its record, so the rows are gone (SUN), and all
+                        \ the erasing left in the game's state is LSX = &FF and
+                        \ Y = &FF
 
- LDY #2*Y-1             \ #Y is the y-coordinate of the centre of the space
-                        \ view, so this sets Y as a counter for the number of
-                        \ lines in the space view (i.e. 191), which is also the
-                        \ number of lines in the LSO block
-
-.WPL2
-
- LDA LSO,Y              \ Fetch the Y-th point from the sun line heap, which
-                        \ gives us the half-width of the sun's line on this line
-                        \ of the screen
-
- BEQ P%+5               \ If A = 0, skip the following call to HLOIN2 as there
-                        \ is no sun line on this line of the screen
-
- JSR HLOIN2             \ Call HLOIN2 to draw a horizontal line on pixel line Y,
-                        \ with centre point YY(1 0) and half-width A, and remove
-                        \ the line from the sun line heap once done
-
- DEY                    \ Decrement the loop counter
-
- BNE WPL2               \ Loop back for the next line in the line heap until
-                        \ we have gone through the entire heap
-
- DEY                    \ This sets Y to &FF, as we end the loop with Y = 0
+ LDY #&FF               \ Set Y to &FF, as the original's loop ends with it
 
  STY LSX                \ Set LSX to &FF to indicate the sun line heap is empty
 
@@ -35313,6 +35203,7 @@ ENDIF
 \       Type: Subroutine
 \   Category: Drawing lines
 \    Summary: Draw a horizontal line given a centre and a half-width
+\       Area: none
 \
 \ ------------------------------------------------------------------------------
 \
