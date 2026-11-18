@@ -3524,10 +3524,12 @@ FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
 \ moves only the heaps of the slots above the one it removes, not yet
 \ processed in the iteration, and NWSHP takes room below the heaps. Then
 \ both passes do what the game keeps of PTCLS (2-build-files/records/live.mjs:
-\ nothing else it leaves is read): the random numbers, which depend only on
-\ the last vertex's seeds and the particle count, as PTCLS calls DORND2 three
-\ times a particle and keeps RAND+1, and RAND+3 = the planet's z_lo; and
-\ Q, U, TGT, CNT and CNT2 as it leaves them
+\ nothing else it leaves is read): of the random numbers, only RAND+3 = the
+\ planet's z_lo, as PTCLS takes none that last (it keeps RAND+1 itself, and
+\ RAND and RAND+2, which its DORND2s step three times a particle, are put
+\ back as it found them: the explosion clouds' seed, in the comparison's
+\ reference too, MASTER-PLAN.md); and Q, U, TGT, CNT and CNT2 as it leaves
+\ them
 
 .F_CLOUD
  BCC fcd1
@@ -3566,32 +3568,12 @@ FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
  BCC fcd2
 .fcd3
  STA CNT
- LDY #3                 \ its seeds RAND and RAND+2 (the bytes after them
- LDA (XX19),Y           \ feed DORND2's RAND+1 and RAND+3, which PTCLS
- EOR CNT                \ puts back as it found them, and as K%+6)
- STA RAND
- LDY #5
- LDA (XX19),Y
- EOR CNT
- STA RAND+2
- LDA U                  \ X = 3 * (U + 1): DORND2's RAND and RAND+2
- ASL A
- SEC
- ADC U
- ADC #2
- TAX
-.fcd4
- LDA RAND
- ASL A
- TAY
- ADC RAND+2
- STA RAND
- STY RAND+2
- DEX
- BNE fcd4
- LDA K%+6               \ (main RAM below &3000: bankcheck: ok)
- STA RAND+3
- DEX                    \ CNT2 = &FF
+ LDA K%+6               \ RAND+3 = the planet's z_lo, as PTCLS leaves it (it
+ STA RAND+3             \ takes no random numbers that last: RAND and RAND+2
+                        \ are put back as it found them, the explosion clouds'
+                        \ seed, and RAND+1 it puts back itself) (main RAM below
+                        \ &3000: bankcheck: ok)
+ LDX #&FF               \ CNT2 = &FF
  STX CNT2
  RTS
 

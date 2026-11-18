@@ -173,7 +173,8 @@ export function canonFor(sy, regions, refPatch = null) {
 // the station's line heap, if the patch moves it; region: [address, length,
 // name], more of the patched original's game state (regionsFor); randAt: a
 // site's name, at which runElite advances RAND as the call the site replaced
-// would (a proof's variant only). A build's
+// would (a proof's variant only); keepRand: { at, bytes }, the bytes kept
+// across the routine at "at" (runElite's handler). A build's
 // patch is for the reference it is compared against: the original, patched
 // so that it runs the same game logic (docs/renderer.md).
 //   refPatchPath(syms): the patch beside a build's symbols, or null
@@ -388,6 +389,13 @@ export async function runElite(opts) {
     // advance it (DORND's sums, with the C flag the call would have had), so
     // that the patch's only other effect, the value it leaves, is all that differs
     let H_RAND = null;
+    // A patch's keepRand ({ at, bytes }: the explosion clouds' random seed):
+    // the bytes (RAND and RAND+2) as they are when the routine at "at" (PTCLS)
+    // is entered are put back when it returns (at its return address, read
+    // from the stack on entry: DOEXP falls into PTCLS, so it returns to
+    // LL9's caller), so the routine takes no random numbers that last
+    const KEEP = opts.refPatch && opts.refPatch.keepRand ? opts.refPatch.keepRand : null;
+    let keepPend = null;
     const res = { snaps: [], screens: [], iterTimes: [], tt100Times: [], tt100AtIter: [], init: null, keyLog: [], events: [], s, cpu, sy, regions };
     let started = false, done = false, armPatch = false, iter = 0, tt100 = 0, checked = false;
     const ctxBase = { rb, rd, sy, iterOf: () => iter, tt100Of: () => tt100 };
@@ -459,6 +467,11 @@ export async function runElite(opts) {
         } else if (p8vec && at(H_MV5, pc)) {
             for (let i = 0; i < 18; i++) cpu.ramRomOs[sy.INWK + 9 + i] = p8vec[i];
             p8vec = null;
+        } else if (KEEP && pc === KEEP.at && !keepPend) {
+            keepPend = { ret: stackWord(1) + 1, vals: KEEP.bytes.map(b => rb(b)) };
+        } else if (keepPend && pc === keepPend.ret) {
+            KEEP.bytes.forEach((b, i) => wr(b, [keepPend.vals[i]]));
+            keepPend = null;
         } else if (H_RAND !== null && pc === H_RAND) {
             const R = sy.RAND, f1 = rb(R), c = cpu.p.c ? 1 : 0;
             const f2 = ((f1 << 1) | c) & 255, f3 = f2 + rb(R + 2) + (f1 >> 7);

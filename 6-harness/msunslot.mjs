@@ -33,7 +33,8 @@
 //             (SUNUP), which the pilot then docks with (and launches: SUNLAU)
 //   full      the sun parked and every other slot filled (three asteroids and
 //             seven canisters, the heap just fitting), which the pilot shoots:
-//             the slots shuffle below the parked sun, and spawns fail
+//             the slots shuffle below the parked sun, spawns fail, and the
+//             explosion clouds are drawn (their seed: DOEXP, PTCLS)
 //   handback  flying at the sun as the station goes: the sun ahead in the
 //             front view, parked, then the station put far away; the sun's
 //             centre on the screen (the build's F_SUX, F_SUY: the frame's
@@ -77,7 +78,7 @@ function labels(sy, ref) {
     const G = n => { const nm = !ref && sy[n + "_C"] !== undefined ? n + "_C" : n, b = sy.__bank[nm];
         return { a: sy[nm], b: b === undefined || sy[nm] < 0x8000 || sy[nm] >= 0xc000 ? null : b & 15 }; };
     return { SUNUP: L("SUNUP"), SUNBK: L("SUNBK"), SUNSC: L("SUNSC"), SUNLAU: L("SUNLAU"), MVEIT: G("MVEIT"), NWSTARS: G("NWSTARS"), SOLAR: G("SOLAR"), TT100: G("TT100"), KILLSHP: G("KILLSHP"),
-        EV: ["DEATH", "DOENTRY", "ESCAPE", "TT18", "MJP", "TITLE", "Ghy", "BOMBON", "ECBLB2"].map(n => [n, G(n)]),
+        EV: ["DEATH", "DOENTRY", "ESCAPE", "TT18", "MJP", "TITLE", "Ghy", "BOMBON", "ECBLB2", "DOEXP"].map(n => [n, G(n)]),
         FEND: ref ? null : G("ff_stars9") };         // (the build's frame's end, after the stars: the frame's sun as recorded)
 }
 
@@ -247,7 +248,7 @@ async function fly(scene, who, disc, sy, ref, seedBoot) {
             // the energy bomb and the E.C.M. with the sun parked (MA24 and the slots'
             // effects skip negative types), then the galactic hyperdrive (CTRL held at
             // hyp's test, then H)
-            else if (k === 4) { ram[sy.BOMB] = 0x7f; ram[sy.ECM] = 0xff; scripted = { until: i + 8, keys: i % 2 ? [K.TAB] : [K.E], alt: [K.E] }; count.bombs = (count.bombs || 0) + 1; }
+            else if (k === 4) { ram[sy.BOMB] = 0x7f; ram[sy.ECM] = 0xff; scripted = { until: i + 8, keys: [K.TAB], alt: [K.E] }; count.bombs = (count.bombs || 0) + 1; }
             else { ram[sy.GHYP] = 0xff; ghyp = i + 6; scripted = { until: i + 4, keys: [K.H] }; count.ghyps = (count.ghyps || 0) + 1; }
         }
         lastSun = sunExists(); wasFlight = flying();
@@ -312,6 +313,7 @@ for (const scene of SCENES) {
         }
     }
     if (scene === "full" && !(R.count.killsParked > 0)) fails.push("no ship removed below the parked sun");
+    if (scene === "full" && !(R.count.DOEXP > 0)) fails.push("no explosion cloud (DOEXP): the clouds' seed is not exercised");
     if (scene === "events") for (const n of ["ESCAPEParked", "MJPParked", "DEATHParked", "TITLE", "TT18Parked", "DOENTRY", "GhyParked", "BOMBONParked", "ECBLB2Parked"])
         if (!R.count[n]) fails.push(`no ${n}`);
     if (scene === "zone" && !(R.count.launchChecked > 0)) fails.push("no launch from a system the scene arrived at (SUNLAU against SOLAR)");

@@ -36,6 +36,11 @@ A patch is:
           lines use, as the station and the parked sun are now both drawn);
           the harness maps it to LSO's address in the compared state
   region  [address, length, name]: the parked sun, compared as game state
+  keepRand  { at, bytes }: the explosion clouds' random seed: RAND and
+          RAND+2 as PTCLS finds them are put back when it returns (the
+          harness does it, at PTCLS's return address: SNG47 has no room
+          left for the code), so drawing a cloud takes no random numbers
+          (docs/renderer.md, "The explosion clouds' seed")
 
 Every name the routines use is bound to SNG47's address for it (its
 symbols, 4-reference-binaries/sng47/symbols.txt and symbols-data.txt), each A_X (a call or a
@@ -190,7 +195,8 @@ def patch(ref, sr, code, passive):
         s_["search"] = [ref[rng[0]], ref[rng[1]]]
     if not passive:
         sites.append(edge(ref))
-    return {"name": "the sun's parking" + (" (passive)" if passive else ", the sun's edge"),
+    keep = {} if passive else {"keepRand": {"at": ref["PTCLS"], "bytes": [ref["RAND"], ref["RAND"] + 2]}}
+    return {**keep, "name": "the sun's parking" + (" (passive)" if passive else ", the sun's edge, the clouds' seed"),
             "code": [[sr["SR_START"], list(code)]], "sites": sites, "lso": sr["SR_HEAP"],
             "region": [sr["SUNPK"], sr["SR_END"] - sr["SUNPK"], "SUNPK"],
             "hooks": {n: sr[n] for n in ("A_SUNUP", "A_SUNBK", "A_SUNSC", "A_SUNLAU", "A_SUNS1") if n in sr}}

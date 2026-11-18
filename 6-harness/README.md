@@ -115,6 +115,14 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
   numbers: with the site alone and `randAt`, at which the harness advances
   `RAND` exactly as the replaced `DORND` would, SNG47 against SNG47 with it
   is identical over the gate's run and the views run.
+* **The explosion clouds' seed.** The original's `PTCLS` seeds `RAND` and
+  `RAND+2` from a cloud's heap and steps them three times a particle, so
+  each cloud drawn decides the game's next random numbers. The port draws
+  clouds in its frame, and in both machines `RAND` and `RAND+2` are put back
+  as `PTCLS` found them when it returns (the patch's `keepRand`, a harness
+  hook, as SNG47 has no room left for the code: noted at `PTCLS`'s entry and
+  put back at its return address, read from the stack). The gate's run never
+  explodes a ship; `msunslot.mjs`'s full scene does.
 * **Boot leftovers.** At `TT170`, any byte of the compared state that the
   new build has not yet written is seeded from the reference (`--seed
   boot`). Such a byte was left by the loader, not by the game.

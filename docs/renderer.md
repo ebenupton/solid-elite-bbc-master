@@ -331,9 +331,11 @@ dropped some (247 of the gate's 5,533). A slot that no longer holds an
 exploding ship has nothing drawn, and the heap is not written between the
 record and the frame: `MA15` removes no ship whose cloud was drawn, `KILLSHP`
 moves only the heaps above the slot it removes, and `NWSHP` takes room
-below them. In record mode both of `DOEXP`'s passes do only what the game
-keeps of `PTCLS` (`F_CLOUD`): `DORND2` three times a particle, the seeds,
-`RAND+1` and `RAND+3`, `Q`, `U`, `TGT`, `CNT` and `CNT2`;
+below them. Drawing a cloud takes no random numbers that last: `RAND` and
+`RAND+2` are put back as `PTCLS` found them when it returns, in the game and
+in the comparison's reference alike (6-harness/README.md). So in record
+mode both of `DOEXP`'s passes do only what the game keeps of `PTCLS`
+(`F_CLOUD`): `RAND+3` (the planet's z_lo), `Q`, `U`, `TGT`, `CNT` and `CNT2`;
 `6-harness/records/live.mjs` (every byte `PTCLS` writes, watched to the
 game's next access over the gate's run) finds nothing else read. The dot
 list holds a distant ship's dot or a cloud, one per slot (`MAXDT =
@@ -918,14 +920,15 @@ ball filling the view), sun (a radius 32 sun beside a radius 60 planet),
 docking (the station ahead at 1500), zone (the safe zone, the sun parked
 behind us) and rear (the beach ball in the rear view).
 
-| Scene | After the CPC findings (37e61f7) | The sun's parking (c7b8519) | The sun's edge (a1b7a72) |
-|---|---:|---:|---:|
-| Flight | 175,589 | 175,472 | 173,759 |
-| Combat | 104,982 | 104,945 | 103,637 |
-| Beach ball | 189,112 | 190,871 | 190,622 |
-| Sun | 203,384 | 203,290 | 146,546 |
-| Docking | 346,017 | 337,000 | 335,179 |
-| Zone | 314,781 | 302,995 | 300,973 |
-| Rear | 189,406 | 189,199 | 189,992 |
+| Scene | After the CPC findings | The sun's parking | The sun's edge | The clouds' seed |
+|---|---:|---:|---:|---:|
+| Flight | 175,589 | 175,472 | 173,759 | 173,801 |
+| Combat | 104,982 | 104,945 | 103,637 | 103,589 |
+| Beach ball | 189,112 | 190,871 | 190,622 | 190,609 |
+| Sun | 203,384 | 203,290 | 146,546 | 146,419 |
+| Docking | 346,017 | 337,000 | 335,179 | 335,168 |
+| Zone | 314,781 | 302,995 | 300,973 | 301,022 |
+| Rear | 189,406 | 189,199 | 189,992 | 189,986 |
 
-(Cycles a frozen iteration; iterations a second = 2,000,000 / cycles.)
+(Cycles a frozen iteration; iterations a second = 2,000,000 / cycles.) No
+scene has an explosion, so the clouds' seed changes none of them.
