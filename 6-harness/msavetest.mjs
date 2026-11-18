@@ -21,7 +21,9 @@
 // than a few of its bytes may equal HAZEL's at the same offset; and that no
 // disc command changes ANDY (the rasteriser's polygon window: a CRC of
 // &8000-&8FFF at each OSCLI DOSCLI makes, against one when DOSNMI ends the
-// command, also on the error path). Screenshots
+// command, also on the error path), nor the parked sun (SUNPK and SUNPF, WP's
+// last bytes: filled with a pattern, CRC'd likewise), which the launch after
+// the loads then parks afresh (SUNLAU). Screenshots
 // of each step go to <out>. Exit status 0 on success.
 import { MachineSession } from "./jsbeeb.mjs";
 import { BBC } from "./jsbeeb.mjs";
@@ -44,9 +46,11 @@ const hm = Object.fromEntries(Object.keys(hits).map(k => [k, mapOfLabel(sy, k)])
 let brkX = 0;
 // ANDY (jsbeeb keeps it at &8000-&8FFF in its RAM array) around each disc command
 const crc = (lo, hi) => { let c = 0xffffffff; for (let a = lo; a < hi; a++) { c ^= cpu.ramRomOs[a]; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return (c ^ 0xffffffff) >>> 0; };
-let andyAt = null, andyChecks = 0, andyBad = 0;
+let andyAt = null, andyChecks = 0, andyBad = 0, pkAt = null, pkBad = 0;
+const PK = sy.SUNPK !== undefined ? [sy.SUNPK, sy.SUNPF + 1] : null;
 cpu.debugInstruction.add(pc => { for (const k in hits) if (pc === sy[k] && (hm[k] === "m" || mapAt(cpu.romsel, pc) === hm[k])) { hits[k]++; if (k === "NEWBRK" && (cpu.acccon & 4)) brkX++;
-    if (k === "DOSNMI_C" && andyAt !== null) { andyChecks++; if (crc(0x8000, 0x9000) !== andyAt) andyBad++; andyAt = null; } } return false; });
+    if (k === "DOSNMI_C" && andyAt !== null) { andyChecks++; if (crc(0x8000, 0x9000) !== andyAt) andyBad++; andyAt = null; }
+    if (k === "DOSNMI_C" && pkAt !== null) { if (crc(...PK) !== pkAt) pkBad++; pkAt = null; } } return false; });
 let shot = 0;
 const snap = async name => writeFileSync(`${OUT}/${String(shot++).padStart(2, "0")}-${name}.png`, await s.screenshotActive({ scale: 1 }));
 // keys by their place in the BBC keyboard matrix (jsbeeb's BBC table)
@@ -66,7 +70,10 @@ const junk = () => {
 cpu.debugInstruction.add(pc => {
     if (pc !== 0xfff7 || (cpu.romsel & 15) !== 7) return false;
     const site = (cpu.ramRomOs[0x100 + ((cpu.s + 1) & 0xff)] | cpu.ramRomOs[0x100 + ((cpu.s + 2) & 0xff)] << 8) - 2;
-    if (site >= sy.DOSCLI_C && site < sy.DOSNMI_C) { junk(); andyAt = crc(0x8000, 0x9000); }   // (DOSCLI's JSR OSCLI, not the loader's)
+    if (site >= sy.DOSCLI_C && site < sy.DOSNMI_C) {     // (DOSCLI's JSR OSCLI, not the loader's)
+        junk(); andyAt = crc(0x8000, 0x9000);
+        if (PK) { for (let a = PK[0]; a < PK[1]; a++) cpu.ramRomOs[a] = (a * 37) & 255; pkAt = crc(...PK); }
+    }
     return false; });
 // the game data from XX21 (the blueprints and their tables) as the build has
 // it, in HAZEL from &C000 (3-assembled-output/HZDATA.bin, next to the symbols)
@@ -120,6 +127,10 @@ await key("SPACE", 0.15, 2);
 await key("ESCAPE", 0.15, 2);              // ESCAPE out of the menu if needed
 await key("F0", 0.2, 12);             // f0: launch
 await snap("launched");
+// the launch after the loads: SUNLAU has parked this system's sun afresh,
+// whatever the pattern left in SUNPK and SUNPF (the save holds neither)
+const parkOk = !PK || (cpu.ramRomOs[sy.SSPR] && cpu.ramRomOs[sy.SUNPF] === 0x80 && cpu.ramRomOs[sy.SUNPK + 8] & 0x80);
+if (PK) console.log(`the sun after the launch: SSPR ${cpu.ramRomOs[sy.SSPR]}, SUNPF &${cpu.ramRomOs[sy.SUNPF].toString(16)}, z_sign &${cpu.ramRomOs[sy.SUNPK + 8].toString(16)} (${parkOk ? "parked afresh" : "NOT PARKED AFRESH"})`);
 await secs(4);
 await snap("flight");
 console.log("disc commands (DOSCLI):", hits.DOSCLI_C, " errors (NEWBRK):", hits.NEWBRK, brkX ? `(${brkX} with ACCCON X SET)` : "(ACCCON X clear)", " NMI handler reinstalls (DOSNMI):", hits.DOSNMI_C);
@@ -153,5 +164,6 @@ if (sy.LL9F !== undefined) {
     console.log(`space view after the disc commands: ${same} of HAZEL's ${nz} non-zero bytes in buffer 0 at the same offset (${viewOk ? "no stale stash" : "STALE STASH"})`);
 }
 console.log(`ANDY over the disc commands: ${andyChecks} checked, ${andyBad ? andyBad + " CHANGED" : "unchanged"}`);
+if (PK) console.log(`the parked sun (SUNPK, SUNPF) over the disc commands: ${pkBad ? pkBad + " CHANGED" : "unchanged"}`);
 console.log(saved ? "E.TESTA is on the disc" : "E.TESTA is NOT on the disc");
-process.exit(ok && saved && !bad && viewOk && junks >= 4 && hits.NEWBRK === 1 && !brkX && andyChecks >= 4 && !andyBad ? 0 : 1);
+process.exit(ok && saved && !bad && viewOk && junks >= 4 && hits.NEWBRK === 1 && !brkX && andyChecks >= 4 && !andyBad && !pkBad && parkOk ? 0 : 1);

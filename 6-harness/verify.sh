@@ -142,6 +142,16 @@ if [ -f 3-assembled-output/sunref.json ]; then
     grep -E "^(bytes|passive|passive-views):" "$LOG/sunref.log"
     grep -q "^SUNREF PASS" "$LOG/sunref.log" || { tail -20 "$LOG/sunref.log"; echo "sunref: FAIL"; fail sunref; }
     SAVE="$SAVE, sunref"
+    # the sun's parking where the gate's run never takes it: the safe zone
+    # left and entered again and again (with fights, docking and launches),
+    # every slot full below the parked sun, the hand-back while flying at the
+    # sun, and the escape pod, a crash, a jump and a mis-jump in the safe
+    # zone, against the patched reference, with the parking's checks on both
+    # machines
+    node 6-harness/msunslot.mjs --cand "$CAND" --csyms "$CSYMS" --out "$LOG/sunslot" > "$LOG/sunslot.log" 2>&1
+    grep -E "^[a-z]+: [0-9]+ iterations" "$LOG/sunslot.log" | cut -c1-160
+    grep -q "^SUNSLOT PASS" "$LOG/sunslot.log" || { grep FAIL "$LOG/sunslot.log" | head -10; echo "sunslot: FAIL"; fail sunslot; }
+    SAVE="$SAVE, sunslot"
 fi
 echo "regressions: PASS (redock, $SAVE)"
 
