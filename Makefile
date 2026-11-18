@@ -81,6 +81,11 @@ PYTHON?=python
 #     starocc.py proves that no star can show through a fill (R_STARPLOT's
 #     rule); the build fails if either fails
 #
+#   * 2-build-files/sunref/sunref.py writes the patch to the comparison's
+#     reference, 3-assembled-output/sunref.json, which the harness writes
+#     into SNG47 at TT170 (6-harness/README.md), and fails a patch that
+#     writes outside its free area and its sites
+#
 #   * then the loader, the README, the commander checksum and the disc
 
 ifeq ($(commander), max)
@@ -112,6 +117,7 @@ all:
 	$(BEEBASM) -i 1-source-files/main-sources/elite-layout.asm -d > 3-assembled-output/symbols.txt
 	$(PYTHON) 2-build-files/layout-info.py
 	$(PYTHON) 2-build-files/bankcheck.py
+	$(PYTHON) 2-build-files/sunref/sunref.py >> 3-assembled-output/compile.txt
 	$(PYTHON) 2-build-files/starocc.py 3-assembled-output
 	$(BEEBASM) -i 1-source-files/main-sources/elite-loader.asm -v >> 3-assembled-output/compile.txt
 	$(BEEBASM) -i 1-source-files/main-sources/elite-readme.asm -v >> 3-assembled-output/compile.txt

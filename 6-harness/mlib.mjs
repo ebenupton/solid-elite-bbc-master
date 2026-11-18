@@ -112,8 +112,8 @@ export function physRead(cpu, map, addr) {
 // Game state compared per iteration: [start, length, name]. All of these are at
 // fixed addresses in the original; a relocated build supplies its own symbols
 // and the regions are located by symbol (see regionsFor).
-export function regionsFor(sy) {
-    return [
+export function regionsFor(sy, refPatch = null) {
+    const r = [
         [0x0000, sy.NOSTM + 1 - 0x0000, "ZP"],                  // zero page game variables (&00-&E3)
         [sy["K%"], 0x0800 - sy["K%"], "K%"],                    // ship data blocks + ship line heap (down from &0800)
         [sy.WP, sy.JOPOS + 3 - sy.WP, "WP"],                    // FRIN, flight variables, sun/planet heaps, stardust, commander (NAME..SVC), JOPOS
@@ -122,6 +122,9 @@ export function regionsFor(sy) {
         [sy["NA%"], sy["NAEND%"] - sy["NA%"], "NA%"],           // last saved commander (template) and checksums
         [sy.SOFLG, sy.SFXPR - sy.SOFLG, "SOUND"],               // sound buffers (written by the IRQ)
     ];
+    // and a patched original's own (its patch's region: mlib's applyRefPatch)
+    if (refPatch && refPatch.region) r.push(refPatch.region);
+    return r;
 }
 
 // Pointers in the compared state to data that a relocated build moves, put
@@ -130,24 +133,80 @@ export function regionsFor(sy) {
 //  * the space station's ship line heap is LSO, in WP (NWSPS sets bytes
 //    #33-#34 of its ship data block to LSO's address), so INWK(34 33) and
 //    bytes #33-#34 of the K% slots may hold LSO's address: the original's
-//    (&107E) goes in its place;
+//    (&107E) goes in its place; a patched original (refPatch, below) may give
+//    the station a line heap of its own, whose address (refPatch.lso) is
+//    mapped to LSO_ORIG in the same way;
 //  * XX0 points at the current ship's blueprint: the blueprints keep the
 //    original's order from XX21 (&8000 in the original) to SNE, so a pointer
 //    into them is moved by the difference.
-// canonFor(sy, regions) returns the function that does it to a snapshot.
+// canonFor(sy, regions, refPatch) returns the function that does it to a snapshot.
 const LSO_ORIG = 0x107e, XX21_ORIG = 0x8000;
-export function canonFor(sy, regions) {
+export function canonFor(sy, regions, refPatch = null) {
     const offOf = a => { let o = 0; for (const [b, n] of regions) { if (a >= b && a + 1 < b + n) return o + a - b; o += n; } return -1; };
     const offs = [sy.INWK + 33, ...Array.from({ length: 12 }, (_, i) => sy["K%"] + 37 * i + 33)].map(offOf).filter(o => o >= 0);
+    const from = [sy.LSO, refPatch && refPatch.lso].filter(a => a !== undefined && a !== null && a !== LSO_ORIG);
     const xx0 = sy.XX0 === undefined ? -1 : offOf(sy.XX0);
     return buf => {
-        if (sy.LSO !== LSO_ORIG) for (const o of offs) if ((buf[o] | buf[o + 1] << 8) === sy.LSO) { buf[o] = LSO_ORIG & 255; buf[o + 1] = LSO_ORIG >> 8; }
+        for (const o of offs) if (from.includes(buf[o] | buf[o + 1] << 8)) { buf[o] = LSO_ORIG & 255; buf[o + 1] = LSO_ORIG >> 8; }
         if (sy.XX21 !== undefined && sy.XX21 !== XX21_ORIG && sy.SNE !== undefined && xx0 >= 0) {
             const v = buf[xx0] | buf[xx0 + 1] << 8;
             if (v >= sy.XX21 && v < sy.SNE) { const w = v - sy.XX21 + XX21_ORIG; buf[xx0] = w & 255; buf[xx0 + 1] = w >> 8; }
         }
         return buf;
     };
+}
+
+// Patches to the original as assembled code (2-build-files/sunref/sunref.py,
+// which writes <build>/sunref.json beside the build's symbols): the bytes of
+// the code to add (code: [address, bytes] in the original's free memory), and
+// the sites to change (sites: name, address, the original's bytes there and
+// the new ones; or, for a site with no label, search: a routine's extent, in
+// which the original's bytes are found exactly once), all in main RAM; lso:
+// the station's line heap, if the patch moves it; region: [address, length,
+// name], more of the patched original's game state (regionsFor). A build's
+// patch is for the reference it is compared against: the original, patched
+// so that it runs the same game logic (docs/renderer.md).
+//   refPatchPath(syms): the patch beside a build's symbols, or null
+//   loadRefPatch(path): the patch (null for a null path)
+//   applyRefPatch(mem, patch): at TT170, each site's bytes are checked against
+//     the original's (an Error if any differs: the patch is for another
+//     build), then the code and the sites are written
+export function refPatchPath(syms) {
+    const p = syms.replace(/[^/]*$/, "sunref.json");
+    return existsSync(p) ? p : null;
+}
+export function loadRefPatch(path) {
+    if (!path) return null;
+    const p = JSON.parse(readFileSync(path, "utf8"));
+    p.path = path;
+    return p;
+}
+export function applyRefPatch(mem, p) {
+    for (const s of p.sites) if (s.search) {      // (a site found by its bytes, once, in a routine)
+        const at = [];
+        for (let a = s.search[0]; a + s.orig.length <= s.search[1]; a++) if (s.orig.every((b, i) => mem[a + i] === b)) at.push(a);
+        if (at.length !== 1) throw new Error(`reference patch ${p.path}: ${s.name} found ${at.length} times in &${s.search[0].toString(16)}-&${(s.search[1] - 1).toString(16)}`);
+        s.addr = at[0];
+    }
+    for (const s of p.sites) s.orig.forEach((b, i) => {
+        if (mem[s.addr + i] !== b) throw new Error(`reference patch ${p.path}: ${s.name} at &${(s.addr + i).toString(16)} is &${mem[s.addr + i].toString(16)}, not &${b.toString(16)}`);
+    });
+    const put = (a, bytes) => { if (a < 0x0200 || a + bytes.length > 0x8000) throw new Error(`reference patch: &${a.toString(16)} is not main RAM`); bytes.forEach((b, i) => { mem[a + i] = b; }); };
+    for (const [a, bytes] of p.code) put(a, bytes);
+    for (const s of p.sites) put(s.addr, s.new);
+}
+
+// The half spin's patch (see runElite's handler): only for a build without
+// the port's own half steps (MVS5's for the planet, which has the label
+// mvs5hf). Its hooks are part 8's first instruction (LDA INWK+30, AND #&80,
+// STA RAT2, before MV8), found once the game is in memory (TT170), and MV5:
+// { p8, mv5 } as { a, m } (address, mapping), or null.
+export function findHalfSpin(sy, cpu) {
+    if (sy.mvs5hf !== undefined || sy.MV8 === undefined || sy.MV5 === undefined) return null;
+    const m = mapOfLabel(sy, "MV8"), want = [0xa5, sy.INWK + 30, 0x29, 0x80, 0x85, sy.RAT2];
+    for (let a = sy.MV8 - 6; a > sy.MV8 - 64; a--)
+        if (want.every((b, i) => physRead(cpu, m, a + i) === b)) return { p8: { a, m }, mv5: { a: sy.MV5, m: mapOfLabel(sy, "MV5") } };
+    throw new Error("MVEIT part 8 not found before MV8 (the half spin's patch)");
 }
 
 // Addresses excluded from the comparison, by symbol: name -> [length, reason]
@@ -244,7 +303,8 @@ function xTrace(s, file, disc) {
 //   returns more [addr, bytes] to write, given the set of addresses written since
 //   the game's entry S%), opts.patch({ wr, rb, sy }) (called at BAY after QU5,
 //   i.e. after the title screens' DFAULT: the commander patch), opts.onIter(i, s, res),
-//   opts.trace (log injected keys), opts.shots / opts.onShot(s, i) (screenshot every N)
+//   opts.trace (log injected keys), opts.shots / opts.onShot(s, i) (screenshot every N),
+//   opts.refPatch (loadRefPatch's: checked and written at TT170, before the seeds)
 // Returns { snaps (per iteration, regions concatenated), iterTimes, tt100Times
 //   ([emulated s, iteration] per TT100), init (snapshot at TT170), initRand, keyLog,
 //   events, iters, tt100, emuSecs, error }
@@ -252,8 +312,8 @@ export async function runElite(opts) {
     const sy = opts.syms;
     const s = await bootMaster(opts.disc);
     const cpu = s._machine.processor;
-    const regions = regionsFor(sy);
-    const canon = canonFor(sy, regions);
+    const regions = regionsFor(sy, opts.refPatch);
+    const canon = canonFor(sy, regions, opts.refPatch);
     const rd = (a, n = 1) => { const r = new Array(n); for (let i = 0; i < n; i++) r[i] = cpu.ramRomOs[(a + i) & 0xffff]; return r; };
     const rb = a => cpu.ramRomOs[a & 0xffff];
     const wr = (a, bytes) => { for (let i = 0; i < bytes.length; i++) cpu.ramRomOs[a + i] = bytes[i] & 255; };
@@ -311,19 +371,8 @@ export async function runElite(opts) {
     const H_RDK = hook("RDKEY", 5), H_DKS5 = hook("DKS5", 17), H_NOISE = hook("NOISE"), H_MLOOP = hook("MLOOP"), H_LL5 = hook("LL5"),
         H_TT100 = hook("TT100"), H_QU5 = hook("QU5"), H_BAY = hook("BAY"), H_MT26 = hook("MT26"), H_TT170 = hook("TT170");
 
-    // The half spin's patch (see the handler): only for a build without the
-    // port's own half steps (MVS5's for the planet, which has the label
-    // mvs5hf); its address, part 8's first instruction, is found when the
-    // game is in memory (TT170), before MV8: LDA INWK+30, AND #&80, STA RAT2
-    let H_P8 = null, p8vec = null;
-    const H_MV5 = sy.MV5 !== undefined ? hook("MV5") : null;
-    const findP8 = () => {
-        if (sy.mvs5hf !== undefined || sy.MV8 === undefined || !H_MV5) return null;
-        const m = mapOfLabel(sy, "MV8"), want = [0xa5, sy.INWK + 30, 0x29, 0x80, 0x85, sy.RAT2];
-        for (let a = sy.MV8 - 6; a > sy.MV8 - 64; a--)
-            if (want.every((b, i) => physRead(cpu, m, a + i) === b)) return { a, m };
-        throw new Error("MVEIT part 8 not found before MV8 (the half spin's patch)");
-    };
+    // The half spin's patch (see the handler; its hooks: findHalfSpin, at TT170)
+    let H_P8 = null, H_MV5 = null, p8vec = null;
     const res = { snaps: [], screens: [], iterTimes: [], tt100Times: [], tt100AtIter: [], init: null, keyLog: [], events: [], s, cpu, sy, regions };
     let started = false, done = false, armPatch = false, iter = 0, tt100 = 0, checked = false;
     const ctxBase = { rb, rd, sy, iterOf: () => iter, tt100Of: () => tt100 };
@@ -425,7 +474,9 @@ export async function runElite(opts) {
                 if (op(H_RDK) !== 0x68) throw new Error(`RDKEY+5 is not PLA (&${op(H_RDK).toString(16)})`);
                 if (op(H_DKS5) !== 0xa9 || op(H_DKS5, 1) !== 0x0b) throw new Error("DKS5+17 is not LDA #&0B");
             }
-            H_P8 = findP8();
+            const hs = findHalfSpin(sy, cpu);
+            if (hs) { H_P8 = hs.p8; H_MV5 = hs.mv5; }
+            if (opts.refPatch) applyRefPatch(cpu.ramRomOs, opts.refPatch);
             if (opts.seed) for (const [a, bytes] of opts.seed) wr(a, bytes);
             if (opts.seedBoot) { res.seeded = opts.seedBoot(regions, written, rb); for (const [a, bytes] of res.seeded) wr(a, bytes); }
             bootWrites.remove();

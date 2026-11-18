@@ -61837,6 +61837,7 @@ End macro FLHW
 .B6_END
 Bank 6: frame layer &8000-&B477 , data &B603 -&BC55  free 938 
 Saving file '3-assembled-output/BANK6.bin'
+sunref: none: 0 bytes of code, 0 sites
 .ZP
      0070
 .P
