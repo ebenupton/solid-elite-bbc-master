@@ -31971,8 +31971,17 @@ ENDIF
 
 .COMPAS
 
- JSR DOT                \ Call DOT to redraw (i.e. remove) the current compass
-                        \ dot
+                        \ Port: the original starts with JSR DOT, to redraw
+                        \ (i.e. remove) the current compass dot; that is
+                        \ deferred to cpdot, once the new dot is worked out,
+                        \ so the dot to remove is kept here
+
+ LDA COMX
+ STA cpox
+ LDA COMY
+ STA cpoy
+ LDA COMC
+ STA cpoc
 
  LDA SSPR               \ If we are inside the space station safe zone, jump to
  BNE SP1                \ SP1 to draw the space station on the compass
@@ -32164,8 +32173,115 @@ ENDIF
 
  STA COMC               \ Store the compass colour in COMC
 
- JMP DOT                \ Jump to DOT to draw the dot on the compass and return
-                        \ from the subroutine using a tail call
+ JMP cpdot              \ Jump to DOT to draw the dot on the compass and return
+                        \ from the subroutine using a tail call (Port: through
+                        \ cpdot, which first removes the old dot, or does
+                        \ neither when the dot has not changed)
+
+\ ******************************************************************************
+\
+\       Name: cpdot
+\       Type: Subroutine
+\   Category: Dashboard
+\    Summary: Port: remove the old compass dot and draw the new one, unless
+\             they are the same
+\
+\ ------------------------------------------------------------------------------
+\
+\ The original's COMPAS calls DOT to remove the old dot (cpox, cpoy, cpoc, as
+\ COMPAS kept them) before working out the new one (COMX, COMY, COMC), then
+\ DOT again to draw it. Both EOR the same bytes when the dot has not moved
+\ (most iterations), so then neither is drawn; only what DOT leaves for the
+\ new dot is set, from the copy cpdot keeps of it: X1 = COMX, Y1, COL = COMC,
+\ SC(1 0) and Y. DOT's other results are not read afterwards: A, X and C
+\ (DIALS' caller rewrites them), and dX1, dtmp, ddn and dmk (the dashboard's
+\ routines write each before reading it). The copy is that of the last dot
+\ drawn here, which is the dot COMPAS kept: a skip needs the new dot equal to
+\ the old one, the old one is the last new one (only SP2 writes COMX, COMY
+\ and COMC, and BEGIN zeroes COMC, which no new dot equals), so by induction
+\ it was drawn here, or skipped with that copy
+\
+\ ******************************************************************************
+
+.cpdot
+
+ LDA COMX               \ If the new dot differs from the old one, jump to cpd1
+ CMP cpox               \ to remove the old one and draw the new one
+ BNE cpd1
+ LDA COMY
+ CMP cpoy
+ BNE cpd1
+ LDA COMC
+ CMP cpoc
+ BNE cpd1
+
+ STA COL                \ The same dot: set what DOT leaves for it, and return
+ LDA COMX
+ STA X1
+ LDA cpy1
+ STA Y1
+ LDA cpsc
+ STA SC
+ LDA cpsc+1
+ STA SCH
+ LDY cpy
+ RTS
+
+.cpd1
+
+ LDA COMX               \ Remove the old dot: DOT with the old dot in COMX,
+ PHA                    \ COMY and COMC, and the new one put back after
+ LDA COMY
+ PHA
+ LDA COMC
+ PHA
+ LDA cpox
+ STA COMX
+ LDA cpoy
+ STA COMY
+ LDA cpoc
+ STA COMC
+ JSR DOT
+ PLA
+ STA COMC
+ PLA
+ STA COMY
+ PLA
+ STA COMX
+
+ JSR DOT                \ Draw the new dot, and keep what DOT leaves for it
+ STY cpy
+ LDA Y1
+ STA cpy1
+ LDA SC
+ STA cpsc
+ LDA SCH
+ STA cpsc+1
+ RTS
+
+.cpox
+
+ EQUB 0                 \ The old dot's COMX, COMY and COMC, as COMPAS found
+                        \ them
+.cpoy
+
+ EQUB 0
+
+.cpoc
+
+ EQUB 0
+
+.cpy1
+
+ EQUB 0                 \ What DOT left for the last dot drawn here: Y1,
+
+.cpy
+
+ EQUB 0                 \ Y,
+
+.cpsc
+
+ EQUW 0                 \ and SC(1 0)
 
 \ ******************************************************************************
 \
