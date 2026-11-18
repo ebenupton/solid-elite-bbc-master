@@ -8339,6 +8339,7 @@ DCN_MARK = 6            \ roll / pitch marker
  LDA #28                \ speed: 0-40, one pixel per unit, danger from 28
  STA dT
  LDA DELTA
+ LDX #8                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
 
  STZ R                  \ Roll and pitch, calculated as Master (ADDK), for
@@ -8463,6 +8464,10 @@ DCN_MARK = 6            \ roll / pitch marker
 .dll9a
  LDY #0
 .dll9
+ TYA                    \ X = 11 + Y, the energy banks' cache indexes (DILI
+ CLC                    \ of SC = &xxA0 with SC+1 = &77 + 2Y)
+ ADC #11
+ TAX
  LDA dbank,Y
  STY P
  JSR DIL
@@ -8480,11 +8485,13 @@ DCN_MARK = 6            \ roll / pitch marker
  LSR A
  LSR A
  LSR A
+ LDX #0                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
  LDA ASH
  LSR A
  LSR A
  LSR A
+ LDX #1                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
 
  LDA #YELLOW2           \ fuel: 0-70 -> 0-35 (clipped at 32)
@@ -8495,6 +8502,7 @@ DCN_MARK = 6            \ roll / pitch marker
  STA dK1
  LDA QQ14
  LSR A
+ LDX #2                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
 
  JSR PZW2               \ temperatures: high values danger, low safe (2)
@@ -8511,11 +8519,13 @@ DCN_MARK = 6            \ roll / pitch marker
  LSR A
  LSR A
  LSR A
+ LDX #3                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
  LDA GNTMP
  LSR A
  LSR A
  LSR A
+ LDX #4                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
 
  LDA #240               \ altitude: 0-255 -> 0-31, one colour
@@ -8531,6 +8541,7 @@ DCN_MARK = 6            \ roll / pitch marker
  LSR A
  LSR A
  LSR A
+ LDX #5                 \ X = this bar's cache index (DILI of SC here)
  JSR DIL
 
  LDA #4                 \ Main RAM back at &3000-&7FFF
@@ -8613,16 +8624,8 @@ DCN_MARK = 6            \ roll / pitch marker
  CMP #33
  BCC P%+4
  LDA #32
- STA dsE
- LDA SC+1               \ X = the cache index, as DILI
- AND #%00001110
- LSR A
- BIT SC
- BPL P%+4
- ORA #8
- TAX
- LDA dsE
- CMP dT
+ STA dsE               \ (X = the bar's cache index, given by DIALS: the one
+ CMP dT                 \ DILI gives for SC, each bar's place being fixed)
  LDA dK
  BCS P%+5
  LDA dK1
