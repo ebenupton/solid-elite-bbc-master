@@ -167,7 +167,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | Part | Where | What |
 |---|---|---|
 | The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
-| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routines that run in game context, from `G_FRAME`: `S_SUN`, the sun near the planet (`gfx-ssun.asm`), and `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
+| Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routine that runs in game context, from `G_FRAME`: `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
 | The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window (`R_LINE`'s cold part, `R_INIT` and `R_RESETBUF`) |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
@@ -625,43 +625,50 @@ of the disc each frame. A cap's rows scale with its size, not the disc's.
 ## The sun near the planet
 
 Elite has one slot, `FRIN+1`, for the sun and the space station. Every 32
-iterations, part 15 of the main flight loop checks whether we are near the
-planet; if so, `WPLS` removes the sun from the screen and `NWSPS` puts the
-station in its slot. When the station is out of range, `KS4` makes a new sun
-overhead, and after a launch there is no sun at all. The game state must
-stay SNG47's, so none of that changes: the renderer draws the sun as
-scenery instead, where it would have been, for the frame only.
+iterations, part 14 of the main flight loop checks whether we are near the
+planet; if so, the original calls `WPLS` to take the sun off the screen and
+`NWSPS`, which puts the station in the slot, so the sun's data block is
+gone. When the station is out of range, `KS4` makes a new sun overhead, not
+where the sun was, and after a launch there is no sun at all. So in the
+original the sun vanishes as the station appears.
 
-`S_SUN` (`gfx-ssun.asm`, at bank 4's end with `L_SUN`) runs after every
-main-loop iteration, from `G_FRAME` with bank 4 paged, before `F_FRAME`. It
-writes only its own variables and the frame's (`F_SUX`, `F_SUY`, `GSUNR`,
-`GSUNON`, `SS_OK`); the zero page and the game's variables that it borrows
-are kept and put back.
+The port keeps the sun. While the station holds slot 1, the sun's block is
+parked outside the slots, in `SUNPK` (37 bytes, after `WP`'s dashboard
+variables), with `SUNPF` saying so, and the main flight loop moves it and
+draws it once an iteration, after the ships. Four routines of the port's
+own, each reached from one original instruction:
 
-* **The sun in its slot**, and the planet within one sign unit on every
-  axis: in the frames with `MCNT AND 31` = 1 or 0 (the last before part 15
-  can swap the slot) it takes D = sun - planet (24-bit two's complement,
-  `ss_d`, in the shared workspace). Further out, D is forgotten.
-* **The station in the slot**: our own movement moves the planet and the
-  sun alike, so D only turns, and it is turned by our roll and pitch by
-  `MV40` itself (`ss_turn`: D into `INWK`'s coordinates, `MV40` with `TYPE`
-  129 and `DELTA` 0, so that `MV45` moves z by nothing and returns). In
-  record mode the sun is recorded at planet + D, as `PLANET` would draw it
-  (the view's axes as `PLUT`, `PLANET`'s tests on z, `PROJ`, the radius
-  24576 / z, `CHKON`).
-* **The station in the slot and D unknown** (we launched, so this system's
-  sun was never in the slot): D comes from the system's seeds by `SOLAR`'s
-  own code. The `SOLAR` block is tagged `Area: cold, again`, so `streams.py`
-  emits it a second time (`elite-source-again.asm`, with no stubs and its
-  labels and call targets named `A_<name>`), which `ss_seed` includes and
-  enters at `A_nobirths`, with stand-ins for `SOS1` and `NWSHP` that note
-  `INWK`'s coordinates instead of making ships ([memory-map.md](memory-map.md)).
-* Docked (`F_DIRECT` clears `SS_OK`), in witchspace or with no planet: no
-  sun.
+* `SUNUP` (hot; part 14's `JSR WPLS`): slot 1's block into `SUNPK`, `SUNPF`
+  = `&80`. `NWSPS` then puts the station in slot 1 as before.
+* `SUNSC` (hot; `MAL1`'s `JMP MA18`, at the end of the slots): with the
+  station present and the sun parked, the sun goes through the rest of
+  `MAL1` like a ship in a slot of its own (`TYPE` 129, `INF` = `SUNPK`,
+  `XSAV` = 11, entering at `MAL1g`, after its `GINF`): `MVEIT` moves it and
+  `LL9` draws it. Bit 6 of `SUNPF` tells its two visits apart, and nothing
+  in the sun's pass can leave the loop (the energy bomb, scooping, docking,
+  collisions, laser hits, missile locks and `FAROF` all skip negative
+  types).
+* `SUNBK` (hot; `KS4`'s `JSR ZINF`): if the sun is parked, its block goes
+  back into slot 1, and the sun carries on where it was; otherwise `KS4`
+  makes its own sun.
+* `SUNLAU` (cold; `TT110`'s `JSR NWSPS`): the station, then the system's sun
+  from its seeds (`QQ2`) as `SOLAR` placed it on arrival, relative to the
+  planet (with bit 0 of `FIST` taken as clear), parked.
 
-When `KS4` brings the game's own sun back, it is overhead, as in the
-original, and the drawn sun jumps there. The lighting keeps turning its
-light while the station has the slot.
+So the sun no longer vanishes as the station appears or jumps overhead when
+it goes, and it exists from a launch. The ship slots, the heap and `NWSHP`
+are the original's. The comparison's reference gets the same change, as a
+patch of the same source blocks assembled for SNG47
+([6-harness/README.md](../6-harness/README.md)), so the game state still
+matches at every iteration. `SUNUP`, `SUNSC` and `SUNBK` are hot, as cold
+routines would need stubs; `SUNBK` sits after `KILLSHP` and `SUNLAU` after
+`TT114`, where their branches stay in range.
+
+The parked sun is drawn by the game as any sun is (`LL9`, `PLANET`, `SUN`,
+`H_SUN` into the frame), so the frame layer, the second disc, the lens
+flare and its probes are as for a sun in slot 1. `L_SUN` seeds the light
+from `SUNPK` while the sun is parked, so the light follows the real sun
+throughout.
 
 **Two discs.** `PLANET` gives the sun and the planet the same radius at the
 same z, so the bigger disc is the nearer. `f_discs` makes the bigger one
@@ -687,21 +694,21 @@ next frame does not repair them. `f_disc2` calls `T_DISCROWS` with C set,
 which `R_DISCROWS` sends to `R_DISC2`. `r_lput2` hands spans of 16 pixels or
 more to the row run.
 
-A frame with the sun in view costs `S_SUN` about 3,200 cycles and the
-second disc 2,500 (held still) to 17,600 (rising); in the front view the
-lens flare costs most, as anywhere. On the gate's docking approach, with a
-small sun in the front view, the windows run 3.1% and 7.0% slower than
-without it; elsewhere the cost is within 0.1%. `test_raster.py`'s `disc2`
+A frame with the second disc costs it 2,500 cycles (held still) to 17,600
+(rising); in the front view the lens flare costs most, as anywhere. Moving
+and drawing the parked sun costs the gate's in-zone flight after the launch
+1.0% (the sun's pass copies its block in and out by `MAL1`'s loops). `test_raster.py`'s `disc2`
 test drives two discs drifting, crossing, coming and going on two buffers,
 with ships, lines, dots, text, stars, resets and K mode, against the model
-every frame. `6-harness/msunnear.mjs` poses the scene (a big planet, the sun
+every frame. `6-harness/msunnear.mjs` poses the scene (a big planet, the parked sun
 rising from behind its limb, the station crossing), `msunprof.mjs` profiles
-a stretch of the gate's run, and `2-build-files/sunnear.py` renders the
+a stretch of the gate's run, `msunslot.mjs` checks the parking in scenes
+the gate's run never reaches, and `2-build-files/sunnear.py` renders the
 frames, a sheet and a movie: `images/sunnear/sunnear.gif` (the sun rising
 from behind the planet's limb with the flare's probes going 0 to 9, then
 the station crossing it), `sheet.png`, and `spawn.png`, the frame after the
 station appears in the game's own way (`msunnear.mjs --spawn`), with the
-sun drawn where the game's own sun was.
+sun drawn where it was before `SUNUP` parked it.
 
 ## Every disc, incremental
 

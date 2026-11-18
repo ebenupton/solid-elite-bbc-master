@@ -238,6 +238,14 @@ NMIpissoff 8, INCYC, backtonormal, CLDELAY and yetanotherrts
 WARP, and hyp1's JSR TT111 (TT18 now calls hyp1, not hyp1+3). Each has a `Port:
 removed` note.
 
+**10 The sun's parking** (10, 278): SUNLAU 0, 119, SUNSC 0, 60, SUNBK 0, 54 and
+SUNUP 0, 37 are port routines (renderer.md, "The sun near the planet": the sun
+parked in SUNPK while the station holds its slot), each reached by one redirected
+call: the main flight loop's JMP MA18 (4, 6), part 14's JSR WPLS (3, 1), KS4's
+JSR ZINF (1, 1) and TT110's JSR NWSPS (2, 1); WP gains SUNPK and SUNPF after DASHV.
+The comparison's reference runs the same four blocks (their `, again` emission,
+assembled for SNG47).
+
 ## Edits in code that is not emitted
 
 PLS22, PLL4F and pl4pat are `Area: none`, as are PL9 parts 2 and 3. streams.py
