@@ -1168,6 +1168,8 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
 .fds_pat                \ BIT #imm (no-ops: they keep X and C)
  STA fpr_b1
  STA fpr_b2
+ JMP fcs                \ the rows in pairs about cy if it can (fcs), else:
+.fpr_old
  LDY R_NDT
  LDX #&E8               \ X = |d| through the loop, stepped by fpr_id: INX
  LDA fz_u               \ (&E8) if d >= 0, else DEX (&CA) until d reaches 0
@@ -1372,6 +1374,200 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
  CLC                    \ (Y = k of the first tail row already)
  JMP fdf1
  ASSERT LO(R_NDISCR) + 191 < 256 AND LO(F_HW) = LO(F_HW2)
+
+\ fcs: the slow path's rows (the disc crosses the window's side, or cx is off
+\ the screen) when cy is one of them: rows cy - k and cy + k together, as
+\ fdsym does, with the clipping done by thresholds on the half-width n,
+\ worked out once from cx (16-bit) and the window, instead of the 16-bit sums
+\ and compares per row. For a row with half-width n, the slow loop gives:
+\   an empty row (R = 0, L = 255) if cx + n < CL or cx - n > CR, i.e.
+\     n < max(CL - cx, cx - CR) = nmin;
+\   else R = CR if n >= CR - cx = nC, else cx + n (its low byte: the sum is
+\     on the screen), and L = CL if n >= cx - CL + 1 = mC1, else cx - n.
+\ Each threshold is clamped to 0 .. r + 1 (n <= r: r + 1 is "never"); with
+\ r = 255 a threshold above 255 cannot be held in a byte, so fcs leaves the
+\ rows to the slow loop then (fpr_old), and when cy is not a row. The pairs
+\ run for k = 0 .. min(cy - T, B - cy), or until the first empty row (n only
+\ falls as k rises, so the rest are empty too, or rows on one side only);
+\ what is left on either side, rows T .. cy - k and cy + k .. B, goes
+\ through the slow loop (fpr2), which makes them exactly as before
+
+.fpr_oldj
+ JMP fpr_old
+.fcs
+ LDA f_cy+1             \ cy must be a row: 0 <= cy, T <= cy <= B
+ BNE fpr_oldj
+ LDA f_cy
+ CMP R_NDT
+ BCC fpr_oldj
+ CMP R_NDB
+ BEQ fcs1
+ BCS fpr_oldj
+.fcs1
+ SEC                    \ nC = CR - cx
+ LDA R_CR
+ SBC f_cx
+ TAY
+ LDA #0
+ SBC f_cxh
+ JSR fcth
+ BCS fpr_oldj
+ STA fcs_c+1
+ SEC                    \ mC1 = cx - CL + 1 (as cx - CL with C set)
+ LDA f_cx
+ SBC R_CL
+ TAY
+ LDA f_cxh
+ SBC #0
+ INY
+ BNE P%+3
+ INC A
+ JSR fcth
+ BCS fpr_oldj
+ STA fcs_m+1
+ SEC                    \ nmin = max(CL - cx, cx - CR)
+ LDA R_CL
+ SBC f_cx
+ TAY
+ LDA #0
+ SBC f_cxh
+ JSR fcth
+ BCS fpr_oldj
+ STA fcs_e+1
+ SEC
+ LDA f_cx
+ SBC R_CR
+ TAY
+ LDA f_cxh
+ SBC #0
+ JSR fcth
+ BCS fpr_oldj
+ CMP fcs_e+1
+ BCC P%+5
+ STA fcs_e+1
+ LDA fpr_ld2+2          \ the half-width table (its low byte: ASSERT above)
+ STA fcs_ld+2
+ STA fcs_ld2+2
+ LDA f_cx               \ cx and cx + 1 (low bytes)
+ STA fcs_x+1
+ INC A
+ STA fcs_x1+1
+ LDA f_cy               \ rows cy + k at (table + cy) + k
+ TAX
+ CLC
+ ADC #LO(R_NDISCR)      \ (no carry: ASSERT above)
+ STA fcs_sr+1
+ TXA
+ ADC #LO(R_NDISCL)
+ STA fcs_sl+1
+ LDA #HI(R_NDISCL)
+ ADC #0
+ STA fcs_sl+2
+ TXA                    \ m + 1 = min(cy - T, B - cy) + 1
+ SEC
+ SBC R_NDT
+ STA fz_i
+ LDA R_NDB
+ SBC f_cy               \ (C = 1: cy >= T)
+ CMP fz_i
+ BCC P%+4
+ LDA fz_i
+ INC A
+ STA fcs_cp+1
+ LDY #0                 \ X = row cy - k, Y = k, from k = 0
+ CLC
+.fcs_l                  \ C = 0 here
+.fcs_ld
+ LDA F_HW,Y             \ patched: the half-width table (high byte)
+.fcs_e
+ CMP #0                 \ patched: nmin (n below it: an empty row, and the
+ BCC fcs_t              \ rest: leave them to the slow loop)
+.fcs_c
+ CMP #0                 \ patched: nC (n at or above it: R = CR)
+ BCS fcs_rc
+.fcs_x
+ ADC #0                 \ patched: cx (C = 0)
+.fcs_r
+ STA R_NDISCR,X
+.fcs_sr
+ STA R_NDISCR,Y         \ patched: R_NDISCR + cy (low byte)
+.fcs_ld2
+ LDA F_HW,Y             \ patched: the half-width table (high byte)
+.fcs_m
+ CMP #0                 \ patched: mC1 (n at or above it: L = CL)
+ BCS fcs_lc
+ EOR #&FF               \ (C = 0) cx + 1 + NOT n = cx - n
+.fcs_x1
+ ADC #0                 \ patched: cx + 1
+.fcs_lf
+ STA R_NDISCL,X
+.fcs_sl
+ STA R_NDISCL,Y         \ patched: R_NDISCL + cy
+ DEX
+ INY
+.fcs_cp
+ CPY #0                 \ patched: m + 1 (C = 0 until then)
+ BNE fcs_l
+ BRA fcs_t
+.fcs_rc
+ LDA R_CR
+ BRA fcs_r
+.fcs_lc
+ LDA R_CL
+ BRA fcs_lf
+.fcs_t                  \ k = Y: rows T .. cy - k and cy + k .. B are left
+ STY fz_i
+ LDA f_cy               \ rows T .. cy - k, if cy - k >= T: the slow loop
+ SEC                    \ from T (|d| = cy - T, stepping down) to cy - k
+ SBC fz_i
+ BCC fcs_t2
+ CMP R_NDT
+ BCC fcs_t2
+ STA fz_q
+ LDA f_cy
+ SEC
+ SBC R_NDT
+ TAX
+ LDA #&CA               \ DEX
+ STA fpr_id
+ LDY R_NDT
+ JSR fpr2
+.fcs_t2
+ LDA f_cy               \ rows cy + k .. B, if cy + k <= B: the slow loop
+ CLC                    \ from cy + k (|d| = k, stepping up) to B
+ ADC fz_i
+ BCS fcs_t9
+ CMP R_NDB
+ BEQ P%+4
+ BCS fcs_t9
+ TAY
+ LDA R_NDB
+ STA fz_q
+ LDX fz_i
+ LDA #&E8               \ INX
+ STA fpr_id
+ JMP fpr2
+.fcs_t9
+ RTS
+
+.fcth                   \ (A Y) = a threshold (high byte, low byte): A = it
+ TAX                    \ clamped to 0 .. r + 1, C set if that is 256 (r =
+ BMI fct0               \ 255): see fcs
+ BNE fctb
+ TYA
+ CMP f_r
+ BCC fctx
+ BEQ fctx
+.fctb
+ LDA f_r
+ CLC
+ ADC #1
+ RTS
+.fct0
+ LDA #0
+.fctx
+ CLC
+ RTS
 
 f_cx = fpr_cx + 1       \ (the operand of ADC # in the slow disc loop)
 .f_cxh EQUB 0           \ high byte of cx
