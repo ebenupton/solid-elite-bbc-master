@@ -1,7 +1,7 @@
 # BBC Master Elite: the port
 
 This branch is a series of changes to Mark Moxon's annotated source for BBC
-Master Elite (the Acornsoft SNG47 release), in six parts:
+Master Elite (the Acornsoft SNG47 release), in eight parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM
    banks 4 and 7, and HAZEL. This leaves main RAM `&4000-&6FFF` and banks 5
@@ -59,6 +59,21 @@ Master Elite (the Acornsoft SNG47 release), in six parts:
    heap). Flight runs at 11.13 iterations per emulated second (0.796 times
    SNG47), most of the cost in the crater system, whose two true craters
    cost more than the original's polygon crater.
+7. **Circle costs** ([renderer.md](renderer.md)). The circle engine's
+   arithmetic made faster with every frame unchanged (square roots from a
+   table, multiplies through pointers into the quarter squares, a tighter
+   divide, short products); then the planet spinning smoothly at half the
+   original's rate, by half steps every iteration, in the game and in the
+   original the gate compares with, and its surface remade every frame close
+   up and every other frame in deep space.
+8. **The CPC port's findings and the sun's slot** ([speedups.md](speedups.md),
+   [renderer.md](renderer.md)). Eleven speed-ups found by the Amstrad CPC
+   port; the optional moons, rings and banded planets removed; the sun kept
+   by the game, parked outside the ship slots while the station is near, in
+   the game and in the comparison's reference alike; and the sun's edge, the
+   explosion clouds and `MV40` no longer taking stray random numbers or
+   carries. Frozen scenes give the sun 28.3% faster, the station's zone 5.9%
+   and docking 3.7% ([renderer.md](renderer.md), "Speed").
 
 Each commit builds, and each passes the gate in [6-harness](../6-harness).
 The gate flies the released game and the new build side by side with a
@@ -123,5 +138,9 @@ encrypt=no`.
 | The disc layer's changed rows as clipped strips, three boundaries kept | 11.13 | 0.796 | 179,751 |
 
 These are the gate's run: the pilot's mix of launches, fights, approaches to
-the station and hyperspace jumps, over 10,000 iterations. Page `&0D` is never
+the station and hyperspace jumps, over 10,000 iterations. Later changes alter
+the run itself (the planet's half spin, the sun's parking and the other
+patches to the original change the game's random numbers, and so where the
+pilot flies), so their speed is given in [renderer.md](renderer.md)'s
+"Speed", by frozen scenes. Page `&0D` is never
 written, and saved commander files are byte for byte the original's.

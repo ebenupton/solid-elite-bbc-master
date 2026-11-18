@@ -906,20 +906,20 @@ tables.
 
 ## Speed
 
-The gate's run gives 11.13 flight iterations per emulated second, against
-SNG47's 13.97 (0.796 times, at 179,751 cycles a flight iteration), with the
+The gate's run gives 15.52 flight iterations per emulated second, against
+15.43 for SNG47 with the comparison's six patches (1.006 times), with the
 frame rate capped at 25 frames a second; without the cap about a tenth of
 the frames would be shown for a single field. With the speed-ups of the
-port's second part and the original's wireframe drawing the port is 17.86,
-and with plain disc planets in place of the beach ball the renderer ran at
-17.24 (115,992 cycles). So most of the cost is the planets: the crater
-system's stretch of the run (iterations 800 to 2799), where two true caps
-cost more than the original's polygon crater, and the beach ball, its
-geometry and its two-colour disc rows, every frame that a meridian planet
-is on screen, which is about half the gate's run, as the pilot starts at
-Lave. Flight with no beach ball on screen runs as fast as before. The big planet and the space station close up are the slowest
-views, as their discs and faces cover most of the screen; the kept solid
-rows speed up the station's last seconds.
+port's second part and the original's wireframe drawing the port was 17.86
+against SNG47's 13.97 on the gate's run of that time, and an earlier build
+of the renderer, measured before the beach ball, with plain disc planets,
+ran at 17.24 (115,992 cycles). So most of the cost is the planets: the
+crater planets, where true caps cost more than the original's polygon
+crater, and the beach ball, its geometry and its two-colour disc rows,
+every frame that a meridian planet is on screen. Flight with no beach ball
+on screen runs as fast as before. The big planet and the space station
+close up are the slowest views, as their discs and faces cover most of the
+screen; the kept solid rows speed up the station's last seconds.
 
 ### Frozen scenes
 
