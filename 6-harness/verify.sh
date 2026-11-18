@@ -142,7 +142,7 @@ if [ -f 3-assembled-output/sunref.json ]; then
     # original (game state identical over the gate's run and the views run:
     # the patch changes nothing unless the sun is parked)
     node 6-harness/msunref.mjs --out "$LOG/sunref" > "$LOG/sunref.log" 2>&1
-    grep -E "^(bytes|passive|passive-views|edge|edge-views):" "$LOG/sunref.log"
+    grep -E "^(bytes|passive|passive-views|edge|edge-views|edge-ahead|edge-ahead-control|full-ahead|k2-control):" "$LOG/sunref.log"
     grep -q "^SUNREF PASS" "$LOG/sunref.log" || { tail -20 "$LOG/sunref.log"; echo "sunref: FAIL"; fail sunref; }
     SAVE="$SAVE, sunref"
     # the sun's parking where the gate's run never takes it: the safe zone

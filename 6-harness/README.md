@@ -122,13 +122,25 @@ about 10 minutes, or 5 once the reference run is cached in `work/`.
   as `PTCLS` found them when it returns (the patch's `keepRand`, a harness
   hook, as SNG47 has no room left for the code: noted at `PTCLS`'s entry and
   put back at its return address, read from the stack). The gate's run never
-  explodes a ship; `msunslot.mjs`'s full scene does.
+  explodes a ship; `msunslot.mjs`'s full scene does (60 clouds with the sun
+  parked), and requires `keepRand`'s restores in the reference; as a
+  control, the reference without `keepRand` must differ from the build.
 * **`MV40`'s `K2`.** `MV40` adds `K2`'s low byte into the low byte of the
   next object's y without setting it, so the carry came from whatever last
   left `K2` (often the planet's drawing). In both machines `ADC K2` is
   `ADC #0` and `SBC K2` is `SBC #0` (two sites in SNG47, each found once in
   `MV40` at `TT170`): the planets' and suns' y rounds without the stray
   carry, at most one unit in y_lo.
+* **The proofs run their sites.** Each run counts its patch's sites as they
+  run (`mcompare.mjs` prints them), and the proofs require them to have
+  run. The gate's pilot rarely faces a large sun, so `msunref.mjs` also
+  poses one (`mcompare.mjs --pose sunahead`: slot 1's sun held ahead and
+  large in the first 300 of every 600 iterations, in both machines): there
+  the sun's edge alone with `randAt` leaves SNG47 identical (`edge-ahead`)
+  while the same without `randAt` must differ (`edge-ahead-control`), and
+  the build against SNG47 with the whole patch is identical (`full-ahead`,
+  with `--deadregs`) while the patch without `MV40`'s two sites must differ
+  (`k2-control`).
 * **Dead registers.** Some port routines return with registers or flags
   other than the original's and claim them dead there (`DIALS`, `SUN`,
   `PLANET`, `PTCLS`, `BOMBOFF`, `PIXEL2`, `WPLS`: `DEAD_AFTER` in

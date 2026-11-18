@@ -65,7 +65,7 @@ import { parseArgs } from "./args.mjs";
 
 const args = parseArgs({ iters: "value", ref: "value", rsyms: "value", cand: "value", csyms: "value", seed: "value", loose: "flag", deadregs: "flag", window: "value",
     out: "value", shots: "value", maxsecs: "value", nopatch: "flag", norefcache: "flag", views: "flag", trace: "value", screen: "flag", crater: "flag",
-    refpatch: "value", candpatch: "value" });
+    refpatch: "value", candpatch: "value", pose: "value", norandat: "flag", nokeeprand: "flag", nosites: "value" });
 for (const [d, s] of [["ref", "rsyms"], ["cand", "csyms"]])       // (a disc with another build's symbols hooks the wrong addresses)
     if (!args[d] !== !args[s]) { console.error(`--${d} and --${s} go together`); process.exit(2); }
 const ITERS = +(args.iters || 5000);
@@ -82,6 +82,25 @@ mkdirSync(OUT, { recursive: true });
 const rsy = loadSyms(RSYMS), csy = loadSyms(CSYMS);
 const RPATCH = loadRefPatch(args.refpatch === "none" ? null : args.refpatch || refPatchPath(CSYMS));
 const CPATCH = loadRefPatch(args.candpatch || null);
+// controls for the proofs (msunref): the patches without a part, to show that the part
+// is needed: --norandat (no RAND advance at the edge's site), --nokeeprand (the clouds'
+// seed not kept), --nosites RE (the sites whose names match RE left out)
+for (const p of [RPATCH, CPATCH]) if (p) {
+    if (args.norandat) delete p.randAt;
+    if (args.nokeeprand) delete p.keepRand;
+    if (args.nosites) p.sites = p.sites.filter(st => !new RegExp(args.nosites).test(st.name));
+}
+// --pose sunahead: in both machines alike (at each MLOOP, from its own state, so
+// identical states get identical pokes), for the first 300 of every 600 iterations,
+// whenever slot 1 holds the sun in flight in the front view, the sun is put 0x30000
+// ahead (radius 32), a little up and to the right, so SUN draws its rows (and, in
+// SNG47, takes a random number per row: the sun's edge)
+const POSE = args.pose === "sunahead" ? (i, ram, sy) => {
+    if (i % 600 >= 300 || ram[sy.FRIN + 1] !== 129 || ram[sy.QQ11] || ram[sy.QQ12] || ram[sy.VIEW]) return;
+    const b = sy["K%"] + 37, put = (o, v) => { const m = Math.abs(v); ram[b + o] = m & 255; ram[b + o + 1] = (m >> 8) & 255; ram[b + o + 2] = ((m >> 16) & 127) | (v < 0 ? 128 : 0); };
+    put(0, 0x1800); put(3, 0x1000); put(6, 0x30000);
+} : null;
+if (args.pose && !POSE) { console.error(`unknown --pose ${args.pose}`); process.exit(2); }
 if (RPATCH) console.log(`reference patch: ${RPATCH.path} (${RPATCH.sites.length} sites, ${RPATCH.code.reduce((n, [, b]) => n + b.length, 0)} bytes of code)`);
 if (CPATCH) console.log(`candidate patch: ${CPATCH.path} (${CPATCH.sites.length} sites, ${CPATCH.code.reduce((n, [, b]) => n + b.length, 0)} bytes of code)`);
 
@@ -95,9 +114,10 @@ async function run(label, disc, sy, seed, seedBoot, refPatch) {
     const r = await runElite({
         disc, syms: sy, pilot, refPatch, deadRegs: !!args.deadregs && label === "cand", iters: ITERS, maxSecs: +(args.maxsecs || 4 * ITERS),
         patch: args.nopatch ? null : args.crater ? (o => { patchCommander(o); o.wr(o.sy.tek, [o.rb(o.sy.tek) | 2]); }) : patchCommander, seed, seedBoot, screen: !!args.screen,
-        onIter: (i, s, res) => { phases.push(pilot.P.phase); if (tracer) tracer(i, s, res); },
+        onIter: (i, s, res) => { phases.push(pilot.P.phase); if (tracer) tracer(i, s, res); if (POSE) POSE(i, s._machine.processor.ramRomOs, sy); },
         shots: SHOTS, onShot: async (s, i) => writeFileSync(`${OUT}/${label}-${String(i).padStart(6, "0")}.png`, await s.screenshotActive({ scale: 1 })),
     });
+    if (r.siteN) console.log(`${label}: patch sites run: ${Object.entries(r.siteN).map(([n, c]) => n + " " + c).join(", ") || "none"}`);
     if (Object.keys(r.deadN || {}).length) console.log(`${label}: registers scrambled after ${Object.entries(r.deadN).map(([n, c]) => n + " " + c).join(", ")}`);
     r.phases = phases; r.stats = pilot.P.stats; r.wall = (Date.now() - t0) / 1000;
     if (tracer) writeFileSync(`${OUT}/trace-${label}.txt`, traceOut.join("\n") + "\n");
@@ -116,7 +136,8 @@ async function cachedRef() {
     const h = createHash("sha1");
     for (const f of [REF, RSYMS, new URL("mlib.mjs", import.meta.url), new URL("mpilot.mjs", import.meta.url)]) h.update(readFileSync(f));
     h.update(RPATCH ? readFileSync(RPATCH.path) : "no patch");
-    h.update(JSON.stringify([ITERS, args.maxsecs || 0, !!args.nopatch, !!args.views, !!args.screen].concat(args.crater ? ['crater'] : [])));
+    h.update(JSON.stringify([ITERS, args.maxsecs || 0, !!args.nopatch, !!args.views, !!args.screen].concat(args.crater ? ['crater'] : [])
+        .concat(args.pose || args.norandat || args.nokeeprand || args.nosites ? [args.pose || "", !!args.norandat, !!args.nokeeprand, args.nosites || ""] : [])));
     const dir = `${WORK}refcache`, file = `${dir}/${h.digest("hex")}.json.gz`;
     if (!args.norefcache && !args.trace && existsSync(file)) {
         const o = JSON.parse(gunzipSync(readFileSync(file)).toString());
@@ -124,13 +145,14 @@ async function cachedRef() {
         o.init = Uint8Array.from(Buffer.from(o.init, "base64"));
         o.stats.systems = new Set(o.stats.systems);
         console.log(`ref: ${o.iters} iterations (${o.tt100} in flight), emulated ${o.emuSecs.toFixed(1)} s (cached)`);
+        if (o.siteN) console.log(`ref: patch sites run: ${Object.entries(o.siteN).map(([n, c]) => n + " " + c).join(", ") || "none"}`);
         return o;
     }
     const r = await run("ref", REF, rsy, null, null, RPATCH);
     const o = { snaps: r.snaps.map(b => Buffer.from(b).toString("base64")), screens: r.screens, init: Buffer.from(r.init).toString("base64"),
         initRand: [...r.initRand], iterTimes: r.iterTimes, tt100Times: r.tt100Times, regions: r.regions, keyLog: r.keyLog,
         iters: r.iters, tt100: r.tt100, emuSecs: r.emuSecs, error: r.error, phases: r.phases,
-        stats: { ...r.stats, systems: [...r.stats.systems] } };
+        stats: { ...r.stats, systems: [...r.stats.systems] }, siteN: r.siteN };
     mkdirSync(dir, { recursive: true });
     // (written whole, then renamed into place: a gate running at the same time in this
     // worktree never reads a part-written file)

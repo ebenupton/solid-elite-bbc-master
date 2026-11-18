@@ -34,7 +34,8 @@
 //   full      the sun parked and every other slot filled (three asteroids and
 //             seven canisters, the heap just fitting), which the pilot shoots:
 //             the slots shuffle below the parked sun, spawns fail, and the
-//             explosion clouds are drawn (their seed: DOEXP, PTCLS)
+//             explosion clouds are drawn (their seed: DOEXP, PTCLS); and, as a
+//             control, the reference without keepRand must differ from the build
 //   handback  flying at the sun as the station goes: the sun ahead in the
 //             front view, parked, then the station put far away; the sun's
 //             centre on the screen (the build's F_SUX, F_SUY: the frame's
@@ -91,7 +92,7 @@ function labels(sy, ref) {
 const coord = (rb, a) => { const m = ((rb(a + 2) & 0x7f) << 16) | (rb(a + 1) << 8) | rb(a); return rb(a + 2) & 0x80 ? -m : m; };
 const putc = (ram, a, v) => { const m = Math.abs(v); ram[a] = m & 255; ram[a + 1] = (m >> 8) & 255; ram[a + 2] = ((m >> 16) & 127) | (v < 0 ? 128 : 0); };
 
-async function fly(scene, who, disc, sy, ref, seedBoot) {
+async function fly(scene, who, disc, sy, ref, seedBoot, patch) {
     const L = labels(sy, ref);
     const pk = ref ? RP.region[0] : sy.SUNPK, pf = pk + NI;
     const pilot = makePilot();
@@ -269,7 +270,7 @@ async function fly(scene, who, disc, sy, ref, seedBoot) {
     const dks = c => (misjump >= iter && c.key === 0x01 && c.site === "ee5") || (ghyp >= iter && c.key === 0x01 && c.site !== "ee5") ? true
         : pilot.dks ? pilot.dks(c) : false;
     const r = await runElite({ disc, syms: sy, pilot: { keys, dks, observe: pilot.observe, P }, iters: ITERS[scene] * (+(a.iters || 1)), maxSecs: 6 * ITERS[scene],
-        patch: patchCommander, refPatch: ref ? RP : null, deadRegs: !ref, onIter, seedBoot });
+        patch: patchCommander, refPatch: ref ? (patch || RP) : null, deadRegs: !ref, onIter, seedBoot });
     if (strays.length) fail.push(`${who}: the patch's memory written by other code: ${strays.join(", ")}`);
     return { r, fail, count, sunPos, arrivals: Object.keys(arrivals).length };
 }
@@ -308,6 +309,15 @@ for (const scene of SCENES) {
     const div = compare(R.r, C.r);
     const fails = [...R.fail, ...C.fail];
     if (div) fails.unshift(`game state: ${div}`);
+    if (scene === "full") {
+        // the control: the reference without keepRand must differ from the build, or the
+        // clouds drawn here would not show that the seed is kept
+        const RN = await fly(scene, "ref", REF, rsy, true, null, { ...RP, keepRand: undefined });
+        const divN = compare(RN.r, C.r);
+        console.log(`  the reference's keepRand restores: ${(R.r.siteN || {}).keepRand || 0}; control (the reference without keepRand): ${divN || "identical"}`);
+        if (!((R.r.siteN || {}).keepRand > 0)) fails.push("keepRand never ran in the reference");
+        if (!divN) fails.push("control: the reference without keepRand matched the build (the clouds' seed is not exercised)");
+    }
     if ((scene === "zone" || scene === "handback") && !(R.count.SUNUP && R.count.SUNBK)) fails.push("the sun was not parked (SUNUP) and restored (SUNBK)");
     if (scene === "handback") {
         if (!C.count.handbacks) fails.push("no hand-back");

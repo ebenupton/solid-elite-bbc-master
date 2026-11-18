@@ -412,6 +412,9 @@ export async function runElite(opts) {
     // LL9's caller), so the routine takes no random numbers that last
     const KEEP = opts.refPatch && opts.refPatch.keepRand ? opts.refPatch.keepRand : null;
     let keepPend = null;
+    // the patch's sites, counted as they run (res.siteN, by name; and keepRand's
+    // restores): a proof needs its sites to have run
+    let SITES = null;
     const res = { snaps: [], screens: [], iterTimes: [], tt100Times: [], tt100AtIter: [], init: null, keyLog: [], events: [], s, cpu, sy, regions };
     let started = false, done = false, armPatch = false, iter = 0, tt100 = 0, checked = false;
     const ctxBase = { rb, rd, sy, iterOf: () => iter, tt100Of: () => tt100 };
@@ -444,6 +447,7 @@ export async function runElite(opts) {
     res.deadN = {};
     const deadRnd = () => { deadSeed ^= deadSeed << 13; deadSeed ^= deadSeed >>> 17; deadSeed ^= deadSeed << 5; return deadSeed >>> 0; };
     const handler = pc => {
+        if (SITES !== null && SITES.has(pc)) { const n = SITES.get(pc); res.siteN[n] = (res.siteN[n] || 0) + 1; }
         if (DEAD.length) {
             for (let j = deadPend.length - 1; j >= 0; j--) {
                 const d = deadPend[j];
@@ -515,6 +519,7 @@ export async function runElite(opts) {
             keepPend = { ret: stackWord(1) + 1, vals: KEEP.bytes.map(b => rb(b)) };
         } else if (keepPend && pc === keepPend.ret) {
             KEEP.bytes.forEach((b, i) => wr(b, [keepPend.vals[i]]));
+            res.siteN.keepRand = (res.siteN.keepRand || 0) + 1;
             keepPend = null;
         } else if (H_RAND !== null && pc === H_RAND) {
             const R = sy.RAND, f1 = rb(R), c = cpu.p.c ? 1 : 0;
@@ -555,6 +560,7 @@ export async function runElite(opts) {
             if (hs) { H_P8 = hs.p8; H_MV5 = hs.mv5; }
             if (opts.refPatch) applyRefPatch(cpu.ramRomOs, opts.refPatch);
             if (opts.refPatch && opts.refPatch.randAt) H_RAND = opts.refPatch.sites.find(st => st.name === opts.refPatch.randAt).addr;
+            if (opts.refPatch) { SITES = new Map(); res.siteN = {}; for (const st of opts.refPatch.sites) SITES.set(st.addr, st.name); }
             if (opts.seed) for (const [a, bytes] of opts.seed) wr(a, bytes);
             if (opts.seedBoot) { res.seeded = opts.seedBoot(regions, written, rb); for (const [a, bytes] of res.seeded) wr(a, bytes); }
             bootWrites.remove();
