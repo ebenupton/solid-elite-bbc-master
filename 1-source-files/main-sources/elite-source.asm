@@ -32072,17 +32072,13 @@ ENDIF
                         \ Port: the original zero-fills the LSO block here
                         \ (LSO+1 to LSO+199: the sun's rows, which are gone,
                         \ SUN, and the space station's line heap, which the
-                        \ frame does not read), then sets LSX to &FF; all that
-                        \ leaves in the game's state is LSX, with A = 0 and
-                        \ Y = &FF as the original returns them
+                        \ frame does not read), then sets LSX to &FF, which
+                        \ nothing reads now (WPLS); all that is left is A = 0
+                        \ and Y = &FF, as the original returns them
 
  LDA #0                 \ Return with A = 0, as the original's fill leaves it
 
  LDY #&FF               \ Set Y to &FF, as the original's loop ends with it
-
- STY LSX                \ Set the first byte of the LSO block, which has its own
-                        \ label LSX, to &FF, to indicate that the sun line heap
-                        \ is empty
 
  RTS                    \ Return from the subroutine
 
@@ -34401,76 +34397,39 @@ ENDIF
 
 .SUN
 
- LDA #RED               \ Switch to colour 2, which is red in the space view
- STA COL
-
- LDA #1                 \ Set LSX = 1 to indicate the sun line heap is about to
- STA LSX                \ be filled up
+                        \ Port: the original sets COL to red and LSX to 1 (the
+                        \ sun line heap about to be filled) here; the frame
+                        \ fills the sun from its record, and nothing reads
+                        \ either afterwards
 
  JSR CHKON              \ Call CHKON to check whether any part of the new sun's
                         \ circle appears on-screen, and if it does, set P(2 1)
                         \ to the maximum y-coordinate of the new sun on-screen
 
  BCS PLF3M3             \ If CHKON set the C flag then the new sun's circle does
- JSR H_SUN              \ Port: in record mode, record the sun for the renderer
-                        \ (gfx-hooks.asm)
                         \ not appear on-screen, so jump to WPLS (via the JMP at
                         \ the top of this routine) to remove the sun from the
                         \ screen, returning from the subroutine using a tail
                         \ call
 
-                        \ Port: the fringe size in CNT, from the radius (0, 1,
-                        \ 3 or 7), is gone with the rows (below)
+ JSR H_SUN              \ Port: in record mode, record the sun for the renderer
+                        \ (gfx-hooks.asm), returning with the C flag clear, as
+                        \ CHKON left it
 
-                        \ We now calculate the highest pixel y-coordinate of the
-                        \ new sun, given that P(2 1) contains the 16-bit maximum
-                        \ y-coordinate of the new sun on-screen
-
- LDA Yx2M1              \ Set Y to the y-coordinate of the bottom of the space
-                        \ view
-
- LDX P+2                \ If P+2 is non-zero, the maximum y-coordinate is off
- BNE PLF2               \ the bottom of the screen, so skip to PLF2 with A set
-                        \ to the y-coordinate of the bottom of the space view
-
- CMP P+1                \ If A < P+1, the maximum y-coordinate is underneath the
- BCC PLF2               \ dashboard, so skip to PLF2 with A set to the
-                        \ y-coordinate of the bottom of the space view
-
- LDA P+1                \ Set A = P+1, the low byte of the maximum y-coordinate
-                        \ of the sun on-screen
-
- BNE PLF2               \ If A is non-zero, skip to PLF2 as it contains the
-                        \ value we are after
-
- LDA #1                 \ Otherwise set A = 1, the top line of the screen
-
-.PLF2
-
- STA TGT                \ Set TGT to A, the maximum y-coordinate of the sun on
-                        \ screen
-
-                        \ Port: the rest of SUN (here the rows' count and
+                        \ Port: the rest of SUN (here the fringe size in CNT,
+                        \ the sun's top row in TGT, the rows' count and
                         \ direction, V and V+1, and K2 = K^2; then parts 2 to 4:
                         \ the old sun's rows erased, each new row's half-width
                         \ from LL5 and its random fringe from DORND, its ends
                         \ from EDGES, the line drawn by HLOIN and kept in the
-                        \ sun line heap at LSO) drew the sun as lines. The frame
-                        \ fills the sun from the record H_SUN makes, and the
-                        \ sun's edge draws no random numbers (in the reference
-                        \ too, the comparison's patch to SUN), so all the rows
-                        \ left in the game's state was what part 4 ends with:
-                        \ SUNX = K3, and the C flag clear (K2 = K^2, which part
-                        \ 1 set for the rows, MV40 no longer reads: MV40's K2).
-                        \ Parts 2 to 4 are Area: none
-
- CLC                    \ Clear the C flag to indicate success in drawing the
-                        \ sun
-
- LDA K3                 \ Set SUNX(1 0) = K3(1 0)
- STA SUNX
- LDA K3+1
- STA SUNX+1
+                        \ sun line heap at LSO, and SUNX = K3) drew the sun as
+                        \ lines. The frame fills the sun from the record H_SUN
+                        \ makes, and the sun's edge draws no random numbers (in
+                        \ the reference too, the comparison's patch to SUN), so
+                        \ all the rows left that the game reads is the C flag
+                        \ clear (TGT, SUNX, LSX and COL nothing reads again
+                        \ before setting them, and MV40 no longer reads K2:
+                        \ MV40's K2). Parts 2 to 4 are Area: none
 
  RTS                    \ Return from the subroutine
 
@@ -35175,19 +35134,13 @@ ENDIF
 
 .WPLS
 
- LDA LSX                \ If LSX < 0, the sun line heap is empty, so return from
- BMI WPLS-1             \ the subroutine (as WPLS-1 contains an RTS)
-
-                        \ Port: the original redraws the sun's rows from the
-                        \ sun line heap at LSO here, to remove them (HLOIN2, for
-                        \ each row from 2 * #Y - 1 up); the frame draws the sun
-                        \ from its record, so the rows are gone (SUN), and all
-                        \ the erasing left in the game's state is LSX = &FF and
-                        \ Y = &FF
-
- LDY #&FF               \ Set Y to &FF, as the original's loop ends with it
-
- STY LSX                \ Set LSX to &FF to indicate the sun line heap is empty
+                        \ Port: the original returns at once if LSX < 0 (the
+                        \ sun line heap empty), else redraws the sun's rows
+                        \ from the heap at LSO to remove them (HLOIN2, for each
+                        \ row from 2 * #Y - 1 up) and sets LSX to &FF; the
+                        \ frame draws the sun from its record, so there are no
+                        \ rows (SUN), and nothing reads LSX or the Y the loop
+                        \ left (&FF), so nothing is left to do
 
  RTS                    \ Return from the subroutine
 

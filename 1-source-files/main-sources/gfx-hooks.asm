@@ -42,10 +42,9 @@
 \ about to draw the planet's circle) and its surface detail (G_PFHOOK), and
 \ returns from PL9 itself, whose meridians and crater the renderer draws
 \ (their maths, PL9 parts 2 and 3, PLS2, PLS22 ..., are "Area: none"),
-\ leaving what the game reads of them: TGT (31 or 64) and FLAG (0); and
-\ LSX2 = 0, STP and CNT as CIRCLE2 would (MV40 no longer reads K2, which
-\ PLS1 left there: MV40's K2). If the circle isn't on screen (CHKON), it
-\ returns from CIRCLE with C set, as CIRCLE does
+\ leaving LSX2 = 0, STP and CNT as CIRCLE2 would (what else they left, TGT,
+\ FLAG and K2, nothing reads again before setting it). If the circle isn't
+\ on screen (CHKON), it returns from CIRCLE with C set, as CIRCLE does
 
 .H_CIRC
  LDA QQ11
@@ -61,7 +60,6 @@
  JSR G_PFHOOK           \ the planet's class and surface detail (gfx-planet7.asm)
  LDA #0
  STA LSX2
- STA FLAG
  LDX K
  LDA #8
  LDY #72
@@ -78,23 +76,6 @@
  STY CNT
  PLA                    \ (return from PL9: CIRCLE's return into it)
  PLA
- LDA K+1                \ (PL9: only below a radius of 256)
- BNE hci9
- LDA TYPE
- CMP #128
- BNE hci2
- LDA K                  \ a meridian planet (part 2): radius 6 up
- CMP #6
- BCC hci9
- LDA #31
- BNE hci3
-.hci2
- LDA INWK+20            \ a crater planet (part 3): its crater facing us
- BMI hci9
- LDA #64
-.hci3
- STA TGT
-.hci9
  RTS
 
 \ H_WPLS2: in record mode the planet's lines are not on screen: just reset the

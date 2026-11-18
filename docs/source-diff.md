@@ -261,7 +261,8 @@ SUN's JSR DORND out too); SUN's part 1 loses its fringe size and its set-up for 
 (ending with SUNX and an RTS), HLOIN its own entry, and WPLS and FLFLLS their line
 heap work, each with a `Port:` note. MV40's K2: its ADC K2 and SBC K2 become ADC #0
 and SBC #0 (2, 2: the reference's patch the same), with a `Port:` note, and PLS1 is
-`Area: none` (H_CIRC no longer calls it for K2).
+`Area: none` (H_CIRC no longer calls it for K2). The leftovers: SUN loses COL, LSX,
+TGT and SUNX, WPLS is an RTS and FLFLLS loses LSX, each with a `Port:` note.
 
 ## Step 0: trivial fixes (done)
 

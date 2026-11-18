@@ -246,7 +246,8 @@ export const DRAW_EXCLUDE = {
     XC: [1, "text cursor"], YC: [1, "text cursor"], LSX2: [256, "planet line heap"], LSY2: [256, "planet line heap"],
     LSO: [200, "sun line heap"], BUF: [90, "line buffer"], XSAV2: [1, "temp"], YSAV2: [1, "temp"],
     COMX: [1, "compass dot"], COMY: [1, "compass dot"], widget: [1, "temp"], dontclip: [1, "temp"], Yx2M1: [1, "temp"],
-    newzp: [1, "temp"], XX18: [4, "temp"],
+    newzp: [1, "temp"], XX18: [4, "temp"], TGT: [1, "temp"], FLAG: [1, "temp"], SUNX: [2, "sun's old centre"],
+    LSX: [1, "sun line heap"],
 };
 
 export function excludeSet(sy, lists) {
@@ -330,9 +331,9 @@ function xTrace(s, file, disc) {
 //   PTCLS    A, X, Y, C: the cloud is drawn in the frame (H_PTCLS, F_CLOUD)
 //   BOMBOFF  A, X: H_BOMB, H_LLINE draw nothing in record mode
 //   PIXEL2   A, N, Z: H_STAROFF (every caller reaches a DEY first)
-//   WPLS     A, X, C: the port's WPLS only empties the sun's heap
+//   WPLS     A, X, Y, C: the port's WPLS is an RTS
 export const DEAD_AFTER = [["DIALS", "axc"], ["SUN", "axy"], ["PLANET", "az"], ["PTCLS", "axyc"],
-    ["BOMBOFF", "ax"], ["PIXEL2", "anz"], ["WPLS", "axc"]];
+    ["BOMBOFF", "ax"], ["PIXEL2", "anz"], ["WPLS", "axyc"]];
 
 export async function runElite(opts) {
     const sy = opts.syms;

@@ -664,16 +664,19 @@ ASSERT XX0 = XX16 + 18
                         \ iteration's ships, in game context)
 
  \ keep the zero page the rasteriser uses (&06-&27) and the frame layer's
- \ (&D2-&E1), unrolled, in f_zsv, not on the stack: the frame's ship
- \ projection puts the vertices in XX3, page 1 from &0100, under the stack
+ \ (&D2-&E1, but for FZ+2, LSX, which the game no longer reads), unrolled,
+ \ in f_zsv, not on the stack: the frame's ship projection puts the
+ \ vertices in XX3, page 1 from &0100, under the stack
  \ (2-build-files/records/stack.mjs)
  FOR z, &06, &27
   LDA z
   STA f_zsv + z - &06
  NEXT
  FOR z, 0, 15
+ IF z <> LSX - FZ
   LDA FZ + z
   STA f_zsv + &22 + z
+ ENDIF
  NEXT
 
  BIT GMODE
@@ -741,8 +744,10 @@ ASSERT XX0 = XX16 + 18
  JSR f_gback
 
  FOR z, 0, 15            \ restore the zero page (kept at ff1)
+ IF z <> LSX - FZ
   LDA f_zsv + &22 + z
   STA FZ + z
+ ENDIF
  NEXT
  FOR z, &06, &27
   LDA f_zsv + z - &06
@@ -3385,12 +3390,12 @@ FC_PLLE = &5F : FC_PLLO = &AF
 \ f_gkeep: before the frame first runs game code (f_proj, f_dots' clouds),
 \ keep the game's zero page that the game reads afterwards and that game
 \ code changes (2-build-files/records/live.mjs, the frame's span, all it
-\ writes): RAND, Q, TGT, XX0, INWK 0-8, INWK+31 and XX19; the frame puts it
+\ writes): RAND, Q, XX0, INWK 0-8, INWK+31 and XX19; the frame puts it
 \ back at its end (f_gback; f_gz bit 7: kept, until then). The rest it
 \ writes, outside the rasteriser's &06-&27 (which F_FRAME keeps), is written
 \ again before it is read
 
-FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
+FGZ = 4 + 1 + 2 + 9 + 1 + 2
 .f_gzs SKIP FGZ
 .f_gz   EQUB 0
 .f_gkeep
@@ -3398,13 +3403,12 @@ FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
  BMI fgk9
  FOR k, 0, 3 : LDA RAND+k : STA f_gzs+k : NEXT
  LDA Q : STA f_gzs+4
- LDA TGT : STA f_gzs+5
- LDA XX0 : STA f_gzs+6
- LDA XX0+1 : STA f_gzs+7
- FOR k, 0, 8 : LDA INWK+k : STA f_gzs+8+k : NEXT
- LDA INWK+31 : STA f_gzs+17
- LDA XX19 : STA f_gzs+18
- LDA XX19+1 : STA f_gzs+19
+ LDA XX0 : STA f_gzs+5
+ LDA XX0+1 : STA f_gzs+6
+ FOR k, 0, 8 : LDA INWK+k : STA f_gzs+7+k : NEXT
+ LDA INWK+31 : STA f_gzs+16
+ LDA XX19 : STA f_gzs+17
+ LDA XX19+1 : STA f_gzs+18
  DEC f_gz
 .fgk9
  RTS
@@ -3413,13 +3417,12 @@ FGZ = 4 + 1 + 1 + 2 + 9 + 1 + 2
  STZ f_gz
  FOR k, 0, 3 : LDA f_gzs+k : STA RAND+k : NEXT
  LDA f_gzs+4 : STA Q
- LDA f_gzs+5 : STA TGT
- LDA f_gzs+6 : STA XX0
- LDA f_gzs+7 : STA XX0+1
- FOR k, 0, 8 : LDA f_gzs+8+k : STA INWK+k : NEXT
- LDA f_gzs+17 : STA INWK+31
- LDA f_gzs+18 : STA XX19
- LDA f_gzs+19 : STA XX19+1
+ LDA f_gzs+5 : STA XX0
+ LDA f_gzs+6 : STA XX0+1
+ FOR k, 0, 8 : LDA f_gzs+7+k : STA INWK+k : NEXT
+ LDA f_gzs+16 : STA INWK+31
+ LDA f_gzs+17 : STA XX19
+ LDA f_gzs+18 : STA XX19+1
  RTS
 
 \ F_GUN: the set-up of LL9's part 6 (LL42P) for a ship firing at us, whose

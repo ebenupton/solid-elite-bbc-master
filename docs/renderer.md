@@ -81,9 +81,10 @@ would have drawn, then returns from the routine itself:
   orientation to the meridian window, which makes its surface detail (see
   "Planet surfaces"). A meridian planet's equator and meridian and a crater
   planet's crater are not worked out at all: in record mode `H_CIRC`
-  returns from `PL9` itself, leaving what the game reads of that path as
-  the original leaves it (`TGT` and `FLAG`; `MV40` no longer reads `K2`,
-  see "MV40's K2" below). That path (`PL9` parts 2 and 3, `PLS1`, `PLS2`,
+  returns from `PL9` itself: nothing the game reads afterwards comes from
+  that path (`TGT` and `FLAG` are set again before they are read, and
+  `MV40` no longer reads `K2`: "The sun's and the planet's leftovers" and
+  "MV40's K2", below). That path (`PL9` parts 2 and 3, `PLS1`, `PLS2`,
   `PLS22` and its curve loop, `PLS3`, `PLS4`, `PLS5`) is `Area: none` in the
   source ([memory-map.md](memory-map.md)): planets are never drawn outside
   record mode, as `GFORCE` is set only for the hyperspace rings, which use
@@ -679,12 +680,11 @@ one a row, each row's half-width the circle's plus a random fringe
 (`LSO`) to erase them. The renderer fills the sun as a disc from the record
 `H_SUN` makes, and the sun's edge takes no random numbers, in the game and in
 the comparison's reference alike (the reference's patch turns `SUN`'s one
-`JSR DORND` into `LDA #0 : NOP`). With no random numbers taken, all the rows
-left in the game's state is what `SUN`'s part 1 computes before them (`TGT`,
-`LSX` and `COL`) and what part 4 ends with (`SUNX` and the C flag clear).
-So the port's `SUN` is part 1, then `SUNX` and an `RTS`; parts 2 to 4, `HLOIN2`, `EDGES` and the orange table are `Area:
-none`, and the fringe size, `PLF3` and `PLF17`, `HLOIN`'s own entry and the
-renderer's `H_HLOIN` went with them. `WPLS` and `FLFLLS` keep only `LSX`.
+`JSR DORND` into `LDA #0 : NOP`). So the port's `SUN` is `CHKON`, `H_SUN`
+and an `RTS`; parts 2 to 4, `HLOIN2`, `EDGES` and the orange table are
+`Area: none`, and the fringe size, `PLF3` and `PLF17`, `HLOIN`'s own entry
+and the renderer's `H_HLOIN` went with them. `WPLS` is an `RTS`, and
+`FLFLLS` returns `A` = 0 and `Y` = `&FF` only.
 A visible sun no longer costs its rows: `msunnear.mjs`'s posed scene (a
 radius 16 sun beside a planet of radius 120) runs at 6.53 it/s against
 5.96.
@@ -699,6 +699,17 @@ game and in the comparison's reference alike: the planets' and suns' y
 rounds without the stray carry, at most one unit in y_lo, and no longer
 depends on what was drawn before. `H_CIRC`'s `PLS1` and `SUN`'s K2 = K^2 went
 with it.
+
+**The sun's and the planet's leftovers.** The original's drawing leaves
+`TGT` (the sun's top row; the planet's 31 or 64), `FLAG`, `SUNX` (the sun's
+centre, for the next erase) and `LSX` (the sun line heap's flag). No game
+code reads any of them before setting it again (`TGT` only `EX4`, after
+`PTCLR` sets it; `FLAG` only `BLINE`, after `CIRCLE2` sets it; `LSX` only the
+original's `WPLS`; `SUNX` nothing), so the port no longer recreates them:
+they are drawing temporaries for the comparison. `LSO`'s last 199 bytes
+(`&0A7F-&0B45`) are free: only `LSO+0`, the station's line heap's first
+byte, is written, and the heap pointer, which is game state, still points at
+`LSO`.
 
 **Two discs.** `PLANET` gives the sun and the planet the same radius at the
 same z, so the bigger disc is the nearer. `f_discs` makes the bigger one
@@ -931,15 +942,15 @@ ball filling the view), sun (a radius 32 sun beside a radius 60 planet),
 docking (the station ahead at 1500), zone (the safe zone, the sun parked
 behind us) and rear (the beach ball in the rear view).
 
-| Scene | After the CPC findings | The sun's parking | The sun's edge | The clouds' seed | MV40's K2 |
-|---|---:|---:|---:|---:|---:|
-| Flight | 175,589 | 175,472 | 173,759 | 173,801 | 174,770 |
-| Combat | 104,982 | 104,945 | 103,637 | 103,589 | 104,692 |
-| Beach ball | 189,112 | 190,871 | 190,622 | 190,609 | 190,175 |
-| Sun | 203,384 | 203,290 | 146,546 | 146,419 | 147,856 |
-| Docking | 346,017 | 337,000 | 335,179 | 335,168 | 335,789 |
-| Zone | 314,781 | 302,995 | 300,973 | 301,022 | 303,167 |
-| Rear | 189,406 | 189,199 | 189,992 | 189,986 | 188,449 |
+| Scene | After the CPC findings | The sun's parking | The sun's edge | The clouds' seed | MV40's K2 | The leftovers |
+|---|---:|---:|---:|---:|---:|---:|
+| Flight | 175,589 | 175,472 | 173,759 | 173,801 | 174,770 | 174,719 |
+| Combat | 104,982 | 104,945 | 103,637 | 103,589 | 104,692 | 104,776 |
+| Beach ball | 189,112 | 190,871 | 190,622 | 190,609 | 190,175 | 190,155 |
+| Sun | 203,384 | 203,290 | 146,546 | 146,419 | 147,856 | 147,759 |
+| Docking | 346,017 | 337,000 | 335,179 | 335,168 | 335,789 | 335,773 |
+| Zone | 314,781 | 302,995 | 300,973 | 301,022 | 303,167 | 303,146 |
+| Rear | 189,406 | 189,199 | 189,992 | 189,986 | 188,449 | 188,422 |
 
 (Cycles a frozen iteration; iterations a second = 2,000,000 / cycles.) No
 scene has an explosion, so the clouds' seed changes none of them.

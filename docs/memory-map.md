@@ -145,8 +145,7 @@ header names its pass:
   place, so a reference still assembles and returns at once. It is the
   planet's surface maths that the renderer's circle engine replaces: `PL9`
   parts 2 and 3, `PLS1`, `PLS2`, `PLS22`, `PLL4F`, `pl4pat`, `PLS3`, `PLS4`
-  and `PLS5` (`H_CIRC` returns from `PL9` in record mode, leaving `TGT` and
-  `FLAG` as they would be); and the sun's rows: `SUN` parts 2 to 4, `HLOIN2`,
+  and `PLS5` (`H_CIRC` returns from `PL9` in record mode); and the sun's rows: `SUN` parts 2 to 4, `HLOIN2`,
   `EDGES` and the orange table. 16 blocks.
 * **`, runs on`** after any of these marks a table that code reads past its
   end, so that the next block must follow it, as a fall-through would.
