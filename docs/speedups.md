@@ -106,3 +106,20 @@ the bytes, and the rate (cycles saved per byte spent).
 | MLSB, the stardust's pitch product, skipped when BET1 = 0 (stl_pat patches a BRA to mlbkj over its first instruction) | -92 | +29 (main and bank 4: the flow moved FEED..BELL from the first container on) | 3.2 |
 | PF_HOOK without its copy of the planet's centre into pf_cx and pf_cy, which only the planet's ring read | -71 | -14 (bank 7) | - |
 | f_discspans keeps the disc rows it made when the disc, its centre, its radius and the window are as last time and no polygon has been drawn since (F_DROK, which R_POLY clears); a moving disc notes only cy, cx and r | -507 | +167 (bank 6 163, ANDY 3, the shared workspace 1) | 3.0 |
+
+Over the CPC port's findings the gate's run went from 131,505 to 128,635
+cycles per flight iteration (15.21 to 15.55 it/s; SNG47 15.93), for 696
+bytes. Free bytes before and after:
+
+| Region | Before | After |
+|---|---:|---:|
+| main RAM, the hot pass's first container (to `&4000`) | 66 | 201 |
+| main RAM, the hot pass's second container (from `&7400`) | 72 | 16 |
+| bank 4 | 382 | 75 |
+| HAZEL | 1,223 | 1,223 |
+| shared workspace (its gaps, and below `CODE%`) | 337 | 325 |
+| bank 5 | 124 | 124 |
+| bank 7 (after the meridian window) | 2,148 | 2,163 |
+| ANDY | 37 | 56 |
+| bank 6 | 1,428 | 938 |
+| total | 5,817 | 5,121 |
