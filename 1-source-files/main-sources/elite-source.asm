@@ -14015,19 +14015,28 @@ ENDIF
  ADC #2                 \ (C = 0: no carry out of HI(QSL))
  STA mlb5+2,X
 
- TXA                    \ Port: and for MLSA (X <> 0), its first instruction:
- BEQ stlpr              \ STA T when b <> 0, BRA mlsk when b = 0, as the roll
- LDA #&85               \ products are then 0 (until ALP1 first changes, MLSA
- LDY #T                 \ keeps its assembled STA T: its own path, which gives
- LDX mla1+1             \ the same results)
- BNE stlw
- LDA #&80
+ LDY #T                 \ Port: and the first instruction of MLSB (X = 0) or
+ LDA mlb1+1,X           \ MLSA: STA T when b <> 0, else BRA mlbkj or BRA mlsk,
+ BNE stlw0              \ as the products are then 0 (until ALP1 or BET1
+ LDY #mlbkj-MLSB-2      \ first changes, the assembled STA T stays: their own
+ TXA                    \ paths, which give the same results)
+ BEQ stlz
  LDY #mlsk-MLSA-2
+
+.stlz
+
+ LDA #&80
+ BRA stlw
+
+.stlw0
+
+ LDA #&85
 
 .stlw
 
- STA MLSA
- STY MLSA+1
+ STA MLSB,X
+ TYA
+ STA MLSB+1,X
 
 .stlpr
 
@@ -14288,7 +14297,10 @@ ENDIF
 
 .MLSB
 
- STA T                  \ Set T = A, as MULTS does
+ STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
+                        \ to BRA mlbkj when BET1 = 0)
+
+.mlb0
  AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlbz, as MULTS does
  BEQ mlbz               \ at MU6
  TAX                    \ Set X = |A|
@@ -14335,6 +14347,8 @@ ENDIF
                         \ P AND 31, so Q^2 < 256), so the original's
                         \ sign-preserving STA T : LDA #0 : ROR A : ORA T is a
                         \ no-op (C = 0 and A, N, Z are the same; ADD rewrites T)
+
+.mlbc
 
  BCS stlb               \ Port: if the high byte C is 0, do ADD inline (P, T
  LDX S                  \ and T1 are dead: STZ P below, and PIX1's ADD rewrites
@@ -14432,6 +14446,11 @@ ENDIF
 
  RTS                    \ Return from the subroutine
 
+.mlbkj
+
+ JMP mlbk               \ (stl_pat's BRA from MLSB's start reaches here, as
+                        \ mlbk is out of its range)
+
 .mlbz
 
  STA P+1                \ MLSB with A = 0: set P(1 0) = 0, as MULTS's MU6,
@@ -14444,6 +14463,30 @@ ENDIF
  LDX BET1               \ before and rejoin
  JSR MULTS
  BRA mlb6
+
+.mlbk
+
+                        \ Port: MLSB when BET1 = 0 (stl_pat puts BRA mlbkj in
+                        \ place of its STA T, through mlbkj): with |A| <> 0 the product is 0
+                        \ with A's sign, so P = 0, Q = A AND &80, and then
+                        \ 2 * Q^2 = 0: join at mlbc with A = 0 and C = 0, as
+                        \ MLSB's own path arrives there (its X = 0 is rewritten
+                        \ by LDX S, its V by the ADD in PIX1 or stlb). |A| = 0
+                        \ (P+1 = 0 too, at mlbz) takes MLSB's own path
+
+ STA T                  \ T = A, as MLSB does
+ BIT #%01111111         \ If |A| = 0, take MLSB's path
+ BEQ mlbkf
+ STZ P
+ AND #%10000000
+ STA Q
+ LDA #0
+ CLC
+ JMP mlbc
+
+.mlbkf
+
+ JMP mlb0
 
 .stlb
 
@@ -14493,63 +14536,6 @@ ENDIF
 
  BRA STC1               \ Jump up to STC1 to draw this new particle (A need not
                         \ be set to y_hi: PIXEL2 starts by loading X1 into A)
-
-.MLUQ
-
-                        \ Port: (A P) = |A| * Q with C clear, as MLU3 gives
-                        \ (it also leaves X = 0; nothing in STL1 reads X or T
-                        \ after it), with Q patched in by STL1 once per
-                        \ particle: q at mlq2 and mlq4, 256 - q at mlq3 and
-                        \ mlq5 (1 <= q <= 255, so the high bytes are fixed).
-                        \ For |A| >= q the product is QS(|A| + q) - QS(|A| - q),
-                        \ exactly as MU11 computes it; |A| < q goes to mlqr
-
- AND #%01111111         \ Set X = |A|
- TAX
-
- CPX Q                  \ If |A| < q, jump to mlqr (with C = 1 otherwise, for
- BCC mlqr               \ the SBC below)
-
-.mlq2
-
- LDA QSL+1,X            \ (patched: QSL + q) Set (A P) = QS(|A| + q)
-.mlq3                   \                                - QS(|A| - q)
- SBC QSL-1,X            \ (patched: QSL - q)              = |A| * q
- STA P
-.mlq4
- LDA QSH+1,X            \ (patched: QSH + q)
-.mlq5
- SBC QSH-1,X            \ (patched: QSH - q)
-
- CLC                    \ Return with C clear, as MLU3 does
- RTS
-
-.mlqr
-
-                        \ |A| < q (rare), with C = 0 and A = X = |A|: join MU11
-                        \ past its set-up, with the registers and P it would
-                        \ have there (T = Q - 1 is not needed past that point,
-                        \ and is dead here: MLSA rewrites it before any read)
-
- STY mu7+1              \ Keep Y, as MU11 does
- STA P                  \ P = |A|, as MLU3 sets it
-
- ADC Q                  \ Set X = |A| + q, with C set if it is 256 or more, as
- TAX                    \ MU11 does with ADC T
-
- BCS mlqh               \ If |A| + q >= 256, join MU11 at mu5
-
- LDA Q                  \ Set A = q - |A| = |P - X| (C = 1 after, as q > |A|),
- SEC                    \ as MU11 computes it before mu4, and join MU11 at mu4
- SBC P
- JMP mu4
-
-.mlqh
-
- JMP mu5                \ Join MU11 at mu5 with C = 1, P = |A|, Q = q and
-                        \ X = |A| + q - 256, as MU11 arrives there
-
- ASSERT QSH = QSL + 512 AND LO(QSL) = 0
 
 .MLS2A
 
@@ -14687,9 +14673,67 @@ ENDIF
  STA T                  \ MLSA's path: its STA T, then the rest
  JMP mla0
 
+.MLUQ
+
+                        \ Port: (A P) = |A| * Q with C clear, as MLU3 gives
+                        \ (it also leaves X = 0; nothing in STL1 reads X or T
+                        \ after it), with Q patched in by STL1 once per
+                        \ particle: q at mlq2 and mlq4, 256 - q at mlq3 and
+                        \ mlq5 (1 <= q <= 255, so the high bytes are fixed).
+                        \ For |A| >= q the product is QS(|A| + q) - QS(|A| - q),
+                        \ exactly as MU11 computes it; |A| < q goes to mlqr
+
+ AND #%01111111         \ Set X = |A|
+ TAX
+
+ CPX Q                  \ If |A| < q, jump to mlqr (with C = 1 otherwise, for
+ BCC mlqr               \ the SBC below)
+
+.mlq2
+
+ LDA QSL+1,X            \ (patched: QSL + q) Set (A P) = QS(|A| + q)
+.mlq3                   \                                - QS(|A| - q)
+ SBC QSL-1,X            \ (patched: QSL - q)              = |A| * q
+ STA P
+.mlq4
+ LDA QSH+1,X            \ (patched: QSH + q)
+.mlq5
+ SBC QSH-1,X            \ (patched: QSH - q)
+
+ CLC                    \ Return with C clear, as MLU3 does
+ RTS
+
+.mlqr
+
+                        \ |A| < q (rare), with C = 0 and A = X = |A|: join MU11
+                        \ past its set-up, with the registers and P it would
+                        \ have there (T = Q - 1 is not needed past that point,
+                        \ and is dead here: MLSA rewrites it before any read)
+
+ STY mu7+1              \ Keep Y, as MU11 does
+ STA P                  \ P = |A|, as MLU3 sets it
+
+ ADC Q                  \ Set X = |A| + q, with C set if it is 256 or more, as
+ TAX                    \ MU11 does with ADC T
+
+ BCS mlqh               \ If |A| + q >= 256, join MU11 at mu5
+
+ LDA Q                  \ Set A = q - |A| = |P - X| (C = 1 after, as q > |A|),
+ SEC                    \ as MU11 computes it before mu4, and join MU11 at mu4
+ SBC P
+ JMP mu4
+
+.mlqh
+
+ JMP mu5                \ Join MU11 at mu5 with C = 1, P = |A|, Q = q and
+                        \ X = |A| + q - 256, as MU11 arrives there
+
+ ASSERT QSH = QSL + 512 AND LO(QSL) = 0
+
  ASSERT mla1 - mlb1 = MLSA - MLSB AND mla3 - mlb3 = MLSA - MLSB
  ASSERT mla5 - mlb5 = MLSA - MLSB AND mla2 - mlb2 = MLSA - MLSB
  ASSERT mla4 - mlb4 = MLSA - MLSB AND MLSA - MLSB < 256
+ ASSERT mlbkj - MLSB - 2 < 128 AND mlsk - MLSA - 2 < 128   \ (stl_pat's BRAs)
 
                         \ Port: FILLKL's variables (fkdet follows MVS5's rare
                         \ paths below)
