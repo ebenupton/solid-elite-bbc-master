@@ -1,8 +1,8 @@
-streams (measure): 610 blocks (low 32, hot 354 with 41 ACCCON X, cold 162), 193 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
-streams (place): 610 blocks (low 32, hot 354 with 41 ACCCON X, cold 162), 193 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
+streams (measure): 610 blocks (low 32, hot 354 with 41 ACCCON X, cold 162), 192 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
+streams (place): 610 blocks (low 32, hot 354 with 41 ACCCON X, cold 162), 192 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
 streams: hot1 &2F7C-&3FFF: 41 units, 4068 bytes, 160 free
 streams: hot2 &7400-&7FFF: 25 units, 3056 bytes, 16 free
-streams: hot3 &8000-&BD5E: 127 units, 14601 bytes, 1110 free
+streams: hot3 &8000-&BD5E: 126 units, 14601 bytes, 1110 free
 streams: hot data:
 streams: HAZEL &C000-&DA38, 1223 free; nothing in bank 4
 .DIALS
