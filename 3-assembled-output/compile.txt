@@ -1,6 +1,6 @@
-streams (measure): 605 blocks (low 32, hot 350 with 41 ACCCON X, cold 161), 192 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
-streams (place): 605 blocks (low 32, hot 350 with 41 ACCCON X, cold 161), 192 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
-streams: hot1 &2F7C-&3FFF: 43 units, 4162 bytes, 66 free
+streams (measure): 605 blocks (low 32, hot 350 with 41 ACCCON X, cold 161), 191 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, measure 50
+streams (place): 605 blocks (low 32, hot 350 with 41 ACCCON X, cold 161), 191 hot units, stubs 38 into the cold pass, 57 out of it; data bdata 1, cold 7, hot 50, hot4 0
+streams: hot1 &2F7C-&3FFF: 42 units, 4162 bytes, 66 free
 streams: hot2 &7400-&7FFF: 26 units, 3000 bytes, 72 free
 streams: hot3 &8000-&B91C: 123 units, 14239 bytes, 382 free
 streams: hot data:

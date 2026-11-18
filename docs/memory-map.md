@@ -224,8 +224,12 @@ that can fall through its end must be followed by a block of its own pass,
 or by a block of the other side whose first statement is its entry label (a
 seam, below). No other fall-through or branch crosses the hot/cold line,
 and the hot side refers to a cold label only to call it, jump to it or take
-its address, as a stub has no data. Then `2-build-files/bankcheck.py`
-checks every reference in the copies (below).
+its address, as a stub has no data. In each hot copy, after a block that
+falls through into the next, an ASSERT checks that the next starts where it
+ends. A block's last statement is its last that assembles anything (`MT16`
+ends with the constant `DTW7 = MT16 + 1`, after the `LDA` that falls into
+`TT26`). Then `2-build-files/bankcheck.py` checks every reference in the
+copies (below).
 
 ## Calls between the passes
 

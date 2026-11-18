@@ -262,14 +262,21 @@ ACTIVE = []
 
 def last_statement(lines, s, e):
     """the last statement of lines[s:e] that is assembled (None if none),
-    passing over the lines of conditional assembly (IF, ELIF, ELSE, ENDIF)
-    and the branches the build's flags rule out"""
+    passing over the lines of conditional assembly (IF, ELIF, ELSE, ENDIF),
+    the branches the build's flags rule out, and the statements that
+    assemble nothing (constants, PRINTs, ASSERTs ...: MT16 ends with DTW7 =
+    MT16 + 1, after the LDA that falls through into TT26)"""
     for i in range(e - 1, s - 1, -1):
         if ACTIVE and not ACTIVE[i]:
             continue
         c = code_part(lines[i])
-        if c and not re.match(r"^(IF|ELIF|ELSE|ENDIF)\b", c, re.I):
-            return c if c.upper().startswith("EQU") else c.split(" : ")[-1].strip()
+        if not c or re.match(r"^(IF|ELIF|ELSE|ENDIF)\b", c, re.I):
+            continue
+        if c.upper().startswith("EQU"):
+            return c
+        for st in reversed([x.strip() for x in c.split(" : ")]):
+            if assembles(st, set()):
+                return st
     return None
 
 
@@ -928,6 +935,7 @@ def main():
     # statement is its entry label, as that label's stub is then the next
     # thing in the falling block's pass
     falls = []
+    hotfalls = []                          # (k, k2): hot block k falls into hot block k2
     for k, (s, e, name, area) in enumerate(bl):
         if eff[k] == "config" or not ASM[k]:
             continue
@@ -944,6 +952,7 @@ def main():
             elif pas(eff[k2]) == pas(eff[k]):
                 if pas(eff[k]) == "hot":
                     join(pos[k], pos[k2])
+                    hotfalls.append((k, k2))
             elif side(eff[k2]) != side(eff[k]):
                 entry = entry_label(lines, s2, e2, macros)
                 if entry:
@@ -1071,6 +1080,22 @@ def main():
     if phase == "measure":
         for k in hot:
             copies["measure"][bl[k][0]] = ".FLOW_%d" % k
+    else:
+        # each hot block that falls through its end must end where the block it
+        # falls into starts: an ASSERT on a blank line after its last code line
+        # (in its copy), so that a flow that parted them fails the build
+        for k, k2 in hotfalls:
+            entry = entry_label(lines, bl[k2][0], bl[k2][1], macros)
+            if not entry:
+                continue
+            s, e = bl[k][0], bl[k][1]
+            last = max([i for i in range(s, e) if code_part(lines[i])], default=None)
+            spot = [i for i in range(last + 1, e) if not lines[i].strip()] if last is not None else []
+            if not spot:
+                errors.append("%s:%d: %s falls into %s: no blank line after its code for the check"
+                              % (SRC, e, bl[k][2], entry))
+                continue
+            copies[copy_of[k]][spot[0]] = " ASSERT P% = " + entry + "   \\ (streams.py: the block before falls through into it)"
     nstubs = glue(copies, errors, lines, bl, eff, copy_of, falls,
                   ["low"] + (["measure"] if phase == "measure" else ["hot1", "hot2", "hot3"]))
     with open(DIRECT, "w") as f:           # (for bankcheck.py: what the cold pass calls directly)
