@@ -14007,8 +14007,16 @@ ENDIF
                         \ operands, QSL-b / QSH-b (both bytes, as b may be 0)
                         \ into the others (here, before STARS1, so that the
                         \ MLSB inlined in STL1 is within 256 bytes of MLSA)
+                        \
+                        \ If b is already patched in (the CPX operand holds
+                        \ the last b, and the assembled operands are those of
+                        \ b = 0), the operands are all set already, so return
+                        \ (STARS1 reads neither A nor C after this: STL1
+                        \ starts with LDA and CMP)
 
  AND #31
+ CMP mlb1+1,X
+ BEQ stlpr
  STA mlb1+1,X
  STA mlb2+1,X
  STA mlb4+1,X
@@ -14022,6 +14030,9 @@ ENDIF
  STA mlb3+2,X
  ADC #2                 \ (C = 0: no carry out of HI(QSL))
  STA mlb5+2,X
+
+.stlpr
+
  RTS
 
 .STARS1
