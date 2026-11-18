@@ -99,3 +99,4 @@ the bytes, and the rate (cycles saved per byte spent).
 | stl_pat patches the stardust's multipliers only when ALP1 or BET1 has changed | -43 | +5 (main) | 8.6 |
 | MLSA returns (S R) when ALP1 = 0 (stl_pat patches a BRA over its first instruction): the stardust's roll products skipped | -268 | +43 (main) | 6.2 |
 | COMPAS removes the old compass dot only when the new one differs (cpdot), else sets what DOT leaves from a copy | -348 | +139 (bank 4) | 2.5 |
+| MLTU2 returns 0 at once when Q = 0 (MVEIT's position rotation with a zero roll or pitch) | -71 | +12 (main) | 5.9 |

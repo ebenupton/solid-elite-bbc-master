@@ -21783,8 +21783,11 @@ ENDIF
                         \ clear (X, Y, N and Z differ: no caller reads them,
                         \ as each caller's next use of X and Y sets them)
 
- STA P+1                \ Y = |A - Q|
- SEC
+ LDX Q                  \ Port: if Q = 0 (MVEIT's calls with a zero roll or
+ BEQ MLTU2z             \ pitch) the product is 0, so return it at MLTU2z
+
+ STA P+1                \ Y = |A - Q|, as QMUL P+1, P+1, Q with A already
+ SEC                    \ loaded
  SBC Q
  BCS MLTU2a
  EOR #&FF
@@ -21867,6 +21870,17 @@ ENDIF
 
  ADC #0                 \ C is set, so A = P + Q - 255 = Q - lo = |lo - Q|
  BRA MLTU2d
+
+.MLTU2z
+
+ STZ P                  \ Q = 0 (X = 0): (A P+1 P) = 0, with C and V clear,
+ STZ P+1                \ as the products above give it
+ TXA
+ CLC
+ CLV
+ RTS
+
+
 \ ******************************************************************************
 \
 \       Name: MUT3
