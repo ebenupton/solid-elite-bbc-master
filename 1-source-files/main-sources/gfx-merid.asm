@@ -44,8 +44,9 @@
 \     circle's record into the next slot of PCB, from the axis pcv (pf_tilt's
 \     sign-magnitude words), its scale pcn, the cosine pcc and its sign
 \     pcneg and the body pcbx, pcby, pcr; its part of the base colour into
-\     pc_inv. It uses Elite's zero page &10-&26, which PF_HOOK saves, and
-\     reads main RAM only for the quarter squares (QSL, QSH);
+\     pc_inv. It uses Elite's zero page &10-&26 (PF_HOOK keeps XC, COL, YC and
+\     QQ17 in it), and reads main RAM only for the quarter squares (QSL,
+\     QSH);
 \
 \   * PC_ROWS (the planet's records), in the frame (bank 6's f_bounds,
 \     through T_CAPS): the disc
@@ -2251,7 +2252,7 @@ O_RC = pv_rc - pv
 .pm_R2  SKIP 4
 .pm_Q2  SKIP 4
 .pm_m8  EQUB 0
-.pm_zsave SKIP 23       \ Elite's &10-&26 while PF_HOOK uses them
+.pm_zsave SKIP 4        \ Elite's XC, COL, YC and QQ17 while PF_HOOK uses &10-&26
 
 .pc_t   EQUB 0
 .pc_dnz EQUB 0          \ bit 7: d is not 0
@@ -2281,7 +2282,7 @@ pr_fd  = pm_P + 15      \ the flags (pr_seg)
 pr_fu  = pm_P + 16
 pr_ke  = pm_P + 17      \ the next k at which they change
 pr_lc  = pm_P + 18      \ the left limb's toggles (pr_nx): how many, their rows
-pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8 and pm_zsave)
+pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8)
 
 .pcb_o  EQUB 0, RSZ, 2*RSZ, 3*RSZ, 4*RSZ \ the slots' offsets in PCB (and the end)
 .PC_N   EQUB 0          \ the planet's records this frame

@@ -17,9 +17,11 @@
 \   * class 1, a crater planet (TYPE 130): one to three craters, small caps
 \     from the system's seed (pf_craters), base 0.
 \
-\ Elite's state is not touched: Elite's zero page &10-&26 (the engine's
-\ workspace) is saved and restored, and A, X, Y and the flags are
-\ preserved. The frame layer makes the rows through T_CAPS (gfx-merid.asm's
+\ Elite's state is not touched: of Elite's zero page &10-&26 (the engine's
+\ workspace), XC, COL, YC and QQ17 (&10-&13) are saved and restored (the
+\ rest, K3, K4 and XX16's first bytes, are temporaries that the game sets
+\ before it reads them again: H_CIRC returns from PL9 after this), and A,
+\ X, Y and the flags are preserved. The frame layer makes the rows through T_CAPS (gfx-merid.asm's
 \ PC_ROWS).
 \ 6-harness/planet_caps.py models it all bit for bit.
 \
@@ -44,12 +46,14 @@
  JMP pfh9
  STA pcr
  STA pf_r
- LDX #22                \ (Elite's &10-&26: the engine's workspace)
-.pfh0
- LDA &10,X
- STA pm_zsave,X
- DEX
- BPL pfh0
+ LDA XC                 \ (the engine's workspace is Elite's &10-&26: these
+ STA pm_zsave           \ four in it are the game's across the planet)
+ LDA COL
+ STA pm_zsave+1
+ LDA YC
+ STA pm_zsave+2
+ LDA QQ17
+ STA pm_zsave+3
  LDA K3                 \ the centre (K3 and K4 are in &10-&28: read before
  STA pcbx               \ the workspace is used)
  LDA K3+1
@@ -78,12 +82,14 @@
  LDA #&80
  TSB PF_CLS
 .pfh7
- LDX #22
-.pfh1
- LDA pm_zsave,X
- STA &10,X
- DEX
- BPL pfh1
+ LDA pm_zsave
+ STA XC
+ LDA pm_zsave+1
+ STA COL
+ LDA pm_zsave+2
+ STA YC
+ LDA pm_zsave+3
+ STA QQ17
 .pfh9
  PLY
  PLX

@@ -106,13 +106,13 @@ SRCH = os.path.join(MS, 'gfx-raster_hz.asm')       # (the bank 5 <-> 7 stubs, wh
 # the meridian window (gfx-merid.asm, the circle engine, and gfx-planet7.asm,
 # the styles: bank 7 after the cold area; here at MTEST), with the game's
 # symbols they read: INWK, K3, K4, TYPE and K at their places in Master Elite's
-# zero page (K3 and K4 are in &10-&28, which PF_HOOK saves and uses: it must
-# read them first), PF_CLS and QQ2 below the workspace (at &0C00: the workspace
+# zero page (K3 and K4 are in &10-&26, which PF_HOOK uses: it must read them
+# first; of those bytes it keeps the game's XC, COL, YC and QQ17), PF_CLS and QQ2 below the workspace (at &0C00: the workspace
 # starts at &0E00), FRIN and K% as the game has them, the quarter squares at
 # &7000 (after the test's screen)
 MERID = os.path.join(MS, 'gfx-merid.asm')
 MTEST = 0xA000
-MG = dict(INWK=0x9C, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
+MG = dict(INWK=0x9C, XC=0x10, COL=0x11, YC=0x12, QQ17=0x13, K3=0x14, K4=0x22, QSL=0x7000, QSH=0x7200,
           TYPE=0x85, MCNT=0x84, K=0x56, PF_CLS=0x0C03, VIEW=0x0C08, QQ2=0x0C10, FRIN=0x0841)
 MG['K%'] = 0x0400
 MERID_GAME = ''.join('%s = &%04X\n' % kv for kv in MG.items())
@@ -747,15 +747,15 @@ def _pfhook(self, vecs, typ, r, cx, cy, qq2, pos=None):
         mem[MG[nm] + 1] = (v >> 8) & 255
     mem[MG['TYPE']] = typ
     mem[MG['QQ2']:MG['QQ2'] + 6] = qq2
-    zp = mem[0x10:0x29]
+    zp = mem[0x10:0x14] + mem[0x27:0x29]
     a0, x0, y0 = rnd.randrange(256), rnd.randrange(256), rnd.randrange(256)
     m.guard = False
     cyc = m.call(m.syms['PF_HOOK'], a=a0, x=x0, y=y0, bank=7)
     m.guard = True
     mpu = m.mpu
-    if (mpu.a, mpu.x, mpu.y, mpu.p & 0xC3) != (a0, x0, y0, 0x24 & 0xC3) or mem[0x10:0x29] != zp:
-        raise AssertionError('PF_HOOK did not keep A, X, Y, the flags and zero page &10-&28: %s %s %s'
-                             % ((mpu.a, mpu.x, mpu.y, mpu.p), (a0, x0, y0), [(0x10 + k, a_, b_) for k, (a_, b_) in enumerate(zip(mem[0x10:0x29], zp)) if a_ != b_]))
+    if (mpu.a, mpu.x, mpu.y, mpu.p & 0xC3) != (a0, x0, y0, 0x24 & 0xC3) or mem[0x10:0x14] + mem[0x27:0x29] != zp:
+        raise AssertionError('PF_HOOK did not keep A, X, Y, the flags and zero page &10-&13, &27-&28: %s %s %s'
+                             % ((mpu.a, mpu.x, mpu.y, mpu.p), (a0, x0, y0), [(k, a_, b_) for k, (a_, b_) in enumerate(zip(mem[0x10:0x14] + mem[0x27:0x29], zp)) if a_ != b_]))
     on = 6 <= r < 256
     if mem[MG['INWK']:MG['INWK'] + 36] != inwk:
         raise AssertionError('PF_HOOK did not keep INWK')
