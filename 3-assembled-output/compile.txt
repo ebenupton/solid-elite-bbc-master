@@ -1089,7 +1089,7 @@ WP workspace from &841 to &CF4 inclusive
      2400   AC 67 24   LDY &2467
 .tdt1
      2403   AD D3 22   LDA &22D3
-     2406   20 BF B1   JSR &B1BF
+     2406   20 BF B3   JSR &B3BF
      2409   4C D4 22   JMP &22D4
 .T_GAME
      240C   8D 2D 24   STA &242D
@@ -40493,7 +40493,7 @@ Shared workspace: &E00 -&1DE3  (free 5 , 24 , 69  and 350  to the main code at &
 .go
      966A   8D A8 99   STA &99A8
      966D   AA         TAX
-     966E   BD EC AE   LDA &AEEC,X
+     966E   BD BF B4   LDA &B4BF,X
      9671   8D A4 82   STA &82A4
      9674   8D 76 82   STA &8276
      9677   8D EF AF   STA &AFEF
@@ -40506,7 +40506,7 @@ Shared workspace: &E00 -&1DE3  (free 5 , 24 , 69  and 350  to the main code at &
      968C   8D C6 B5   STA &B5C6
      968F   8D D8 B5   STA &B5D8
      9692   8D 52 82   STA &8252
-     9695   BD EE AE   LDA &AEEE,X
+     9695   BD C1 B4   LDA &B4C1,X
      9698   8D F7 AF   STA &AFF7
      969B   8D FC AF   STA &AFFC
      969E   8D CD B2   STA &B2CD
@@ -40515,21 +40515,21 @@ Shared workspace: &E00 -&1DE3  (free 5 , 24 , 69  and 350  to the main code at &
      96A7   8D 12 8C   STA &8C12
      96AA   8D CE B5   STA &B5CE
      96AD   8D DD B5   STA &B5DD
-     96B0   BD F0 AE   LDA &AEF0,X
+     96B0   BD C3 B4   LDA &B4C3,X
      96B3   8D 23 B8   STA &B823
      96B6   8D F6 B9   STA &B9F6
-     96B9   BD FC AE   LDA &AEFC,X
+     96B9   BD CF B4   LDA &B4CF,X
      96BC   8D 28 B8   STA &B828
      96BF   8D E1 B9   STA &B9E1
-     96C2   BD F2 AE   LDA &AEF2,X
+     96C2   BD C5 B4   LDA &B4C5,X
      96C5   8D 1A B8   STA &B81A
      96C8   8D F1 B9   STA &B9F1
      96CB   8D E0 B8   STA &B8E0
-     96CE   BD F4 AE   LDA &AEF4,X
+     96CE   BD C7 B4   LDA &B4C7,X
      96D1   8D 15 B8   STA &B815
      96D4   8D EC B9   STA &B9EC
      96D7   8D D9 B8   STA &B8D9
-     96DA   BD F6 AE   LDA &AEF6,X
+     96DA   BD C9 B4   LDA &B4C9,X
      96DD   8D 3D 8A   STA &8A3D
      96E0   8D 02 8C   STA &8C02
      96E3   8D 53 88   STA &8853
@@ -40654,12 +40654,12 @@ Shared workspace: &E00 -&1DE3  (free 5 , 24 , 69  and 350  to the main code at &
      97F8   A9 85      LDA #&85
      97FA   85 F4      STA &F4
      97FC   8D 30 FE   STA &FE30
-     97FF   BD EC AE   LDA &AEEC,X
+     97FF   BD BF B4   LDA &B4BF,X
      9802   8D 80 83   STA &8380
      9805   8D ED 83   STA &83ED
      9808   8D 85 83   STA &8385
      980B   8D F2 83   STA &83F2
-     980E   BD EE AE   LDA &AEEE,X
+     980E   BD C1 B4   LDA &B4C1,X
      9811   8D 8E 83   STA &838E
      9814   8D FB 83   STA &83FB
      9817   8D 93 83   STA &8393
@@ -42979,58 +42979,35 @@ Macro R_RUN:
 End macro R_RUN
 .r_pclip
      AEBF   E4 0A      CPX &0A
-     AEC1   90 28      BCC &AEEB
+     AEC1   90 30      BCC &AEF3
      AEC3   E4 0B      CPX &0B
      AEC5   F0 02      BEQ &AEC9
-     AEC7   B0 22      BCS &AEEB
+     AEC7   B0 2A      BCS &AEF3
 .ok1
      AEC9   C4 0C      CPY &0C
-     AECB   90 1E      BCC &AEEB
+     AECB   90 26      BCC &AEF3
      AECD   C4 0D      CPY &0D
      AECF   F0 02      BEQ &AED3
-     AED1   B0 18      BCS &AEEB
+     AED1   B0 20      BCS &AEF3
 .ok2
-     AED3   98         TYA
-     AED4   AC A8 99   LDY &99A8
-     AED7   D9 A9 99   CMP &99A9,Y
-     AEDA   B0 03      BCS &AEDF
-     AEDC   99 A9 99   STA &99A9,Y
+     AED3   BD 00 9E   LDA &9E00,X
+     AED6   3D 00 9F   AND &9F00,X
+     AED9   85 26      STA &26
+.r_pm
+     AEDB   98         TYA
+     AEDC   AC A8 99   LDY &99A8
+     AEDF   D9 A9 99   CMP &99A9,Y
+     AEE2   B0 03      BCS &AEE7
+     AEE4   99 A9 99   STA &99A9,Y
 .n3
-     AEDF   D9 AB 99   CMP &99AB,Y
-     AEE2   90 03      BCC &AEE7
-     AEE4   99 AB 99   STA &99AB,Y
+     AEE7   D9 AB 99   CMP &99AB,Y
+     AEEA   90 03      BCC &AEEF
+     AEEC   99 AB 99   STA &99AB,Y
 .n4
-     AEE7   A8         TAY
-     AEE8   4C BF AF   JMP &AFBF
+     AEEF   A8         TAY
+     AEF0   4C C7 AF   JMP &AFC7
 .out
-     AEEB   60         RTS
-.r_sbh_dl
-     AEEC   11
-     AEED   14
-.r_sbh_dr
-     AEEE   12
-     AEEF   15
-.r_sbh_s0a
-     AEF0   A2
-     AEF1   A5
-.r_sbh_s0x
-     AEF2   A1
-     AEF3   A4
-.r_sbh_s0y
-     AEF4   A0
-     AEF5   A3
-.r_sbh_sl
-     AEF6   14
-     AEF7   17
-.r_sbh_s0k
-     AEF8   AD
-     AEF9   AC
-.r_sbh_s0r
-     AEFA   A7
-     AEFB   A8
-.r_sbh_s0b
-     AEFC   A6
-     AEFD   A9
+     AEF3   60         RTS
 Macro R_ENDPAGE:
 End macro R_ENDPAGE
 .r_run15
@@ -43102,21 +43079,22 @@ Macro R_RUN:
      AFBE   00
 End macro R_RUN
 .r_pset
-     AFBF   98         TYA
-     AFC0   29 07      AND #&07
-     AFC2   1D 00 9C   ORA &9C00,X
-     AFC5   85 14      STA &14
+     AFBF   BD 00 9E   LDA &9E00,X
+     AFC2   3D 00 9F   AND &9F00,X
+     AFC5   85 26      STA &26
+.r_psetm
      AFC7   98         TYA
-     AFC8   4A         LSR A
-     AFC9   4A         LSR A
-     AFCA   29 FE      AND #&FE
-     AFCC   09 40      ORA #&40
-     AFCE   E0 80      CPX #&80
-     AFD0   69 00      ADC #&00
-     AFD2   85 15      STA &15
-     AFD4   BD 00 9E   LDA &9E00,X
-     AFD7   3D 00 9F   AND &9F00,X
-     AFDA   85 26      STA &26
+     AFC8   29 07      AND #&07
+     AFCA   1D 00 9C   ORA &9C00,X
+     AFCD   85 14      STA &14
+     AFCF   98         TYA
+     AFD0   4A         LSR A
+     AFD1   4A         LSR A
+     AFD2   29 FE      AND #&FE
+     AFD4   09 40      ORA #&40
+     AFD6   E0 80      CPX #&80
+     AFD8   69 00      ADC #&00
+     AFDA   85 15      STA &15
      AFDC   98         TYA
      AFDD   4A         LSR A
      AFDE   A5 06      LDA &06
@@ -43134,6 +43112,7 @@ End macro R_RUN
 .r_pt02
      AFF2   99 F5 11   STA &11F5,Y
 .n1
+.r_pdr
 .r_pt03
      AFF5   D9 B5 12   CMP &12B5,Y
      AFF8   90 03      BCC &AFFD
@@ -43337,7 +43316,7 @@ Macro R_RUN:
      B1BD   60         RTS
      B1BE   00
 End macro R_RUN
-.R_DOT
+.r_dotg
      B1BF   8D EF A0   STA &A0EF
      B1C2   8E F0 A0   STX &A0F0
      B1C5   8C F1 A0   STY &A0F1
@@ -43546,6 +43525,40 @@ Macro R_RUN:
      B3BD   60         RTS
      B3BE   00
 End macro R_RUN
+.R_DOT
+     B3BF   85 25      STA &25
+     B3C1   C9 02      CMP #&02
+     B3C3   90 32      BCC &B3F7
+     B3C5   E4 0A      CPX &0A
+     B3C7   90 29      BCC &B3F2
+     B3C9   E4 0B      CPX &0B
+     B3CB   B0 25      BCS &B3F2
+     B3CD   C4 0C      CPY &0C
+     B3CF   90 21      BCC &B3F2
+     B3D1   C4 0D      CPY &0D
+     B3D3   B0 1D      BCS &B3F2
+     B3D5   BD 00 9E   LDA &9E00,X
+     B3D8   3D 01 9F   AND &9F01,X
+     B3DB   F0 15      BEQ &B3F2
+     B3DD   85 26      STA &26
+     B3DF   20 E9 B3   JSR &B3E9
+     B3E2   A5 25      LDA &25
+     B3E4   C9 03      CMP #&03
+     B3E6   90 12      BCC &B3FA
+     B3E8   C8         INY
+.two
+     B3E9   20 DB AE   JSR &AEDB
+     B3EC   E8         INX
+     B3ED   8A         TXA
+     B3EE   CA         DEX
+     B3EF   4C F5 AF   JMP &AFF5
+.gen
+     B3F2   A5 25      LDA &25
+     B3F4   4C BF B1   JMP &B1BF
+.one
+     B3F7   4C BF AE   JMP &AEBF
+.done
+     B3FA   60         RTS
 Macro R_ENDPAGE:
 End macro R_ENDPAGE
 .r_run20
@@ -43616,6 +43629,33 @@ Macro R_RUN:
      B4BD   60         RTS
      B4BE   00
 End macro R_RUN
+.r_sbh_dl
+     B4BF   11
+     B4C0   14
+.r_sbh_dr
+     B4C1   12
+     B4C2   15
+.r_sbh_s0a
+     B4C3   A2
+     B4C4   A5
+.r_sbh_s0x
+     B4C5   A1
+     B4C6   A4
+.r_sbh_s0y
+     B4C7   A0
+     B4C8   A3
+.r_sbh_sl
+     B4C9   14
+     B4CA   17
+.r_sbh_s0k
+     B4CB   AD
+     B4CC   AC
+.r_sbh_s0r
+     B4CD   A7
+     B4CE   A8
+.r_sbh_s0b
+     B4CF   A6
+     B4D0   A9
 Macro R_ENDPAGE:
 End macro R_ENDPAGE
 .r_run21
@@ -52057,7 +52097,7 @@ Saving file '3-assembled-output/MERID.bin'
      8D7B   4C 2C 8E   JMP &8E2C
 .rl_lpat
      8D7E   8E E0 B0   STX &B0E0
-     8D81   BD EC AE   LDA &AEEC,X
+     8D81   BD BF B4   LDA &B4BF,X
      8D84   8D 8B 8E   STA &8E8B
      8D87   8D 90 8E   STA &8E90
      8D8A   8D DF 8E   STA &8EDF
@@ -52066,7 +52106,7 @@ Saving file '3-assembled-output/MERID.bin'
      8D93   8D 37 8F   STA &8F37
      8D96   8D 84 8F   STA &8F84
      8D99   8D 89 8F   STA &8F89
-     8D9C   BD EE AE   LDA &AEEE,X
+     8D9C   BD C1 B4   LDA &B4C1,X
      8D9F   8D 93 8E   STA &8E93
      8DA2   8D 98 8E   STA &8E98
      8DA5   8D E7 8E   STA &8EE7
