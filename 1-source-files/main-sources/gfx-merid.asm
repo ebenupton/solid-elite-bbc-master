@@ -199,14 +199,36 @@ PCSLOTS = PCMAX
  BPL pms5
  LDX #pm_Z2-pm_P        \ t = Z2 / R2 (0.16)
  LDY #pm_R2-pm_P
- JSR pm_fdiv16
+ JSR pm_fdiv            \ (clamped to 16 bits)
+ LDA pm_p+2
+ ORA pm_p+3
+ BEQ pms5b
+ LDA #&FF
  STA pm_tq
- STX pm_tq+1
+ STA pm_tq+1
+ BRA pms5bx
+.pms5b
+ LDA pm_p
+ STA pm_tq
+ LDA pm_p+1
+ STA pm_tq+1
+.pms5bx
  LDX #pm_X2-pm_P        \ v = X2 / Q2 (0.16)
  LDY #pm_Q2-pm_P
- JSR pm_fdiv16
+ JSR pm_fdiv            \ (clamped to 16 bits)
+ LDA pm_p+2
+ ORA pm_p+3
+ BEQ pms5c
+ LDA #&FF
  STA pm_v
- STX pm_v+1
+ STA pm_v+1
+ BRA pms5cx
+.pms5c
+ LDA pm_p
+ STA pm_v
+ LDA pm_p+1
+ STA pm_v+1
+.pms5cx
  LDX #pm_XY-pm_P        \ |a| = XY / R2 (8.16)
  LDY #pm_R2-pm_P
  JSR pm_fdiv
@@ -785,20 +807,7 @@ PCSLOTS = PCMAX
 \ (12 steps: 2^10 <= q < 2^12) is shifted left by 5 + ev - eu (right if
 \ negative), saturating at 2^32 - 1 (as when V loses all its bits). U = 0
 \ gives 0. (planet_caps.fdiv)
-\ pm_fdiv16: the same clamped to 16 bits, in X (high) and A (low).
 
-.pm_fdiv16
- JSR pm_fdiv
- LDA pm_p+2
- ORA pm_p+3
- BEQ pfd16
- LDA #&FF
- TAX
- RTS
-.pfd16
- LDA pm_p
- LDX pm_p+1
- RTS
 .pfd_e0
  JMP pfd_0
 .pfd_es
