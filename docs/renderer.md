@@ -209,7 +209,10 @@ points at its own loop while its rows run.
   edges into per-row left and right boundaries, with 8-bit or 16-bit DDAs.
   An 8-bit polygon's edges make no call: an edge's set-up is in line in
   its chain, its division is reached and left by jumps (`r_pdiv`, in the
-  shared region), and its DDA loop jumps back to the chain (`r_ex`).
+  shared region), and its DDA loop jumps back to the chain (`r_ex`). A
+  steep edge (|dx| < dy) has loops of its own (`r_sp` for dx > 0, `r_sn`
+  for dx < 0): x in X, the error in A, the rows counted in Y, and x stored
+  through an operand whose low byte counts up the table.
   Phase B fills the rows.
 * `R_LINE` draws a line. Both ends on screen take the fast loops. Any other
   line is clipped exactly to the window's sides first, with the original's
