@@ -134,7 +134,154 @@ PCSLOTS = PCMAX
  BNE pcl1
  LDA pc_t               \ (no axis: no circle)
  BEQ pcc9
- JSR pms_core           \ sx, sy, inv, t, v, a, K2
+
+\ pms_core (in line: its one call): from the magnitudes and signs in pv_m,
+\ pm_sg and pm_nz, the circle's orientation terms: pm_sx, pm_sy, pm_inv,
+\ t (pm_tq), v (pm_v), a (pm_a32) and K2 (pm_K2)
+
+ LDA pm_sg              \ sx = sign(mx), sy = sign(my') = -sign(my)
+ STA pm_sx
+ LDA pm_sg+2
+ EOR pm_nz+2
+ STA pm_sy
+ LDA #0
+ STA pm_inv
+ LDA pm_sg+4            \ mz < 0: negate m (inverting this circle's colour)
+ BPL pms3
+ INC pm_inv
+ LDA pm_sx
+ EOR pm_nz
+ STA pm_sx
+ LDA pm_sy
+ EOR pm_nz+2
+ STA pm_sy
+.pms3
+ LDX #0                 \ X2 = mx^2, Y2 = my^2, Z2 = mz^2, XY = mx my
+ JSR pc_sq
+ LDX #pm_X2-pm_P
+ JSR pms_stp
+ LDX #2
+ JSR pc_sq
+ LDX #pm_Y2-pm_P
+ JSR pms_stp
+ LDX #4
+ JSR pc_sq
+ LDX #pm_Z2-pm_P
+ JSR pms_stp
+ LDX #0
+ LDY #2
+ JSR pc_mul
+ LDX #pm_XY-pm_P
+ JSR pms_stp
+ CLC                    \ R2 = X2 + Z2, Q2 = X2 + Y2 (0 only when the
+                        \ dividend is too: pm_fdiv gives 0, or saturates)
+ LDX #0
+ LDY #3
+.pms4
+ LDA pm_X2,X
+ ADC pm_Z2,X
+ STA pm_R2,X
+ INX
+ DEY
+ BPL pms4
+ CLC
+ LDX #0
+ LDY #3
+.pms5
+ LDA pm_X2,X
+ ADC pm_Y2,X
+ STA pm_Q2,X
+ INX
+ DEY
+ BPL pms5
+ LDX #pm_Z2-pm_P        \ t = Z2 / R2 (0.16)
+ LDY #pm_R2-pm_P
+ JSR pm_fdiv16
+ STA pm_tq
+ STX pm_tq+1
+ LDX #pm_X2-pm_P        \ v = X2 / Q2 (0.16)
+ LDY #pm_Q2-pm_P
+ JSR pm_fdiv16
+ STA pm_v
+ STX pm_v+1
+ LDX #pm_XY-pm_P        \ |a| = XY / R2 (8.16)
+ LDY #pm_R2-pm_P
+ JSR pm_fdiv
+ LDA pm_p+3             \ (at most &FF.FFFF)
+ BEQ pms5a
+ LDA #&FF
+ STA pm_p
+ STA pm_p+1
+ STA pm_p+2
+ LDA #0
+ STA pm_p+3
+.pms5a
+ LDA pm_sx              \ a = -mx my' / rho2: negative iff mx, my' have the
+ EOR pm_sy              \ same sign
+ BMI pms6
+ LDX #0                 \ (pm_p negated)
+ LDY #4
+ SEC
+.ppn1
+ LDA #0
+ SBC pm_p,X
+ STA pm_p,X
+ INX
+ DEY
+ BNE ppn1
+.pms6
+ LDX #3
+.pms7
+ LDA pm_p,X
+ STA pm_a32,X
+ DEX
+ BPL pms7
+ LDX #pm_Y2-pm_P        \ u = Y2 / R2 (16.16)
+ LDY #pm_R2-pm_P
+ JSR pm_fdiv
+ LDA pm_p               \ K2 = t (1 + u) = t u_hi + t + (t u_lo) / 65536
+ STA pm_ulo
+ LDA pm_p+1
+ STA pm_ulo+1
+ LDA pm_p+2
+ STA pm_a
+ LDA pm_p+3
+ STA pm_a+1
+ LDA pm_tq              \ (pm_b = t, for this product and the next: pm_mul16
+ STA pm_b               \ keeps it)
+ LDA pm_tq+1
+ STA pm_b+1
+ JSR pm_mul16
+ CLC
+ LDA pm_p
+ ADC pm_tq
+ STA pm_K2
+ LDA pm_p+1
+ ADC pm_tq+1
+ STA pm_K2+1
+ LDA pm_p+2
+ ADC #0
+ STA pm_K2+2
+ LDA pm_p+3
+ ADC #0
+ STA pm_K2+3
+ LDA pm_ulo
+ STA pm_a
+ LDA pm_ulo+1
+ STA pm_a+1
+ JSR pm_mul16
+ CLC
+ LDA pm_K2
+ ADC pm_p+2
+ STA pm_K2
+ LDA pm_K2+1
+ ADC pm_p+3
+ STA pm_K2+1
+ BCC pms8
+ INC pm_K2+2
+ BNE pms8
+ INC pm_K2+3
+.pms8
  LDX #7                 \ (a, K2 into the record)
 .pcl2
  LDA pm_a32,X
@@ -436,13 +583,19 @@ PCSLOTS = PCMAX
  BCS pcm1
  LDA pm_sx
  EOR pc_dn
- JSR pc_rl
+ ASL A                  \ (A = 2, the right limb, if A bit 7 is clear,
+ LDA #2                 \ else 1, the left)
+ BCC P%+4
+ LDA #1
  STA wr+R_M1
  BRA pcm2
 .pcm1
  LDA pm_sx
  EOR pm_sy
- JSR pc_rl
+ ASL A                  \ (the same)
+ LDA #2
+ BCC P%+4
+ LDA #1
  STA wr+R_M1
  EOR #3
 .pcm2
@@ -559,15 +712,6 @@ PCSLOTS = PCMAX
 .pcy9
  RTS
 
-\ pc_rl: A = 2 (the right limb) if A bit 7 is clear, else 1 (the left)
-
-.pc_rl
- ASL A
- LDA #2
- BCC P%+4
- LDA #1
- RTS
-
 \ pc_unit: A = min(255, pv+X (the magnitude >> 2) pcn / 2 >> 16) (|m| times
 \ 2^24 over its nominal length: Elite's vectors are of length &6000), 0.8;
 \ at least 1 if the component is not zero
@@ -628,188 +772,6 @@ PCSLOTS = PCMAX
  BNE pcg1
  PLY
 .pcg9
- RTS
-
-\ pp_neg: pm_p (4 bytes) negated
-
-.pp_neg
- LDX #0
- LDY #4
- SEC
-.ppn1
- LDA #0
- SBC pm_p,X
- STA pm_p,X
- INX
- DEY
- BNE ppn1
- RTS
-
-\ pc_mul: pm_p (4) = pv+X (2) * pv+Y (2), unsigned
-
-.pc_mul
- LDA pv,X
- STA pm_a
- LDA pv+1,X
- STA pm_a+1
- LDA pv,Y
- STA pm_b
- LDA pv+1,Y
- STA pm_b+1
- JMP pm_mul16
-
-\ pc_sq: pm_p (4) = pv+X (2) squared
-
-.pc_sq
- LDA pv,X
- STA pm_a
- LDA pv+1,X
- STA pm_a+1
- JMP pm_sq16
-
-\ pms_core: from the magnitudes and signs in pv_m, pm_sg and pm_nz, the
-\ circle's orientation terms: pm_sx, pm_sy, pm_inv, t (pm_tq), v (pm_v), a
-\ (pm_a32) and K2 (pm_K2)
-
-.pms_core
- LDA pm_sg              \ sx = sign(mx), sy = sign(my') = -sign(my)
- STA pm_sx
- LDA pm_sg+2
- EOR pm_nz+2
- STA pm_sy
- LDA #0
- STA pm_inv
- LDA pm_sg+4            \ mz < 0: negate m (inverting this circle's colour)
- BPL pms3
- INC pm_inv
- LDA pm_sx
- EOR pm_nz
- STA pm_sx
- LDA pm_sy
- EOR pm_nz+2
- STA pm_sy
-.pms3
- LDX #0                 \ X2 = mx^2, Y2 = my^2, Z2 = mz^2, XY = mx my
- JSR pc_sq
- LDX #pm_X2-pm_P
- JSR pms_stp
- LDX #2
- JSR pc_sq
- LDX #pm_Y2-pm_P
- JSR pms_stp
- LDX #4
- JSR pc_sq
- LDX #pm_Z2-pm_P
- JSR pms_stp
- LDX #0
- LDY #2
- JSR pc_mul
- LDX #pm_XY-pm_P
- JSR pms_stp
- CLC                    \ R2 = X2 + Z2, Q2 = X2 + Y2 (0 only when the
-                        \ dividend is too: pm_fdiv gives 0, or saturates)
- LDX #0
- LDY #3
-.pms4
- LDA pm_X2,X
- ADC pm_Z2,X
- STA pm_R2,X
- INX
- DEY
- BPL pms4
- CLC
- LDX #0
- LDY #3
-.pms5
- LDA pm_X2,X
- ADC pm_Y2,X
- STA pm_Q2,X
- INX
- DEY
- BPL pms5
- LDX #pm_Z2-pm_P        \ t = Z2 / R2 (0.16)
- LDY #pm_R2-pm_P
- JSR pm_fdiv16
- STA pm_tq
- STX pm_tq+1
- LDX #pm_X2-pm_P        \ v = X2 / Q2 (0.16)
- LDY #pm_Q2-pm_P
- JSR pm_fdiv16
- STA pm_v
- STX pm_v+1
- LDX #pm_XY-pm_P        \ |a| = XY / R2 (8.16)
- LDY #pm_R2-pm_P
- JSR pm_fdiv
- LDA pm_p+3             \ (at most &FF.FFFF)
- BEQ pms5a
- LDA #&FF
- STA pm_p
- STA pm_p+1
- STA pm_p+2
- LDA #0
- STA pm_p+3
-.pms5a
- LDA pm_sx              \ a = -mx my' / rho2: negative iff mx, my' have the
- EOR pm_sy              \ same sign
- BMI pms6
- JSR pp_neg
-.pms6
- LDX #3
-.pms7
- LDA pm_p,X
- STA pm_a32,X
- DEX
- BPL pms7
- LDX #pm_Y2-pm_P        \ u = Y2 / R2 (16.16)
- LDY #pm_R2-pm_P
- JSR pm_fdiv
- LDA pm_p               \ K2 = t (1 + u) = t u_hi + t + (t u_lo) / 65536
- STA pm_ulo
- LDA pm_p+1
- STA pm_ulo+1
- LDA pm_p+2
- STA pm_a
- LDA pm_p+3
- STA pm_a+1
- JSR pms_bt
- JSR pm_mul16
- CLC
- LDA pm_p
- ADC pm_tq
- STA pm_K2
- LDA pm_p+1
- ADC pm_tq+1
- STA pm_K2+1
- LDA pm_p+2
- ADC #0
- STA pm_K2+2
- LDA pm_p+3
- ADC #0
- STA pm_K2+3
- LDA pm_ulo
- STA pm_a
- LDA pm_ulo+1
- STA pm_a+1
- JSR pms_bt
- JSR pm_mul16
- CLC
- LDA pm_K2
- ADC pm_p+2
- STA pm_K2
- LDA pm_K2+1
- ADC pm_p+3
- STA pm_K2+1
- BCC pms8
- INC pm_K2+2
- BNE pms8
- INC pm_K2+3
-.pms8
- RTS
-.pms_bt                  \ pm_b = t
- LDA pm_tq
- STA pm_b
- LDA pm_tq+1
- STA pm_b+1
  RTS
 
 .pms_stp                 \ pm_P+X (4 bytes) = pm_p
@@ -1115,6 +1077,18 @@ ENDMACRO
  STZ pm_p+2
  RTS
 
+\ pc_mul: pm_p (4) = pv+X (2) * pv+Y (2), unsigned
+
+.pc_mul
+ LDA pv,X
+ STA pm_a
+ LDA pv+1,X
+ STA pm_a+1
+ LDA pv,Y
+ STA pm_b
+ LDA pv+1,Y
+ STA pm_b+1
+                        \ (falls into pm_mul16)
 .pm_mul16
  PMQH
  PMQB pm_b              \ al bl
@@ -1174,6 +1148,14 @@ ENDMACRO
  STZ pm_p+3
  RTS
 
+\ pc_sq: pm_p (4) = pv+X (2) squared
+
+.pc_sq
+ LDA pv,X
+ STA pm_a
+ LDA pv+1,X
+ STA pm_a+1
+                        \ (falls into pm_sq16)
 .pm_sq16
  PMQH
  PMQB pm_a              \ al^2 = QS(2 al)
@@ -1241,7 +1223,8 @@ ENDMACRO
 \ pm_tt - f^2. n is normalised to n' = 4^k n >= 2^14 (k = 0..7), so that
 \ f' = floor(sqrt(n')) is pis_t's floor(sqrt(256 h')) (h' = n' DIV 256) or
 \ one more (as sqrt(256 h' + 255) - sqrt(256 h') < 1); then f = f' >> k.
-\ The squares come from the quarter-square table (c^2 = 4 QS(c) + (c AND 1))
+\ The squares come from the quarter-square table (c^2 = 4 QS(c) + (c AND 1),
+\ in line twice: hot code, inlined on purpose)
 
 .pm_isqrt
  LDY #0                 \ k
@@ -1271,8 +1254,19 @@ ENDMACRO
  CMP #255
  BEQ pis4               \ (g = 255: f' = 255, as n' < 256^2)
  TAX
- INX                    \ f' = g + 1 iff (g + 1)^2 <= n'
- JSR pis_sq
+ INX                    \ f' = g + 1 iff (g + 1)^2 <= n' (pmi_c = X^2)
+ LDA QSL,X              \ (bankcheck: ok: game context)
+ ASL A
+ STA pmi_c
+ LDA QSH,X              \ (bankcheck: ok)
+ ROL A
+ ASL pmi_c
+ ROL A
+ STA pmi_c+1
+ TXA
+ AND #1
+ ORA pmi_c
+ STA pmi_c
  LDA pmi_n
  CMP pmi_c
  LDA pmi_n+1
@@ -1289,20 +1283,7 @@ ENDMACRO
  DEY
  BNE pis5
 .pis6
- TAX                    \ the remainder n - f^2
- JSR pis_sq
- LDA pm_tt
- SEC
- SBC pmi_c
- STA pm_tt
- LDA pm_tt+1
- SBC pmi_c+1
- STA pm_tt+1
- TXA
-.pis9
- RTS
-
-.pis_sq                 \ pmi_c = X^2 (X kept)
+ TAX                    \ the remainder n - f^2 (pmi_c = X^2, the same)
  LDA QSL,X              \ (bankcheck: ok: game context)
  ASL A
  STA pmi_c
@@ -1315,6 +1296,15 @@ ENDMACRO
  AND #1
  ORA pmi_c
  STA pmi_c
+ LDA pm_tt
+ SEC
+ SBC pmi_c
+ STA pm_tt
+ LDA pm_tt+1
+ SBC pmi_c+1
+ STA pm_tt+1
+ TXA
+.pis9
  RTS
 
 .pis_t                  \ floor(sqrt(256 h)), h = 64..255 (pm_isqrt)
