@@ -43888,18 +43888,25 @@ ENDMACRO
 
  LDA XX12               \ Set XX18(2 0) = dot_sidev
  STA XX18
- LDA XX12+1
- STA XX18+2
+ STA XX15               \ Port: and XX15(1 0), XX15(3 2) and XX15(5 4) to the
+ LDA XX12+1             \ same three dot products, which is what a face of a
+ STA XX18+2             \ ship that is a long way away (XX17 >= 4) takes its
+ STA XX15+1             \ own dot product with, at LL89: the original copied
+                        \ them from XX18 for each such face, at LL143
 
  LDA XX12+2             \ Set XX18(5 3) = dot_roofv
  STA XX18+3
+ STA XX15+2
  LDA XX12+3
  STA XX18+5
+ STA XX15+3
 
  LDA XX12+4             \ Set XX18(8 6) = dot_nosev
  STA XX18+6
+ STA XX15+4
  LDA XX12+5
  STA XX18+8
+ STA XX15+5
 
  LDY #4                 \ Fetch byte #4 of the ship's blueprint, which contains
  LDA (XX0),Y            \ the low byte of the offset to the faces data
@@ -43967,64 +43974,56 @@ ENDMACRO
 
 .LL87
 
- LDA XX12+1             \ Fetch byte #0 for this face into A
+ LDA XX12+1             \ Set A = XX12+1 = byte #0 of this face's data
 
- ASL A                  \ Shift A left and store it, so XX12+3 now has the sign
- STA XX12+3             \ of normal_y
+ ASL A                  \ Set XX12+3 = A << 1
+ STA XX12+3
 
- ASL A                  \ Shift A left and store it, so XX12+5 now has the sign
- STA XX12+5             \ of normal_z
+ ASL A                  \ Set XX12+5 = XX12+3 << 1 = A << 2
+ STA XX12+5
 
  INY                    \ Increment Y to point to byte #1
 
- LDA (V),Y              \ Fetch byte #1 for this face and store in XX12, so
- STA XX12               \ XX12 = normal_x
+ LDA (V),Y              \ Set XX12 = byte #1 = face normal's x-coordinate
+ STA XX12
 
  INY                    \ Increment Y to point to byte #2
 
- LDA (V),Y              \ Fetch byte #2 for this face and store in XX12+2, so
- STA XX12+2             \ XX12+2 = normal_y
+ LDA (V),Y              \ Set XX12+2 = byte #2 = face normal's y-coordinate
+ STA XX12+2
 
  INY                    \ Increment Y to point to byte #3
 
- LDA (V),Y              \ Fetch byte #3 for this face and store in XX12+4, so
- STA XX12+4             \ XX12+4 = normal_z
+ LDA (V),Y              \ Set XX12+4 = byte #3 = face normal's z-coordinate
+ STA XX12+4
 
                         \ So we now have:
                         \
-                        \   XX12(1 0) = (normal_x_sign normal_x)
+                        \   XX12(1 0) = (face normal x-sign, face normal x)
                         \
-                        \   XX12(3 2) = (normal_y_sign normal_y)
+                        \   XX12(3 2) = (face normal y-sign, face normal y)
                         \
-                        \   XX12(5 4) = (normal_z_sign normal_z)
+                        \   XX12(5 4) = (face normal z-sign, face normal z)
 
- LDX XX17               \ If XX17 < 4 then jump to LL92, otherwise we stored a
- CPX #4                 \ larger scale factor above
+ STY T1                 \ Port: keep Y, the offset of this face's last byte, in
+                        \ T1, as the multiplications below use Y (they are in
+                        \ line, with the additions: the face makes no call)
+
+ LDX XX17               \ If XX17 < 4 then jump to LL92 to add the face normal,
+ CPX #4                 \ scaled down, to XX18
  BCC LL92
 
-.LL143
-
- LDA XX18               \ Set XX15(1 0) = XX18(2 0)
- STA XX15               \               = dot_sidev
- LDA XX18+2
- STA XX15+1
-
- LDA XX18+3             \ Set XX15(3 2) = XX18(5 3)
- STA XX15+2             \               = dot_roofv
- LDA XX18+5
- STA XX15+3
-
- LDA XX18+6             \ Set XX15(5 4) = XX18(8 6)
- STA XX15+4             \               = dot_nosev
- LDA XX18+8
- STA XX15+5
-
- JMP LL89               \ Jump down to LL89
+ JMP LL89               \ Otherwise the ship is a long way away, and XX15
+                        \ already holds XX18, [ dot_sidev dot_roofv
+                        \ dot_nosev ], which we put there for every face
+                        \ before LL86 (Port: the original copied it for each
+                        \ face, at LL143), so jump to LL89 to skip the
+                        \ addition and go straight to the dot product
 
 .ovflw
 
                         \ If we get here then the addition below overflowed, so
-                        \ we halve the dot products and normal vector
+                        \ we halve the dot products and the face normal vector
 
  LSR XX18               \ Divide dot_sidev_lo by 2, so dot_sidev = dot_sidev / 2
 
@@ -44032,8 +44031,8 @@ ENDMACRO
 
  LSR XX18+3             \ Divide dot_roofv_lo by 2, so dot_roofv = dot_roofv / 2
 
- LDX #1                 \ Set X = 1 so when we fall through into LL92, we divide
-                        \ the normal vector by 2 as well
+ LDX #1                 \ Set X = 1 so when we fall through into LL92, we
+                        \ divide the normal vector by 2 as well
 
 .LL92
 
@@ -44041,13 +44040,13 @@ ENDMACRO
                         \ and now we apply it by scaling the normal vector down
                         \ by a factor of 2^X (i.e. divide by 2^X)
 
- LDA XX12               \ Set XX15 = normal_x
+ LDA XX12               \ Set XX15 = XX12 = face normal x
  STA XX15
 
- LDA XX12+2             \ Set XX15+2 = normal_y
+ LDA XX12+2             \ Set XX15+2 = XX12+2 = face normal y
  STA XX15+2
 
- LDA XX12+4             \ Set A = normal_z
+ LDA XX12+4             \ Set A = XX12+4 = face normal z
 
 .LL93
 
@@ -44056,191 +44055,343 @@ ENDMACRO
  BMI LL94               \ If X was 0 before the decrement, there is no scaling
                         \ to do, so jump to LL94 to exit the loop
 
- LSR XX15               \ Set XX15 = XX15 / 2
-                        \          = normal_x / 2
+ LSR XX15               \ Set XX15 = XX15 >> 1, which divides the x-coordinate
+                        \ of the normal vector by 2
 
- LSR XX15+2             \ Set XX15+2 = XX15+2 / 2
-                        \            = normal_y / 2
+ LSR XX15+2             \ Set XX15+2 = XX15+2 >> 1, which divides the
+                        \ y-coordinate of the normal vector by 2
 
- LSR A                  \ Set A = A / 2
-                        \       = normal_z / 2
+ LSR A                  \ Set A = A >> 1, which divides the z-coordinate of the
+                        \ normal vector by 2
 
  DEX                    \ Decrement the scale factor in X
 
  BPL LL93+3             \ If we have more scaling to do, loop back up to the
-                        \ first LSR above until the normal vector is scaled down
+                        \ first LSR above until the normal vector is scaled
+                        \ down correctly
 
 .LL94
 
+                        \ Port: we now add the scaled normal to XX18, with
+                        \ LL38's three sign-magnitude additions in line (the
+                        \ same steps and results as its calls: with the same
+                        \ signs the magnitudes are added, and a carry is an
+                        \ overflow; with different signs the smaller is taken
+                        \ from the larger, which gives the sum its sign), to
+                        \ set:
+                        \
+                        \   XX15(5 4) = (dot_nosev_sign dot_nosev_lo)
+                        \               + (normal z-sign, scaled normal z)
+                        \
+                        \   XX15(1 0) = dot_sidev + scaled normal x
+                        \
+                        \   XX15(3 2) = dot_roofv + scaled normal y
+
  STA R                  \ Set R = normal_z
 
- LDA XX12+5             \ Set S = normal_z_sign
- STA S
+ LDA XX18+8             \ If dot_nosev and the normal's z-coordinate have
+ EOR XX12+5             \ different signs, jump to l94a to subtract
+ BMI l94a
 
- LDA XX18+6             \ Set Q = dot_nosev_lo
- STA Q
+ LDA XX18+6             \ They have the same sign, so set A = dot_nosev_lo +
+ CLC                    \ normal_z, and if the addition overflowed, jump up to
+ ADC R                  \ ovflw to divide both the normal vector and the dot
+ BCS ovflw              \ products by 2 and try again
 
- LDA XX18+8             \ Set A = dot_nosev_sign
+ BCC l94c               \ Jump to l94c to store the sum with the normal's sign
+                        \ (this BCC is effectively a JMP as we just passed
+                        \ through a BCS)
 
- JSR LL38               \ Set (S A) = (S R) + (A Q)
-                        \           = normal_z + dot_nosev
-                        \
-                        \ setting the sign of the result in S
+.ovf1
 
- BCS ovflw              \ If the addition overflowed, jump up to ovflw to divide
-                        \ both the normal vector and dot products by 2 and try
-                        \ again
+ JMP ovflw              \ (the additions below jump here on an overflow, as
+                        \ ovflw is too far for a branch)
 
- STA XX15+4             \ Set XX15(5 4) = (S A)
- LDA S                  \               = normal_z + dot_nosev
+.l94a
+
+ LDA R                  \ Set A = normal_z - dot_nosev_lo, and if that does not
+ SEC                    \ underflow, jump to l94c to store it with the normal's
+ SBC XX18+6             \ sign
+ BCS l94c
+
+ EOR #&FF               \ Otherwise the sum is dot_nosev_lo - normal_z, the
+ ADC #1                 \ negation of A (the C flag is clear), with the
+ STA XX15+4             \ opposite sign to the normal's
+ LDA XX12+5
+ EOR #%10000000
+ BCC l94d               \ (this BCC is effectively a JMP: the negation of a
+                        \ non-zero A does not carry)
+
+.l94c
+
+ STA XX15+4             \ Set XX15(5 4) = (normal z-sign, A)
+ LDA XX12+5
+
+.l94d
+
  STA XX15+5
 
- LDA XX15               \ Set R = normal_x
- STA R
+ LDA XX18+2             \ Now the same for the x-coordinates: if dot_sidev and
+ EOR XX12+1             \ the normal's x-coordinate (scaled, in XX15) have
+ BMI l94e               \ different signs, jump to l94e to subtract
 
- LDA XX12+1             \ Set S = normal_x_sign
- STA S
+ LDA XX18               \ Set A = dot_sidev_lo + normal_x, and jump to ovflw if
+ CLC                    \ it overflowed
+ ADC XX15
+ BCS ovf1
 
- LDA XX18               \ Set Q = dot_sidev_lo
- STA Q
+ BCC l94g               \ Jump to l94g to store the sum with the normal's sign
 
- LDA XX18+2             \ Set A = dot_sidev_sign
+.l94e
 
- JSR LL38               \ Set (S A) = (S R) + (A Q)
-                        \           = normal_x + dot_sidev
-                        \
-                        \ setting the sign of the result in S
+ LDA XX15               \ Set A = normal_x - dot_sidev_lo, and jump to l94g to
+ SEC                    \ store it with the normal's sign if it does not
+ SBC XX18               \ underflow
+ BCS l94g
 
- BCS ovflw              \ If the addition overflowed, jump up to ovflw to divide
-                        \ both the normal vector and dot products by 2 and try
-                        \ again
+ EOR #&FF               \ Otherwise the sum is dot_sidev_lo - normal_x, with
+ ADC #1                 \ the opposite sign to the normal's
+ STA XX15
+ LDA XX12+1
+ EOR #%10000000
+ BCC l94h
 
- STA XX15               \ Set XX15(1 0) = (S A)
- LDA S                  \               = normal_x + dot_sidev
+.l94g
+
+ STA XX15               \ Set XX15(1 0) = (normal x-sign, A)
+ LDA XX12+1
+
+.l94h
+
  STA XX15+1
 
- LDA XX15+2             \ Set R = normal_y
- STA R
+ LDA XX18+5             \ And the same for the y-coordinates: if dot_roofv and
+ EOR XX12+3             \ the normal's y-coordinate (scaled, in XX15+2) have
+ BMI l94i               \ different signs, jump to l94i to subtract
 
- LDA XX12+3             \ Set S = normal_y_sign
- STA S
+ LDA XX18+3             \ Set A = dot_roofv_lo + normal_y, and jump to ovflw if
+ CLC                    \ it overflowed
+ ADC XX15+2
+ BCS ovf1
 
- LDA XX18+3             \ Set Q = dot_roofv_lo
- STA Q
+ BCC l94k               \ Jump to l94k to store the sum with the normal's sign
 
- LDA XX18+5             \ Set A = dot_roofv_sign
+.l94i
 
- JSR LL38               \ Set (S A) = (S R) + (A Q)
-                        \           = normal_y + dot_roofv
+ LDA XX15+2             \ Set A = normal_y - dot_roofv_lo, and jump to l94k to
+ SEC                    \ store it with the normal's sign if it does not
+ SBC XX18+3             \ underflow
+ BCS l94k
 
- BCS ovflw              \ If the addition overflowed, jump up to ovflw to divide
-                        \ both the normal vector and dot products by 2 and try
-                        \ again
+ EOR #&FF               \ Otherwise the sum is dot_roofv_lo - normal_y, with
+ ADC #1                 \ the opposite sign to the normal's
+ STA XX15+2
+ LDA XX12+3
+ EOR #%10000000
+ BCC l94l
 
- STA XX15+2             \ Set XX15(3 2) = (S A)
- LDA S                  \               = normal_y + dot_roofv
+.l94k
+
+ STA XX15+2             \ Set XX15(3 2) = (normal y-sign, A)
+ LDA XX12+3
+
+.l94l
+
  STA XX15+3
 
 .LL89
 
                         \ When we get here, we have set up the following:
                         \
-                        \   XX15(1 0) = normal_x + dot_sidev
-                        \             = normal_x + [x y z] . sidev
+                        \   XX15(1 0) = dot_sidev + normal_x
                         \
-                        \   XX15(3 2) = normal_y + dot_roofv
-                        \             = normal_y + [x y z] . roofv
+                        \   XX15(3 2) = dot_roofv + normal_y
                         \
-                        \   XX15(5 4) = normal_z + dot_nosev
-                        \             = normal_z + [x y z] . nosev
+                        \   XX15(5 4) = dot_nosev + normal_z
                         \
                         \ and:
                         \
-                        \   XX12(1 0) = (normal_x_sign normal_x)
+                        \   XX12(1 0) = (face normal x-sign, face normal x)
                         \
-                        \   XX12(3 2) = (normal_y_sign normal_y)
+                        \   XX12(3 2) = (face normal y-sign, face normal y)
                         \
-                        \   XX12(5 4) = (normal_z_sign normal_z)
+                        \   XX12(5 4) = (face normal z-sign, face normal z)
                         \
                         \ We now calculate the dot product XX12 . XX15 to tell
-                        \ us whether or not this face is visible
+                        \ us whether or not this face is visible.
+                        \
+                        \ Port: FMLTU's three multiplications and LL38's two
+                        \ additions are in line (the same steps and results
+                        \ as their calls: each product is the antilog of the
+                        \ sum of its arguments' logs, or 0 when an argument is
+                        \ 0 or the sum does not carry)
 
- LDA XX12               \ Set Q = XX12
- STA Q
+ LDX XX12               \ Set T = XX12 * XX15 / 256
+ BEQ l89a               \       = normal_x * |dot_sidev + normal_x| / 256
+ LDY XX15               \
+ BEQ l89a               \ which is 0 if either argument is 0
+ CLC
+ LDA logL,X
+ ADC logL,Y
+ LDA log,X
+ ADC log,Y
+ BCC l89a
+ TAX
+ LDA alogh,X
+ BCS l89b               \ (this BCS is effectively a JMP)
 
- LDA XX15               \ Set A = XX15
+.l89a
 
- JSR FMLTU              \ Set T = A * Q / 256
- STA T                  \       = XX15 * XX12 / 256
+ LDA #0
+
+.l89b
+
+ STA T
 
  LDA XX12+1             \ Set S = sign of XX15(1 0) * XX12(1 0), so:
  EOR XX15+1             \
- STA S                  \   (S T) = XX15(1 0) * XX12(1 0) / 256
+ STA S                  \   (S T) = normal_x * (dot_sidev + normal_x)
 
- LDA XX12+2             \ Set Q = XX12+2
+ LDX XX12+2             \ Set A = XX12+2 * XX15+2 / 256
+ BEQ l89c               \       = normal_y * |dot_roofv + normal_y| / 256
+ LDY XX15+2
+ BEQ l89c
+ CLC
+ LDA logL,X
+ ADC logL,Y
+ LDA log,X
+ ADC log,Y
+ BCC l89c
+ TAX
+ LDA alogh,X
+ BCS l89d               \ (this BCS is effectively a JMP)
+
+.l89c
+
+ LDA #0
+
+.l89d
+
+ STA Q                  \ Set Q = A
+
+ LDA XX12+3             \ If normal_y * (dot_roofv + normal_y) and (S T) have
+ EOR XX15+3             \ different signs, jump to l89e to subtract
+ EOR S
+ BMI l89e
+
+ LDA Q                  \ They have the same sign, so set T = Q + T (as LL38,
+ CLC                    \ whose callers ignored a carry here)
+ ADC T
+ BRA l89f               \ Jump to l89f to store T (the sign S is unchanged)
+
+.l89e
+
+ LDA T                  \ Set A = T - Q, and jump to l89f to store it if it
+ SEC                    \ does not underflow (the sign S is unchanged)
+ SBC Q
+ BCS l89f
+
+ EOR #&FF               \ Otherwise the sum is Q - T, with the opposite sign
+ ADC #1                 \ (the C flag is clear)
+ TAX
+ LDA S
+ EOR #%10000000
+ STA S
+ TXA
+
+.l89f
+
+ STA T                  \ So now we have:
+                        \
+                        \   (S T) = normal_x * (dot_sidev + normal_x)
+                        \           + normal_y * (dot_roofv + normal_y)
+
+ LDX XX12+4             \ Set Q = XX12+4 * XX15+4 / 256
+ BEQ l89g               \       = normal_z * |dot_nosev + normal_z| / 256
+ LDY XX15+4
+ BEQ l89g
+ CLC
+ LDA logL,X
+ ADC logL,Y
+ LDA log,X
+ ADC log,Y
+ BCC l89g
+ TAX
+ LDA alogh,X
+ BCS l89h               \ (this BCS is effectively a JMP)
+
+.l89g
+
+ LDA #0
+
+.l89h
+
  STA Q
 
- LDA XX15+2             \ Set A = XX15+2
-
- JSR FMLTU              \ Set Q = A * Q
- STA Q                  \       = XX15+2 * XX12+2 / 256
-
- LDA T                  \ Set T = R, so now:
- STA R                  \
-                        \   (S R) = XX15(1 0) * XX12(1 0) / 256
-
- LDA XX12+3             \ Set A = sign of XX15+3 * XX12+3, so:
- EOR XX15+3             \
-                        \   (A Q) = XX15(3 2) * XX12(3 2) / 256
-
- JSR LL38               \ Set (S T) = (S R) + (A Q)
- STA T                  \           =   XX15(1 0) * XX12(1 0) / 256
-                        \             + XX15(3 2) * XX12(3 2) / 256
-
- LDA XX12+4             \ Set Q = XX12+4
- STA Q
-
- LDA XX15+4             \ Set A = XX15+4
-
- JSR FMLTU              \ Set Q = A * Q
- STA Q                  \       = XX15+4 * XX12+4 / 256
-
- LDA T                  \ Set T = R, so now:
- STA R                  \
-                        \   (S R) =   XX15(1 0) * XX12(1 0) / 256
-                        \           + XX15(3 2) * XX12(3 2) / 256
-
- LDA XX15+5             \ Set A = sign of XX15+5 * XX12+5, so:
- EOR XX12+5             \
-                        \   (A Q) = XX15(5 4) * XX12(5 4) / 256
-
- JSR LL38               \ Set (S A) = (S R) + (A Q)
-                        \           =   XX15(1 0) * XX12(1 0) / 256
-                        \             + XX15(3 2) * XX12(3 2) / 256
-                        \             + XX15(5 4) * XX12(5 4) / 256
-
- PHA                    \ Push the result A onto the stack, so the stack now
-                        \ contains the dot product XX12 . XX15
+ LDY T1                 \ Port: set Y to the offset of this face's last byte
+                        \ again, which we kept in T1
 
  TYA                    \ Set X = Y / 4
- LSR A                  \       = the number of this face * 4 /4
+ LSR A                  \       = the number of this face * 4 / 4
  LSR A                  \       = the number of this face
  TAX
 
- PLA                    \ Pull the dot product off the stack into A
+ LDA XX15+5             \ If normal_z * (dot_nosev + normal_z) and (S T) have
+ EOR XX12+5             \ different signs, jump to l89i to subtract
+ EOR S
+ BMI l89i
 
- BIT S                  \ If bit 7 of S is set, i.e. the dot product is
- BMI P%+4               \ negative, then this face is visible as its normal is
-                        \ pointing towards us, so skip the following instruction
+ LDA Q                  \ They have the same sign, so the dot product is:
+ CLC                    \
+ ADC T                  \   (S A) = normal_x * (dot_sidev + normal_x)
+                        \           + normal_y * (dot_roofv + normal_y)
+                        \           + normal_z * (dot_nosev + normal_z)
 
- LDA #0                 \ Otherwise the face is not visible, so set A = 0 so we
-                        \ can store this to mean "not visible"
+ BIT S                  \ If the dot product is negative, jump to l89k to store
+ BMI l89k               \ A in the face's visibility byte, so the face is shown
+                        \ unless A is 0
 
- STA XX2,X              \ Store the face's visibility in the X-th byte of XX2
+ BPL l89j               \ Otherwise jump to l89j to hide the face (this BPL is
+                        \ effectively a JMP)
+
+.l89i
+
+ LDA T                  \ Set A = T - Q
+ SEC
+ SBC Q
+
+ BCC l89m               \ If that underflowed, jump to l89m, as the dot product
+                        \ is Q - T with the opposite sign to S
+
+ BIT S                  \ If the dot product, (S A), is negative, jump to l89k
+ BMI l89k               \ to store A in the face's visibility byte
+
+.l89j
+
+ LDA #0                 \ The dot product is positive, so the face is hidden
+
+.l89k
+
+ STA XX2,X              \ Store the face's visibility in the X-th entry in XX2
 
  INY                    \ Above we incremented Y to point to byte #3, so this
                         \ increments Y to point to byte #4, i.e. byte #0 of the
                         \ next face
+
+ BNE LL88               \ Jump to LL88 to move on to the next face (this BNE is
+                        \ effectively a JMP as Y is never 0 here)
+
+.l89m
+
+ EOR #&FF               \ Set A = Q - T, the negation of A (the C flag is
+ ADC #1                 \ clear)
+
+ BIT S                  \ The dot product is (-S A): if S is positive it is
+ BPL l89k               \ negative, so jump to l89k to store A in the face's
+                        \ visibility byte
+
+ BMI l89j               \ Otherwise jump to l89j to hide the face (this BMI is
+                        \ effectively a JMP)
 
 .LL88
 
