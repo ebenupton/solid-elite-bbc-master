@@ -3473,8 +3473,8 @@ FGZ = 4 + 1 + 2 + 9 + 1 + 2
 
 \ F_GUN: the set-up of LL9's part 6 (LL42P) for a ship firing at us, whose
 \ gun vertex alone it projects in the game (H_LL42; the frame projects the
-\ ship): A = blueprint byte #6, 4 * the vertex's number. XX16 as LL42P
-\ leaves it (transposed: LL51's matrix), XX20 = the offset after the vertex
+\ ship): A = blueprint byte #6, 4 * the vertex's number. XX20 = the offset
+\ after the vertex
 \ (the loop's end), V = the vertex data (XX0 + 20), CNT = A (its offset in
 \ XX3) and Y = its offset in the vertex data, 6 * the number, for part 6's
 \ loop at LL48
@@ -3495,31 +3495,6 @@ FGZ = 4 + 1 + 2 + 9 + 1 + 2
  LDA XX0+1
  ADC #0
  STA V+1
- \ the transpose, as LL42P: XX16 2-3 <-> 6-7, 4-5 <-> 12-13, 10-11 <-> 14-15
- LDY XX16+2
- LDX XX16+3
- LDA XX16+6
- STA XX16+2
- LDA XX16+7
- STA XX16+3
- STY XX16+6
- STX XX16+7
- LDY XX16+4
- LDX XX16+5
- LDA XX16+12
- STA XX16+4
- LDA XX16+13
- STA XX16+5
- STY XX16+12
- STX XX16+13
- LDY XX16+10
- LDX XX16+11
- LDA XX16+14
- STA XX16+10
- LDA XX16+15
- STA XX16+11
- STY XX16+14
- STX XX16+15
  PLA
  TAY
  RTS

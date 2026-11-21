@@ -43264,6 +43264,129 @@ ENDMACRO
 
 \ ******************************************************************************
 \
+\       Name: LL42M
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Put the logs of a ship's scaled orientation vectors into the
+\             operands of LL9's dot products for its vertices
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: LL9's part 6 takes the dot product of each visible vertex with the
+\ ship's three orientation vectors (XX16, as part 3 scaled it), as LL51 does:
+\ nine products a vertex, each the antilog of the sum of two logs. The vectors
+\ are the same for every vertex of the ship, so this puts the logs of their
+\ nine coordinates into the operands of part 6's ADCs (lva and lvb), once a
+\ ship: a coordinate of 0 gets a log of 0, which makes its products 0, as
+\ LL51's test does. Part 6 calls this (LL42P), as does LL48G, which H_LL42
+\ jumps to for the gun vertex of a ship that is firing at us (Y is the
+\ vertex's offset, for part 6's loop at LL48).
+\
+\ ******************************************************************************
+
+.LL48G
+
+ PHY                    \ Put the vectors' logs into the dot products' operands,
+ JSR LL42M              \ keeping Y, and jump to part 6's loop for the vertex
+ PLY
+ JMP LL48
+
+.LL42M
+
+ LDX XX16               \ The log of scaled |sidev_x|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(1 0)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva00+1            
+ STY lvb00+1            
+
+ LDX XX16+6             \ The log of scaled |roofv_x|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(1 0)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva01+1            
+ STY lvb01+1            
+
+ LDX XX16+12            \ The log of scaled |nosev_x|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(1 0)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva02+1            
+ STY lvb02+1            
+
+ LDX XX16+2             \ The log of scaled |sidev_y|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(3 2)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva10+1            
+ STY lvb10+1            
+
+ LDX XX16+8             \ The log of scaled |roofv_y|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(3 2)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva11+1            
+ STY lvb11+1            
+
+ LDX XX16+14            \ The log of scaled |nosev_y|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(3 2)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva12+1            
+ STY lvb12+1            
+
+ LDX XX16+4             \ The log of scaled |sidev_z|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(5 4)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva20+1            
+ STY lvb20+1            
+
+ LDX XX16+10            \ The log of scaled |roofv_z|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(5 4)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva21+1            
+ STY lvb21+1            
+
+ LDX XX16+16            \ The log of scaled |nosev_z|, or 0 if it is 0, into the
+ LDA logL,X             \ operands of its product in XX12(5 4)
+ LDY log,X              
+ CPX #1                 
+ BCS P%+6               
+ LDA #0                 
+ LDY #0                 
+ STA lva22+1            
+ STY lvb22+1            
+
+ RTS                    \ Return from the subroutine
+
+\ ******************************************************************************
+\
 \       Name: LL21I
 \       Type: Subroutine
 \   Category: Drawing ships
@@ -44427,9 +44550,9 @@ ENDMACRO
 
 .LL42P
 
-                        \ The first task is to set up the inverse matrix, ready
-                        \ for us to send to the dot product routine at LL51.
-                        \ Back up in part 3, we set up the following variables:
+                        \ Port: the first task is to set up the inverse matrix
+                        \ for the dot products below. Back up in part 3, we
+                        \ set up the following variables:
                         \
                         \   * XX16(1 0) = sidev_x
                         \   * XX16(3 2) = sidev_y
@@ -44443,68 +44566,16 @@ ENDMACRO
                         \   * XX16(15 14) = nosev_y
                         \   * XX16(17 16) = nosev_z
                         \
-                        \ and we then scaled the vectors to give the following:
-                        \
-                        \   * XX16   = scaled |sidev_x|
-                        \   * XX16+2 = scaled |sidev_y|
-                        \   * XX16+4 = scaled |sidev_z|
-                        \
-                        \   * XX16+6  = scaled |roofv_x|
-                        \   * XX16+8  = scaled |roofv_y|
-                        \   * XX16+10 = scaled |roofv_z|
-                        \
-                        \   * XX16+12 = scaled |nosev_x|
-                        \   * XX16+14 = scaled |nosev_y|
-                        \   * XX16+16 = scaled |nosev_z|
-                        \
-                        \ We now need to rearrange these locations so they
-                        \ effectively transpose the matrix into its inverse
+                        \ and we then scaled the vectors' low bytes. The
+                        \ original transposed the matrix in XX16 here, for
+                        \ LL51; instead LL42M puts the log of each scaled
+                        \ coordinate into the operands of the dot products'
+                        \ code below, which takes the coordinates in the
+                        \ transposed order, and their signs from XX16 where
+                        \ they are
 
- LDY XX16+2             \ Set XX16+2 = XX16+6 = scaled |roofv_x|
- LDX XX16+3             \ Set XX16+3 = XX16+7 = roofv_x_hi
- LDA XX16+6             \ Set XX16+6 = XX16+2 = scaled |sidev_y|
- STA XX16+2             \ Set XX16+7 = XX16+3 = sidev_y_hi
- LDA XX16+7
- STA XX16+3
- STY XX16+6
- STX XX16+7
-
- LDY XX16+4             \ Set XX16+4 = XX16+12 = scaled |nosev_x|
- LDX XX16+5             \ Set XX16+5 = XX16+13 = nosev_x_hi
- LDA XX16+12            \ Set XX16+12 = XX16+4 = scaled |sidev_z|
- STA XX16+4             \ Set XX16+13 = XX16+5 = sidev_z_hi
- LDA XX16+13
- STA XX16+5
- STY XX16+12
- STX XX16+13
-
- LDY XX16+10            \ Set XX16+10 = XX16+14 = scaled |nosev_y|
- LDX XX16+11            \ Set XX16+11 = XX16+15 = nosev_y_hi
- LDA XX16+14            \ Set XX16+14 = XX16+10 = scaled |roofv_z|
- STA XX16+10            \ Set XX16+15 = XX16+11 = roofv_z
- LDA XX16+15
- STA XX16+11
- STY XX16+14
- STX XX16+15
-
-                        \ So now we have the following sign-magnitude variables
-                        \ containing parts of the scaled orientation vectors:
-                        \
-                        \   XX16(1 0)   = scaled sidev_x
-                        \   XX16(3 2)   = scaled roofv_x
-                        \   XX16(5 4)   = scaled nosev_x
-                        \
-                        \   XX16(7 6)   = scaled sidev_y
-                        \   XX16(9 8)   = scaled roofv_y
-                        \   XX16(11 10) = scaled nosev_y
-                        \
-                        \   XX16(13 12) = scaled sidev_z
-                        \   XX16(15 14) = scaled roofv_z
-                        \   XX16(17 16) = scaled nosev_z
-                        \
-                        \ which is what we want, as the various vectors are now
-                        \ arranged so we can use LL51 to multiply by the
-                        \ transpose (i.e. the inverse of the matrix)
+ JSR LL42M              \ Put the nine scaled coordinates' logs into the dot
+                        \ products' operands
 
  LDY #8                 \ Fetch byte #8 of the ship's blueprint, which is the
  LDA (XX0),Y            \ number of vertices * 8, and store it in XX20
@@ -44633,19 +44704,455 @@ ENDMACRO
                         \   XX15(5 4) = vertex z-coordinate
                         \
                         \   XX16(1 0)   = scaled sidev_x
-                        \   XX16(3 2)   = scaled roofv_x
-                        \   XX16(5 4)   = scaled nosev_x
+                        \   XX16(3 2)   = scaled sidev_y
+                        \   XX16(5 4)   = scaled sidev_z
                         \
-                        \   XX16(7 6)   = scaled sidev_y
+                        \   XX16(7 6)   = scaled roofv_x
                         \   XX16(9 8)   = scaled roofv_y
-                        \   XX16(11 10) = scaled nosev_y
+                        \   XX16(11 10) = scaled roofv_z
                         \
-                        \   XX16(13 12) = scaled sidev_z
-                        \   XX16(15 14) = scaled roofv_z
+                        \   XX16(13 12) = scaled nosev_x
+                        \   XX16(15 14) = scaled nosev_y
                         \   XX16(17 16) = scaled nosev_z
 
- JSR LL51               \ Call LL51 to set XX12 to the dot products of XX15 and
-                        \ XX16, as follows:
+                        \ Port: we now set XX12 to the dot products of XX15
+                        \ and XX16, as LL51 does (the same steps and results
+                        \ as its call), in line: each of the nine products is
+                        \ the antilog of the sum of the vertex coordinate's log
+                        \ and the vector coordinate's, which LL42M put in
+                        \ the ADCs' operands for the whole ship (so XX16 is
+                        \ not transposed, and no log is patched in for each
+                        \ vertex), and each row's three are added as LL51L
+                        \ adds them. Y is free here (the vertex's offset is in
+                        \ XX17)
+
+                        \ Set XX12(1 0) = [ x y z ] . [ sidev_x roofv_x nosev_x ]
+
+ LDX XX15               \ Set R = x * |sidev_x| / 256, from the logs: 0 if the
+ BEQ lvz00              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva00
+
+ ADC #0                 
+ LDA log,X              
+.lvb00
+
+ ADC #0                 
+ BCC lvz00              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd00
+
+ STA R                  
+
+ LDA XX15+1             \ Set S = the sign of x * sidev_x
+ EOR XX16+1             
+ STA S                  
+
+ LDX XX15+2             \ Set Q = y * |roofv_x| / 256, from the logs: 0 if the
+ BEQ lvz01              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva01
+
+ ADC #0                 
+ LDA log,X              
+.lvb01
+
+ ADC #0                 
+ BCC lvz01              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd01
+
+ STA Q                  
+
+ LDA S                  \ If y * roofv_x has the opposite sign, jump to lvn01
+ EOR XX15+3             \ to subtract
+ EOR XX16+7             
+ BMI lvn01              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+ BRA lvr01              \ Jump over the following to store the sum in R
+
+.lvz00
+
+ LDA #0                 \ The first product is 0
+ BEQ lvd00              
+
+.lvz01
+
+ LDA #0                 \ The second product is 0
+ BEQ lvd01              
+
+.lvz02
+
+ LDA #0                 \ The third product is 0
+ BEQ lvd02              
+
+.lvn01
+
+ LDA R                  \ Set A = R - Q, and jump to lvr01 to store it if it does
+ SEC                    \ not underflow (the sign S is unchanged)
+ SBC Q                  
+ BCS lvr01              
+
+ EOR #&FF               \ Otherwise the sum is Q - R (the C flag is clear), with
+ ADC #1                 \ the opposite sign
+ STA R                  
+ LDA S                  
+ EOR #%10000000         
+ STA S                  
+ BRA lvs01              
+
+.lvn02
+
+ LDA R                  \ Set A = R - Q, and jump to lvr02 to store it if it does
+ SEC                    \ not underflow (with the sign S)
+ SBC Q                  
+ BCS lvr02              
+
+ EOR #&FF               \ Otherwise the sum is Q - R, with the opposite sign
+ ADC #1                 
+ STA XX12               
+ LDA S                  
+ EOR #%10000000         
+ BRA lvs02              
+
+.lvr01
+
+ STA R                  \ Set (S R) = x * sidev_x + y * roofv_x
+
+.lvs01
+
+ LDX XX15+4             \ Set Q = z * |nosev_x| / 256, from the logs: 0 if the
+ BEQ lvz02              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva02
+
+ ADC #0                 
+ LDA log,X              
+.lvb02
+
+ ADC #0                 
+ BCC lvz02              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd02
+
+ STA Q                  
+
+ LDA XX15+5             \ If z * nosev_x has the opposite sign, jump to lvn02
+ EOR XX16+13            \ to subtract
+ EOR S                  
+ BMI lvn02              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+.lvr02
+
+ STA XX12               \ Store the sum and its sign in XX12(1 0)
+ LDA S                  
+
+.lvs02
+
+ STA XX12+1             
+
+                        \ Set XX12(3 2) = [ x y z ] . [ sidev_y roofv_y nosev_y ]
+
+ LDX XX15               \ Set R = x * |sidev_y| / 256, from the logs: 0 if the
+ BEQ lvz10              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva10
+
+ ADC #0                 
+ LDA log,X              
+.lvb10
+
+ ADC #0                 
+ BCC lvz10              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd10
+
+ STA R                  
+
+ LDA XX15+1             \ Set S = the sign of x * sidev_y
+ EOR XX16+3             
+ STA S                  
+
+ LDX XX15+2             \ Set Q = y * |roofv_y| / 256, from the logs: 0 if the
+ BEQ lvz11              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva11
+
+ ADC #0                 
+ LDA log,X              
+.lvb11
+
+ ADC #0                 
+ BCC lvz11              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd11
+
+ STA Q                  
+
+ LDA S                  \ If y * roofv_y has the opposite sign, jump to lvn11
+ EOR XX15+3             \ to subtract
+ EOR XX16+9             
+ BMI lvn11              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+ BRA lvr11              \ Jump over the following to store the sum in R
+
+.lvz10
+
+ LDA #0                 \ The first product is 0
+ BEQ lvd10              
+
+.lvz11
+
+ LDA #0                 \ The second product is 0
+ BEQ lvd11              
+
+.lvz12
+
+ LDA #0                 \ The third product is 0
+ BEQ lvd12              
+
+.lvn11
+
+ LDA R                  \ Set A = R - Q, and jump to lvr11 to store it if it does
+ SEC                    \ not underflow (the sign S is unchanged)
+ SBC Q                  
+ BCS lvr11              
+
+ EOR #&FF               \ Otherwise the sum is Q - R (the C flag is clear), with
+ ADC #1                 \ the opposite sign
+ STA R                  
+ LDA S                  
+ EOR #%10000000         
+ STA S                  
+ BRA lvs11              
+
+.lvn12
+
+ LDA R                  \ Set A = R - Q, and jump to lvr12 to store it if it does
+ SEC                    \ not underflow (with the sign S)
+ SBC Q                  
+ BCS lvr12              
+
+ EOR #&FF               \ Otherwise the sum is Q - R, with the opposite sign
+ ADC #1                 
+ STA XX12+2             
+ LDA S                  
+ EOR #%10000000         
+ BRA lvs12              
+
+.lvr11
+
+ STA R                  \ Set (S R) = x * sidev_y + y * roofv_y
+
+.lvs11
+
+ LDX XX15+4             \ Set Q = z * |nosev_y| / 256, from the logs: 0 if the
+ BEQ lvz12              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva12
+
+ ADC #0                 
+ LDA log,X              
+.lvb12
+
+ ADC #0                 
+ BCC lvz12              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd12
+
+ STA Q                  
+
+ LDA XX15+5             \ If z * nosev_y has the opposite sign, jump to lvn12
+ EOR XX16+15            \ to subtract
+ EOR S                  
+ BMI lvn12              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+.lvr12
+
+ STA XX12+2             \ Store the sum and its sign in XX12(3 2)
+ LDA S                  
+
+.lvs12
+
+ STA XX12+3             
+
+                        \ Set XX12(5 4) = [ x y z ] . [ sidev_z roofv_z nosev_z ]
+
+ LDX XX15               \ Set R = x * |sidev_z| / 256, from the logs: 0 if the
+ BEQ lvz20              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva20
+
+ ADC #0                 
+ LDA log,X              
+.lvb20
+
+ ADC #0                 
+ BCC lvz20              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd20
+
+ STA R                  
+
+ LDA XX15+1             \ Set S = the sign of x * sidev_z
+ EOR XX16+5             
+ STA S                  
+
+ LDX XX15+2             \ Set Q = y * |roofv_z| / 256, from the logs: 0 if the
+ BEQ lvz21              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva21
+
+ ADC #0                 
+ LDA log,X              
+.lvb21
+
+ ADC #0                 
+ BCC lvz21              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd21
+
+ STA Q                  
+
+ LDA S                  \ If y * roofv_z has the opposite sign, jump to lvn21
+ EOR XX15+3             \ to subtract
+ EOR XX16+11            
+ BMI lvn21              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+ BRA lvr21              \ Jump over the following to store the sum in R
+
+.lvz20
+
+ LDA #0                 \ The first product is 0
+ BEQ lvd20              
+
+.lvz21
+
+ LDA #0                 \ The second product is 0
+ BEQ lvd21              
+
+.lvz22
+
+ LDA #0                 \ The third product is 0
+ BEQ lvd22              
+
+.lvn21
+
+ LDA R                  \ Set A = R - Q, and jump to lvr21 to store it if it does
+ SEC                    \ not underflow (the sign S is unchanged)
+ SBC Q                  
+ BCS lvr21              
+
+ EOR #&FF               \ Otherwise the sum is Q - R (the C flag is clear), with
+ ADC #1                 \ the opposite sign
+ STA R                  
+ LDA S                  
+ EOR #%10000000         
+ STA S                  
+ BRA lvs21              
+
+.lvn22
+
+ LDA R                  \ Set A = R - Q, and jump to lvr22 to store it if it does
+ SEC                    \ not underflow (with the sign S)
+ SBC Q                  
+ BCS lvr22              
+
+ EOR #&FF               \ Otherwise the sum is Q - R, with the opposite sign
+ ADC #1                 
+ STA XX12+4             
+ LDA S                  
+ EOR #%10000000         
+ BRA lvs22              
+
+.lvr21
+
+ STA R                  \ Set (S R) = x * sidev_z + y * roofv_z
+
+.lvs21
+
+ LDX XX15+4             \ Set Q = z * |nosev_z| / 256, from the logs: 0 if the
+ BEQ lvz22              \ vertex's coordinate is 0 or the sum does not carry
+ CLC                    \ (the vector's logs are in the operands: LL42M)
+ LDA logL,X             
+.lva22
+
+ ADC #0                 
+ LDA log,X              
+.lvb22
+
+ ADC #0                 
+ BCC lvz22              
+ TAY                    
+ LDA alogh,Y            
+
+.lvd22
+
+ STA Q                  
+
+ LDA XX15+5             \ If z * nosev_z has the opposite sign, jump to lvn22
+ EOR XX16+17            \ to subtract
+ EOR S                  
+ BMI lvn22              
+
+ LDA Q                  \ The same sign: set A = Q + R
+ CLC                    
+ ADC R                  
+
+.lvr22
+
+ STA XX12+4             \ Store the sum and its sign in XX12(5 4)
+ LDA S                  
+
+.lvs22
+
+ STA XX12+5             
+
+                        \ So we have set XX12 as follows:
                         \
                         \   XX12(1 0) = [ x y z ] . [ sidev_x roofv_x nosev_x ]
                         \
@@ -45075,12 +45582,18 @@ ENDMACRO
                         \
                         \ which we can do as x >= z
 
- JMP LL69+3             \ Jump over the next instruction to skip the division
-                        \ for x_lo < z_lo
+ JMP LL69b              \ Jump over the division for x_lo < z_lo
+
+.ll69f
+
+ LDA #255               \ The division below overflowed, so set R = 255, as
+ BNE ll69z              \ LL28 does (this BNE is effectively a JMP)
 
 .LL69
 
- JSR LL28               \ Call LL28 to calculate:
+                        \ Port: LL28's division is in line here (the same
+                        \ steps and result as its call, for A < Q), to
+                        \ calculate:
                         \
                         \   R = 256 * A / Q
                         \     = 256 * x / z
@@ -45088,6 +45601,26 @@ ENDMACRO
                         \ Because x < z, the result fits into one byte, and we
                         \ also know that U = 0, so (U R) also contains the
                         \ result
+
+ TAX                    \ If A = 0, jump to ll69z to set R = 0
+ BEQ ll69z
+
+ LDY Q                  \ Subtract the log of Q from the log of A, and if the
+ SEC                    \ subtraction does not underflow, jump to ll69f to set
+ LDA logL,X             \ R = 255
+ SBC logL,Y
+ LDA log,X
+ SBC log,Y
+ BCS ll69f
+
+ TAX                    \ Otherwise set A to the antilog of the result
+ LDA alogh,X
+
+.ll69z
+
+ STA R                  \ Set R = A
+
+.LL69b
 
                         \ At this point we have:
                         \
@@ -45155,6 +45688,11 @@ ENDMACRO
 
  JMP LL68               \ Jump to LL68 to skip the division for y_lo < z_lo
 
+.ll67f
+
+ LDA #255               \ The division at LL67 overflowed, so set R = 255, as
+ BNE ll67z              \ LL28 does (this BNE is effectively a JMP)
+
 .LL70
 
                         \ This gets called from below when y_sign is negative
@@ -45179,7 +45717,8 @@ ENDMACRO
 
 .LL67
 
- JSR LL28               \ Call LL28 to calculate:
+                        \ Port: LL28's division is in line here too, as at
+                        \ LL69, to calculate:
                         \
                         \   R = 256 * A / Q
                         \     = 256 * y / z
@@ -45187,6 +45726,24 @@ ENDMACRO
                         \ Because y < z, the result fits into one byte, and we
                         \ also know that U = 0, so (U R) also contains the
                         \ result
+
+ TAX                    \ If A = 0, jump to ll67z to set R = 0
+ BEQ ll67z
+
+ LDY Q                  \ Subtract the log of Q from the log of A, and if the
+ SEC                    \ subtraction does not underflow, jump to ll67f to set
+ LDA logL,X             \ R = 255
+ SBC logL,Y
+ LDA log,X
+ SBC log,Y
+ BCS ll67f
+
+ TAX                    \ Otherwise set A to the antilog of the result
+ LDA alogh,X
+
+.ll67z
+
+ STA R                  \ Set R = A
 
 .LL68
 

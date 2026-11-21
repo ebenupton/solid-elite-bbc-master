@@ -164,9 +164,10 @@
  BIT XX1+31             \ not firing at us: on to H_EE31 (as LL72)
  BVC H_EE31
  LDY #6                 \ firing: its gun vertex (byte #6: 4 * its number)
- LDA (XX0),Y            \ alone, through part 6's loop (G_GUN: LL42P's matrix
- JSR G_GUN              \ and the loop's set-up for it, returning Y = its
- JMP LL48               \ offset in the vertex data)
+ LDA (XX0),Y            \ alone, through part 6's loop (G_GUN: the loop's
+ JSR G_GUN              \ set-up for it, returning Y = its offset in the
+ JMP LL48G              \ vertex data; LL48G: the vectors' logs for the dot
+                        \ products, as LL42P, then the loop)
 .hll9
  RTS
 
