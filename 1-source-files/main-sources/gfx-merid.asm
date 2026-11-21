@@ -1323,89 +1323,279 @@ ENDMACRO
 \ ******************************************************************************
 \
 \ PC_ROWS (the planet: slots 0 .. PC_N - 1, base colour pc_inv): the disc
-\ layer's boundaries
-\ for rows R_NDT..R_NDB (spans R_NDISCL..R_NDISCR). Every row starts with
-\ no boundary and the base colour; then each record in turn: its left limb's
-\ toggles flip the start colour of the rows from T1 or T2 down, and, unless
-\ every row is wholly outside its region, its rows from Yc out, down and up.
-\ Called by f_bounds (bank 6) through T_CAPS, during
-\ the frame, with this bank paged; it uses the rasteriser's scratch zero page
-\ &10-&27 (F_FRAME has saved it).
+\ layer's boundaries for rows R_NDT..R_NDB (spans R_NDISCL..R_NDISCR). Every
+\ row starts with no boundary and the base colour; then each record in turn:
+\ its left limb's toggles flip the start colour of the rows from T1 or T2
+\ down, and, unless every row is wholly outside its region, its rows from Yc
+\ out, down and up.
+\ Called by f_bounds (bank 6) through T_CAPS, during the frame, with this
+\ bank paged; it uses the rasteriser's scratch zero page &10-&1C (F_FRAME
+\ has saved it), and patches its own code (this bank is RAM).
 \
 \ ******************************************************************************
 
-ZD  = &10               \ D(k) / 2, 16.16 (its low byte is not used)
-ZT0 = &10               \ (pr_nx's, before the records: the colour, the row,
-ZT1 = &11               \ the next toggle)
+ZT0 = &10               \ (before the records: the colour, the row, the next
+ZT1 = &11               \ toggle; pcr1's record)
 ZT2 = &12
-ZDL = &14               \ (D(k) - D(k+1)) / 2, 16.16, saturated
-ZCD = &18               \ the centre line, 16.16 signed: row Yc + k
-ZC2 = &1C               \ 2 C0 (16-bit)
-pr_H = &10              \ (s^2 - s) / 2: its low byte (ZD's, not used once
-pr_Hh = &1E             \ halved) and its high byte
-pr_t = &1F              \ a row's flags (pr_row, pr_side)
-mt_x = &23              \ (mpi)
-ZK  = &20               \ k
-ZYD = &21               \ Yc + k, Yc - k (their low bytes)
-ZYU = &22
-ZC  = &24               \ the row's centre, ceil(C)
-ZS  = &26               \ s = round(sqrt(D(k)))
-ZSS = &27               \ the half-chord used: s, or 0 once past
+ZT3 = &13
+pr_H = &10              \ H = (s^2 - s) / 2 (16-bit; a record's, after them)
+pr_Hf = &12             \ and the 1/8 with it (&20; 0 with H, once s is 0)
+pr_y1 = &14             \ Yc + 1 (16-bit signed)
+ZC2 = &16               \ 2 C0 (16-bit)
+pr_t = &18              \ (PR_KU's, pr_slow's)
+ZK  = &19               \ k, at a segment's start (pr_seg)
+mt_x = &1A              \ a crossing being inserted (pr_ins)
+ZC  = &1B               \ the row's centre, ceil(C): its low byte
+ZS  = &1C               \ s = round(sqrt(D(k))), the half-chord; 0 once past
+
+\ The loop's own numbers are the operands of its instructions, in this bank:
+\ C, the centre line of row Yc + k (16.16 signed), in pra0 to pra3's LDA #s
+\ and a in their ADC #s; dl = (D(k) - D(k+1)) / 2 (16.16, saturated) in prk0
+\ to prk3's LDA #s and K2 in their ADC #s; E = D(k) / 2 - H - 1/8 (16.8: s
+\ drops while it is negative, that is, while D < s^2 - s + 1/4; it is not
+\ negative when a step is taken from it, so a borrow is its sign) in pr_e0
+\ to pr_e2's LDA #s; the rows Yc + k and Yc - k (their low bytes) in
+\ pr_dx's and pr_ux's LDX #s; and the row at which the segment ends in
+\ pr_cmp's CMP #.
+\
+\ A segment is a run of k over which neither side's flags change (pr_seg):
+\ for it, each row's code and each of its two crossings' is switched on or
+\ off at its head, an instruction that does nothing (on) or a branch (off)
+\ to the next head (PR_HEADS), so that a row tests no flag. The whole of a row is in line: no call
+\ is made and nothing is pushed for a row or a crossing.
+
+\ PR_LT: the left limb toggle of the record's half at PCB + X, if it has one,
+\ to pr_lt + Y (in line in PC_ROWS, twice)
+
+MACRO PR_LT
+ LDA PCB+R_M1,X
+ LSR A
+ BCC n
+ LDA PCB+R_T1,X
+ STA pr_lt,Y
+ INY
+.n
+ENDMACRO
+
+\ PR_KD: A = clamp(A - Yc) (0..255); PR_KU: A = clamp(Yc + 1 - A) (in line in
+\ pr_lim's loop; Y used)
+
+MACRO PR_CL
+ BEQ n2                 \ (the high byte: 0, in range)
+ BMI n1
+ LDY #255
+ BNE n2
+.n1
+ LDY #0
+.n2
+ TYA
+ENDMACRO
+
+MACRO PR_KD
+ SEC
+ SBC pr_c+R_YC
+ TAY
+ LDA #0
+ SBC pr_c+R_YC+1
+ PR_CL
+ENDMACRO
+
+MACRO PR_KU
+ STA pr_t
+ SEC
+ LDA pr_y1
+ SBC pr_t
+ TAY
+ LDA pr_y1+1
+ SBC #0
+ PR_CL
+ENDMACRO
+
+\ PR_DROP: s (X, not 0) drops, H -= s and E += s (the new s), until E >= 0
+\ (then ok) or s = 0 (in line in the loop's pr_sd). PR_NORM: with s = 0,
+\ E += H + 1/8 (E = D / 2) and H = 0, no 1/8: C clear if E < 0 still (D < 0)
+
+MACRO PR_DROP ok
+.d1
+ DEX
+ STX ZS
+ SEC
+ LDA pr_H
+ SBC ZS
+ STA pr_H
+ BCS d2
+ DEC pr_H+1
+.d2
+ CLC
+ LDA pr_e1+1
+ ADC ZS
+ STA pr_e1+1
+ BCC d3
+ INC pr_e2+1
+ BEQ ok
+.d3
+ TXA
+ BNE d1
+ENDMACRO
+
+MACRO PR_NORM
+ CLC
+ LDA pr_e0+1
+ ADC pr_Hf
+ STA pr_e0+1
+ LDA pr_e1+1
+ ADC pr_H
+ STA pr_e1+1
+ LDA pr_e2+1
+ ADC pr_H+1
+ STA pr_e2+1
+ LDA #0
+ STA pr_Hf
+ STA pr_H
+ STA pr_H+1
+ENDMACRO
+
+\ PR_SIDE: f = a side's flags at k (Y): its base b EOR M1, M2 from its first
+\ two thresholds (pr_tk + o), and bit 7 between the last two; 3 (off) with
+\ both limbs in the region (in line in pr_seg, for each side)
+
+MACRO PR_SIDE b, o, f
+ LDA b
+ CPY pr_tk+o
+ BCC n0
+ EOR pr_c+R_M1
+.n0
+ CPY pr_tk+o+1
+ BCC n1
+ EOR pr_c+R_M2
+.n1
+ CPY pr_tk+o+2
+ BCC n2
+ EOR #&80
+.n2
+ CPY pr_tk+o+3
+ BCC n3
+ EOR #&80
+.n3
+ STA f
+ AND #3
+ CMP #3
+ BNE n4
+ STA f
+.n4
+ENDMACRO
+
+\ PR_HEADS: a row's heads for the segment, from its flags f: the row (hc) on
+\ if bit 7 is set and, with s = 0, just one limb is outside the region; its
+\ crossings X- (hm) and X+ (hp) on if bits 0 and 1 are clear (in line in
+\ pr_seg, for each side). A head is two bytes: on, LDY # (which does
+\ nothing: Y is free there), and off, a branch always taken to the next
+\ head with the same operand, BNE at the row's and X+'s, which are come to
+\ with Z clear (from the loop's end, a crossing's last store, PR_FLIP,
+\ pr_ir or a head's own branch), BEQ at X-'s, come to with Z set (the
+\ centre's high byte is 0). X+'s is come to with Z set from X-'s branch,
+\ but then it is on: with both off, the row is.
+
+PR_ON = &A0             \ LDY #
+PR_OFFN = &D0           \ BNE
+PR_OFFZ = &F0           \ BEQ
+PR_SON = &2C            \ (E's step, pr_hs: BIT abs, JMP abs)
+PR_SOFF = &4C
+
+MACRO PR_HEADS f, hc, hm, hp
+ LDX #PR_OFFN
+ LDA f
+ BPL h1
+ AND #3
+ ORA ZS
+ BEQ h1
+ LDX #PR_ON
+.h1
+ STX hc
+ LDA f
+ LSR A
+ LDX #PR_ON
+ BCC h2
+ LDX #PR_OFFZ
+.h2
+ STX hm
+ LSR A
+ LDX #PR_ON
+ BCC h3
+ LDX #PR_OFFN
+.h3
+ STX hp
+ENDMACRO
+
+\ PR_FLIP: row X's starting colour flipped (a crossing at or left of the
+\ span's left end); Z clear after it, for the head it goes on to
+
+MACRO PR_FLIP
+ LDA R_NDN,X
+ EOR #&80
+ STA R_NDN,X
+ LDY #1
+ENDMACRO
+
+\ PR_PUT: a crossing at A (0..255) on row X: at or left of the span's left
+\ end it flips the row's colour (fl), right of the span it is dropped,
+\ inside it is the row's first (R_NDX0), or is inserted in order (pr_ins,
+\ which the four share: it goes on at pr_ir's JMP, set to nx); then nx, or,
+\ for the row's first, the code that follows. In line for each side's X-
+\ and X+ (the loop's four crossings).
+
+MACRO PR_PUT fl, nx
+ CMP R_NDISCL,X
+ BCC fl
+ BEQ fl
+ CMP R_NDISCR,X
+ BEQ P%+4
+ BCS j9
+ LDY R_NDN,X            \ the count (bit 7: the colour)
+ BEQ p0
+ CPY #&80
+ BEQ p0
+ STA mt_x
+ LDA #LO(nx)
+ STA pr_ir+1
+ LDA #HI(nx)
+ STA pr_ir+2
+ JMP pr_ins
+.j9
+ JMP nx
+.p0
+ INC R_NDN,X            \ (the row's first)
+ STA R_NDX0,X
+ENDMACRO
 
 .PC_ROWS
  LDX #0
  LDY PC_N
- LDA pc_inv
-.pcr0
  STX pr_n
  STY pr_end
- LSR A                  \ (the base colour, bit 0, to bit 7: R_NDN's)
- LDA #0
- ROR A
- PHA
  LDY #0                 \ the records' left limb toggles: the start colour of
 .pcr1                   \ the rows from T on flipped (pr_lt, pr_lc of them)
  CPX pr_end
  BCS pcr4
- PHX
+ STX ZT3
  LDA pcb_o,X
  TAX
- JSR pcr1a
+ PR_LT
  INX
- JSR pcr1a
- PLX
+ PR_LT
+ LDX ZT3
  INX
- BRA pcr1
-.pcr1a
- LDA PCB+R_M1,X
- LSR A
- BCC pcr1b
- LDA PCB+R_T1,X
- STA pr_lt,Y
- INY
-.pcr1b
- RTS
+ BNE pcr1
 .pcr4
  STY pr_lc
- PLA                    \ every row: no boundary, the base colour EOR the
- LDX R_NDT              \ toggles so far
- JSR pr_nx
-.pcr5
- STA R_NDN,X
- CPX R_NDB
- BCS pcr2
- INX
- CPX ZT2
- BCC pcr5
- JSR pr_nx
- BRA pcr5
-
-\ pr_nx: A = the colour A EOR a toggle (bit 7) for each of pr_lt <= X (each
-\ then taken out); ZT2 = the least left, or 255
-
-.pr_nx
- STA ZT0
- STX ZT1
+ LDA pc_inv             \ every row: no boundary, the base colour (bit 0, to
+ LSR A                  \ bit 7: R_NDN's) EOR the toggles so far
+ LDA #0
+ ROR A
+ LDX R_NDT
+.pcr6                   \ the colour A EOR a toggle (bit 7) for each of
+ STA ZT0                \ pr_lt <= X (each then taken out); ZT2 = the least
+ STX ZT1                \ left, or 255
  LDA #255
  STA ZT2
  LDY pr_lc
@@ -1417,20 +1607,34 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  BEQ pnx2
  BCS pnx3
 .pnx2
- LDA #255
- STA pr_lt,Y
  LDA ZT0
  EOR #&80
  STA ZT0
- BRA pnx1
+ LDA #255
+ STA pr_lt,Y
+ BNE pnx1
 .pnx3
  CMP ZT2
  BCS pnx1
  STA ZT2
- BRA pnx1
+ BCC pnx1
 .pnx9
+ LDY R_NDB              \ the rows up to the next toggle's, or to the last
+ INY                    \ (pcr5c's CPX #)
+ CPY ZT2
+ BCC P%+4
+ LDY ZT2
+ STY pcr5c+1
  LDA ZT0
- RTS
+.pcr5
+ STA R_NDN,X
+ INX
+.pcr5c
+ CPX #0
+ BCC pcr5
+ CPX R_NDB
+ BCC pcr6
+ BEQ pcr6
 
 .pcr2
  LDX pr_n
@@ -1458,60 +1662,88 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  STA pr_lo
  STX pr_hi
 .pcr8
-.pcr9
- LDX #3                 \ D/2 = K0/2, dl = K2/2, C = C0, 2 C0
-.pcr10
- LDA pr_c+R_K0,X
- STA ZD,X
- LDA pr_c+R_K2,X
- STA ZDL,X
- DEX
- BPL pcr10
- STZ ZCD
- STZ ZCD+1
- LDA pr_c+R_C0
- STA ZCD+2
- ASL A
- STA ZC2
- LDA pr_c+R_C0+1
- STA ZCD+3
- ROL A
- STA ZC2+1
- LSR ZD+3
- ROR ZD+2
- ROR ZD+1
- ROR ZD
- LSR ZDL+3
- ROR ZDL+2
- ROR ZDL+1
- ROR ZDL
- LDX #0                 \ K2 and a into the row loop's ADC #s
- LDY #0                 \ (six bytes apart)
-.pcr11
- LDA pr_c+R_K2,Y
- STA prk0+1,X
- LDA pr_c+R_A,Y
- STA pra0+1,X
- TXA
+ LDY #0                 \ a and K2 into the loop's ADC #s (seven bytes
+ LDX #0                 \ apart; C stays clear), and dl = K2 / 2
  CLC
- ADC #6
+.pcr11
+ LDA pr_c+R_A,Y
+ STA pra0+3,X
+ LDA pr_c+R_K2,Y
+ STA prk0+3,X
+ STA prk0+1,X
+ TXA
+ ADC #7
  TAX
  INY
  CPY #4
  BNE pcr11
- LDA pr_c+R_YC          \ the rows Yc + k and Yc - k (their low bytes: the
- STA ZYD                \ rows, when they are on the screen)
- STA ZYU
- STZ ZK
- LDA pr_c+R_S0
- STA ZS
+ LSR prk3+1
+ ROR prk2+1
+ ROR prk1+1
+ ROR prk0+1
  LDA pr_c+R_L0+1        \ H = L0 / 2
  LSR A
- STA pr_Hh
+ STA pr_H+1
  LDA pr_c+R_L0
  ROR A
  STA pr_H
- STZ ZSS
+ LDX #0                 \ C = C0 (and 2 C0), not past
+ STX pra0+1
+ STX pra1+1
+ STX pr_past
+ LDA pr_c+R_C0
+ STA pra2+1
+ ASL A
+ STA ZC2
+ LDA pr_c+R_C0+1
+ STA pra3+1
+ ROL A
+ STA ZC2+1
+ LDA #PR_SON            \ (E's step is on until past the ellipse)
+ STA pr_hs
+ LDA pr_c+R_YC          \ the rows Yc + k and Yc - k (their low bytes: the
+ STA pr_dx+1            \ rows, when they are on the screen), and Yc + 1
+ STA pr_ux+1
+ CLC
+ ADC #1
+ STA pr_y1
+ LDA pr_c+R_YC+1
+ ADC #0
+ STA pr_y1+1
+ LDA #&20
+ STA pr_Hf
+ LDA pr_c+R_S0          \ s = s0
+ STA ZS
+ LDA pr_c+R_K0+3        \ E = D / 2 - H - 1/8, D = K0 (D / 2 is kept to
+ LSR A                  \ 1/256)
+ STA pr_e2+1
+ LDA pr_c+R_K0+2
+ ROR A
+ STA pr_e1+1
+ LDA pr_c+R_K0+1
+ ROR A
+ SEC
+ SBC #&20               \ (pr_Hf)
+ STA pr_e0+1
+ LDA pr_e1+1
+ SBC pr_H
+ STA pr_e1+1
+ LDA pr_e2+1
+ SBC pr_H+1
+ STA pr_e2+1
+ BCS pcr9a             \ E < 0: s drops, by the loop's code (pr_sls), which
+ LDA #LO(pcr9)          \ comes back at pcr9
+ STA pr_dlj+1
+ LDA #HI(pcr9)
+ STA pr_dlj+2
+ LDA pr_e2+1
+ JMP pr_sls
+.pcr9
+ LDA #LO(pr_dls)
+ STA pr_dlj+1
+ LDA #HI(pr_dls)
+ STA pr_dlj+2
+.pcr9a
  LDA pr_c+R_F           \ the limbs' regions on row Yc + k: F, toggled by M1
  STA pr_bd              \ from k = T1 - Yc, by M2 from T2 - Yc; on row Yc - k:
  EOR pr_c+R_M1          \ F EOR M1 EOR M2, toggled by M1 from k = Yc + 1 - T1,
@@ -1526,171 +1758,25 @@ ZSS = &27               \ the half-chord used: s, or 0 once past
  BPL pcr12
  LDA R_NDT
  STA pr_tk+2
- LDA R_NDB
- INC A
- STA pr_tk+6
- LDX #2
-.pcr13
- LDA pr_tk,X
- JSR pr_kd
- STA pr_tk,X
- LDA pr_tk+4,X
- JSR pr_ku
- STA pr_tk+4,X
- DEX
- BPL pcr13
- LDA pr_tk+6            \ (up: k >= 1)
- BNE P%+5
- INC pr_tk+6
- STZ pr_past
- JSR pr_lim
+ LDX R_NDB
+ INX
+ STX pr_tk+6
 
-.pr_loop
- LDA ZK                 \ a segment's end: the flags, or done
- CMP pr_ke
- BCC prl1
- JSR pr_seg
- BCC prl1
- JMP pcr2
-.prl1
- BIT pr_past            \ s = round(sqrt(D)): s drops while D/2 < H + 1/8
- BMI prl3               \ (D < s^2 - s + 1/4)
-.prs1
- LDA ZS
- BEQ prs9
- LDA ZD+1
- CMP #&20
- LDA ZD+2
- SBC pr_H
- LDA ZD+3
- SBC pr_Hh
- BCS prs9
- DEC ZS                 \ H -= s (the new s)
- LDA pr_H
- SEC
- SBC ZS
- STA pr_H
- BCS prs1
- DEC pr_Hh
- BCC prs1
-.prs9
- LDA ZS
- STA ZSS
-.prl3
- BIT pr_fd              \ row Yc + k: centre ceil(C)
- BPL prl4
- LDA ZCD
- ORA ZCD+1
- CMP #1
- LDA ZCD+2
- ADC #0
- STA ZC
- LDA ZCD+3
- ADC #0
- STA ZC+1
- LDX ZYD
- LDA pr_fd
- JSR pr_row
-.prl4
- BIT pr_fu              \ row Yc - k: centre ceil(2 C0 - C) = 2 C0 - floor(C)
- BPL prl5
- SEC
- LDA ZC2
- SBC ZCD+2
- STA ZC
- LDA ZC2+1
- SBC ZCD+3
- STA ZC+1
- LDX ZYU
- LDA pr_fu
- JSR pr_row
-.prl5
- BIT pr_past            \ D -= dl, dl += K2 (past the ellipse once D < 0)
- BMI prl7
- SEC                    \ (D is kept to 1/256: its low byte is not used)
- LDA ZD+1
- SBC ZDL+1
- STA ZD+1
- LDA ZD+2
- SBC ZDL+2
- STA ZD+2
- LDA ZD+3
- SBC ZDL+3
- STA ZD+3
- BCS prl6
- JSR pr_pst
- BRA prl7
-.prl6
- CLC                    \ (the ADC #s: K2, patched)
- LDA ZDL
-.prk0
- ADC #0
- STA ZDL
- LDA ZDL+1
-.prk1
- ADC #0
- STA ZDL+1
- LDA ZDL+2
-.prk2
- ADC #0
- STA ZDL+2
- LDA ZDL+3
-.prk3
- ADC #0
- STA ZDL+3
- BCC prl7
- LDA #&FF
- STA ZDL
- STA ZDL+1
- STA ZDL+2
- STA ZDL+3
-.prl7
- CLC                    \ C += a (the ADC #s: a, patched)
- LDA ZCD
-.pra0
- ADC #0
- STA ZCD
- LDA ZCD+1
-.pra1
- ADC #0
- STA ZCD+1
- LDA ZCD+2
-.pra2
- ADC #0
- STA ZCD+2
- LDA ZCD+3
-.pra3
- ADC #0
- STA ZCD+3
- INC ZYD
- DEC ZYU
- INC ZK
- JMP pr_loop
-ASSERT prk1 = prk0 + 6 AND prk3 = prk0 + 18 AND pra3 = pra0 + 18
+\ pr_lim: the last rows the loop may reach (pr_tk + 3, pr_tk + 7): down, NDB
+\ (past, thi - 1); up, NDT (past, tlo); they, and for a record's first row
+\ the other thresholds, as k: down clamp(row - Yc), up clamp(Yc + 1 - row).
+\ Then a new segment (pr_pst, past the ellipse, comes here too)
 
-\ pr_pst: past the ellipse: s = 0 from now on, and only the rows with one
-\ crossing at most (a new segment next). pr_lim: the last rows the loop may
-\ reach (pr_tk + 3, pr_tk + 7): down, NDB (past, thi - 1); up, NDT (past,
-\ tlo)
-
-.pr_pst
- LDA #&80
- STA pr_past
- STZ ZSS
 .pr_lim
- STZ pr_ke
- LDA R_NDB
- INC A
+ LDX R_NDB
+ INX
+ TXA
  BIT pr_past
  BPL prm1
  CMP pr_hi
  BCC prm1
  LDA pr_hi
 .prm1
- JSR pr_kd
- CMP pr_tk+2            \ (not below the first)
- BCS P%+5
- LDA pr_tk+2
  STA pr_tk+3
  LDA R_NDT
  BIT pr_past
@@ -1699,33 +1785,56 @@ ASSERT prk1 = prk0 + 6 AND prk3 = prk0 + 18 AND pra3 = pra0 + 18
  BCS prm2
  LDA pr_lo
 .prm2
- JSR pr_ku
+ STA pr_tk+7
+ LDX #3
+.pcr13
+ LDA pr_tk,X
+ PR_KD
+ STA pr_tk,X
+ LDA pr_tk+4,X
+ PR_KU
+ STA pr_tk+4,X
+ DEX
+ BMI pcr14
+ BIT pr_past            \ (past: the last rows only)
+ BPL pcr13
+.pcr14
+ LDA pr_tk+6            \ (up: k >= 1)
+ BNE P%+5
+ INC pr_tk+6
+ LDA pr_tk+3            \ (the last not below the first)
+ CMP pr_tk+2
+ BCS P%+8
+ LDA pr_tk+2
+ STA pr_tk+3
+ LDA pr_tk+7
  CMP pr_tk+6
- BCS P%+5
+ BCS P%+8
  LDA pr_tk+6
  STA pr_tk+7
- RTS
 
-\ pr_seg: at k (ZK): done (C set) once both sides are past their last rows;
-\ else (C clear) each side's flags (pr_fd, pr_fu: bit 7 the row is on the
-\ screen with a limb outside the region, bits 0-1 the limbs in it) and the
-\ next k at which any changes (pr_ke)
+\ pr_seg: a segment starts at k (the down row less Yc): the record is done
+\ once both sides are past their last rows; else each side's flags (pr_fd,
+\ pr_fu: bit 7 the row is on the screen with a limb outside the region, bits
+\ 0-1 the limbs in it) and its heads, and the next k at which any flag
+\ changes (pr_ke: its down row into pr_cmp)
 
 .pr_seg
- LDA ZK
+ SEC
+ LDA pr_dx+1
+ SBC pr_c+R_YC
+ STA ZK
  CMP pr_tk+3
  BCC pre1
  CMP pr_tk+7
- BCS pre9
+ BCC pre1
+ JMP pcr2
 .pre1
- LDA pr_bd
- LDX #0
- JSR pr_side
- STA pr_fd
- LDA pr_bu
- LDX #4
- JSR pr_side
- STA pr_fu
+ TAY
+ PR_SIDE pr_bd, 0, pr_fd
+ PR_SIDE pr_bu, 4, pr_fu
+ PR_HEADS pr_fd, pr_hd, pr_hdm, pr_hdp
+ PR_HEADS pr_fu, pr_hu, pr_hum, pr_hup
  LDA #255
  STA pr_ke
  LDX #7
@@ -1741,190 +1850,365 @@ ASSERT prk1 = prk0 + 6 AND prk3 = prk0 + 18 AND pra3 = pra0 + 18
  DEX
  BPL pre2
  CLC
-.pre9
- RTS
+ LDA pr_ke
+ ADC pr_c+R_YC
+ STA pr_cmp+1
+ LDY #1                 \ (Z clear, as pr_hd is come to)
 
-.pr_side                \ A = the side's flags at k (X = 0 down, 4 up): the
- STA pr_t               \ base EOR M1, M2 from its first two thresholds, and
- LDY #0                 \ bit 7 between the last two (pr_tm: M1, M2, &80, &80)
-.prd1
- LDA ZK
- CMP pr_tk,X
- BCC prd2
- LDA pr_t
- EOR pr_tm,Y
- STA pr_t
-.prd2
- INX
- INY
- CPY #4
- BNE prd1
- LDA pr_t               \ (both limbs in the region: inactive)
- AND #3
- CMP #3
- BEQ prd9
- LDA pr_t
-.prd9
- RTS
+\ The loop: for each k, row Yc + k, row Yc - k, then C += a, E -= dl and
+\ dl += K2 (with s dropped, or past the ellipse, if E < 0: pr_sls)
 
-\ pr_kd: A = clamp(A - Yc) (0..255); pr_ku: A = clamp(Yc + 1 - A)
-
-.pr_kd
- SEC
- SBC pr_c+R_YC
- TAY
- LDA #0
- SBC pr_c+R_YC+1
- BRA pr_cl
-.pr_ku
- STA pr_t
- SEC
- LDA pr_c+R_YC
- SBC pr_t
- TAY
- LDA pr_c+R_YC+1
- SBC #0
- INY
- BNE pr_cl
- INC A
-.pr_cl
- CMP #0
- BMI pck0
- BNE pck1
- TYA
- RTS
-.pck0
- LDA #0
- RTS
-.pck1
- LDA #255
- RTS
-
-\ pr_row: row X's crossings about its centre ZC, A = the limbs in the region:
-\ X- if the left limb is outside it, X+ if the right one is; with s = 0 (past
-\ the ellipse, or at its ends) only if one is
-
-.pr_row
- AND #3
- STA pr_t
- LDA ZSS
- BNE prw1
- LDA pr_t
- BEQ prw9
-.prw1
- LSR pr_t
- BCS prw2
- SEC                    \ X-: c - s
- LDA ZC
- SBC ZSS
- TAY
- LDA ZC+1
- SBC #0
- JSR pr_put
-.prw2
- LSR pr_t
- BCS prw9
- CLC                    \ X+: c + s
- LDA ZC
- ADC ZSS
- TAY
- LDA ZC+1
+.pr_k
+.pr_hd
+ EQUB PR_ON, pr_dj - pr_hd - 2  \ row Yc + k (off: BNE pr_dj, and on to pr_hu)
+.pr_dx
+ LDX #0                 \ (the row)
+ LDA pra0+1             \ its centre, ceil(C)
+ ORA pra1+1
+ CMP #1
+ LDA pra2+1
  ADC #0
+ STA ZC
+ BCS pr_ds
+ LDY pra3+1
+ BEQ pr_hdm
+.pr_ds                  \ (not on the screen: pr_slow; C: the carry into
+ LDA pra3+1             \ the centre's high byte)
+ ADC #0
+ TAY
+ BEQ pr_ds0
+ LDA pr_fd
+ JSR pr_slow
+ DEY
+ BEQ pr_dpf
+ BPL pr_ds2
+.pr_dj
+ JMP pr_hu
+.pr_ds2
+ DEY
+ BEQ pr_dmp
+ BNE pr_dpp
+.pr_ds0
+ LDA ZC
+ LDY #0                 \ (Z set, as pr_hdm is come to)
+.pr_hdm
+ EQUB PR_ON, pr_hdp - pr_hdm - 2  \ X-: c - s (off: BEQ pr_hdp)
+ SEC
+ SBC ZS
+ BCS pr_dmp
+.pr_dmf
+ PR_FLIP
+ JMP pr_hdp
+.pr_dmp
+ PR_PUT pr_dmf, pr_hdp
+.pr_hdp
+ EQUB PR_ON, pr_hu - pr_hdp - 2  \ X+: c + s (off: BNE pr_hu)
+ LDA ZC
+ CLC
+ ADC ZS
+ BCC pr_dpp
+ LDY #1                 \ (Z clear)
+ JMP pr_hu
+.pr_dpf
+ PR_FLIP
+ JMP pr_hu
+.pr_dpp
+ PR_PUT pr_dpf, pr_hu
+.pr_hu
+ EQUB PR_ON, pr_uj - pr_hu - 2  \ row Yc - k (off: BNE pr_uj, and on to pr_adv)
+.pr_ux
+ LDX #0                 \ (the row)
+ SEC                    \ its centre, ceil(2 C0 - C) = 2 C0 - floor(C)
+ LDA ZC2
+ SBC pra2+1
+ STA ZC
+ LDA ZC2+1
+ SBC pra3+1
+ BEQ pr_hum
+ TAY                    \ (not on the screen: pr_slow)
+ LDA pr_fu
+ JSR pr_slow
+ DEY
+ BEQ pr_upf
+ BPL pr_us2
+.pr_uj
+ JMP pr_adv
+.pr_us2
+ DEY
+ BEQ pr_ump
+ BNE pr_upp
+.pr_hum
+ EQUB PR_ON, pr_hup - pr_hum - 2  \ X-: c - s (off: BEQ pr_hup)
+ LDA ZC
+ SEC
+ SBC ZS
+ BCS pr_ump
+.pr_umf
+ PR_FLIP
+ JMP pr_hup
+.pr_ump
+ PR_PUT pr_umf, pr_hup
+.pr_hup
+ EQUB PR_ON, pr_adv - pr_hup - 2  \ X+: c + s (off: BNE pr_adv)
+ LDA ZC
+ CLC
+ ADC ZS
+ BCC pr_upp
+ JMP pr_adv
+.pr_upf
+ PR_FLIP
+ JMP pr_adv
+.pr_upp
+ PR_PUT pr_upf, pr_adv
+ASSERT pr_dj - pr_hd < 129 AND pr_hdp - pr_hdm < 129 AND pr_hu - pr_hdp < 129
+ASSERT pr_uj - pr_hu < 129 AND pr_hup - pr_hum < 129 AND pr_adv - pr_hup < 129
+.pr_adv
+ CLC                    \ C += a
+.pra0
+ LDA #0
+ ADC #0
+ STA pra0+1
+.pra1
+ LDA #0
+ ADC #0
+ STA pra1+1
+.pra2
+ LDA #0
+ ADC #0
+ STA pra2+1
+.pra3
+ LDA #0
+ ADC #0
+ STA pra3+1
+ INC pr_dx+1
+ DEC pr_ux+1
+.pr_hs
+ BIT pr_nk              \ E -= dl (off, past the ellipse: JMP pr_nk)
+ SEC
+.pr_e0
+ LDA #0
+ SBC prk1+1
+ STA pr_e0+1
+.pr_e1
+ LDA #0
+ SBC prk2+1
+ STA pr_e1+1
+.pr_e2
+ LDA #0
+ SBC prk3+1
+ STA pr_e2+1
+ BCC pr_sls
+.pr_dls
+ CLC                    \ dl += K2
+.prk0
+ LDA #0
+ ADC #0
+ STA prk0+1
+.prk1
+ LDA #0
+ ADC #0
+ STA prk1+1
+.prk2
+ LDA #0
+ ADC #0
+ STA prk2+1
+.prk3
+ LDA #0
+ ADC #0
+ STA prk3+1
+ BCC pr_nk
+ LDA #&FF
+ STA prk0+1
+ STA prk1+1
+ STA prk2+1
+ STA prk3+1
+.pr_nk
+ LDA pr_dx+1            \ the next k: a new segment at its end
+.pr_cmp
+ CMP #0
+ BEQ pr_sgj
+ JMP pr_k
+.pr_sgj
+ JMP pr_seg
+ASSERT pra1 = pra0 + 7 AND pra3 = pra0 + 21 AND prk1 = prk0 + 7 AND prk3 = prk0 + 21
 
-\ pr_put: a crossing at (A Y) (16-bit signed) on row X: at or left of the
-\ span's left end it flips the row's colour, right of the span it is
-\ dropped, inside it is inserted in order, and with a fifth the two
-\ rightmost are dropped. X kept
+\ pr_sls: E < 0 after its step (A = its high byte). Past the ellipse if
+\ D / 2 = E + H + 1/8 < 0: then s = 0 from now on, E's step is off, and only
+\ the rows with one crossing at most are left (pr_lim, and a new segment).
+\ Else s drops until E >= 0 (PR_DROP; the test of D is left out when
+\ E > -256, as the drops then end soon, and made if they reach s = 0 with
+\ E < 0: PR_NORM), with a new segment if it reaches 0 (the rows' heads
+\ depend on it).
 
-.pr_put
- BMI pr_flipx
- BNE prw9
- TYA
- CMP R_NDISCL,X
- BCC pr_flipx
- BEQ pr_flipx
- CMP R_NDISCR,X
- BEQ P%+4
- BCS prw9
- LDY R_NDN,X            \ the count (bit 7: the colour)
- BMI pp1
- BEQ prp0
- CPY #4
- BCS pr_over
+.pr_sls
+ LDX ZS
+ BEQ pr_s0
+ CMP #&FF
+ BEQ pr_sd
+ CLC
+ LDA pr_e0+1
+ ADC pr_Hf
+ LDA pr_e1+1
+ ADC pr_H
+ LDA pr_e2+1
+ ADC pr_H+1
+ BCC pr_pst
+.pr_sd
+ PR_DROP pr_sok
+ LDA pr_dx+1            \ (s is 0 now: a new segment)
+ STA pr_cmp+1
+.pr_s0
+ PR_NORM
+ BCC pr_pst
+ BCS pr_dlj
+.pr_sok
+ TXA
+ BNE pr_dlj
+ LDA pr_dx+1            \ (s is 0 now: a new segment)
+ STA pr_cmp+1
+.pr_dlj
+ JMP pr_dls              \ (a record's first row: to pcr9)
+.pr_pst
+ LDA #PR_SOFF
+ STA pr_hs
+ LDA #&80
+ STA pr_past
+ ASL A
+ STA ZS
+ JMP pr_lim
+
+\ pr_ins: mt_x inserted in order into row X's R_NDX0.. (Y = R_NDN: 1 to 4
+\ there, and the colour); with a fifth the two rightmost are dropped. Then
+\ on, through pr_ir (PR_PUT sets it)
+
+.pr_ins
  INC R_NDN,X
- BRA mpi
-.pp1                    \ (colour B at the left end: the count is Y - &80)
- CPY #&81
- BCC prp0
- CPY #&84
- BCS pr_over
- INC R_NDN,X
- STA mt_x
- CPY #&82
- BEQ mpi2
- BCC mpi1
- BRA mpi3
-.prp0                   \ (the row's first)
- STA R_NDX0,X
- INC R_NDN,X
- RTS
-.pr_flipx               \ row X's starting colour flipped
- LDA R_NDN,X
- EOR #&80
- STA R_NDN,X
-.prw9
- RTS
-
-\ mpi: insert x (A) into row X's sorted R_NDX0 .. R_NDX(Y-1) (Y = 1..3)
-
-.mpi
- STA mt_x
- CPY #2
- BEQ mpi2
- BCC mpi1
-.mpi3
+ TYA                    \ 1, 2, 3 there: into R_NDX0, R_NDX0..1, R_NDX0..2
+ AND #7
+ LSR A
+ BEQ pri1
+ BCS pri3
+ LSR A
+ BCS pri2
+ DEC R_NDN,X            \ 4 there: the count stays 3, and the fifth is put
+ DEC R_NDN,X            \ only if it is left of the fourth
+ LDA mt_x
+ CMP R_NDX3,X
+ BCS pr_irz
+.pri3
  LDA R_NDX2,X
  CMP mt_x
- BEQ mpi3s
- BCS mpi3m
-.mpi3s
+ BEQ pri3s
+ BCS pri3m
+.pri3s
  LDA mt_x
  STA R_NDX3,X
- RTS
-.mpi3m
+ JMP pr_ir
+.pri3m
  STA R_NDX3,X
-.mpi2
+.pri2
  LDA R_NDX1,X
  CMP mt_x
- BEQ mpi2s
- BCS mpi2m
-.mpi2s
+ BEQ pri2s
+ BCS pri2m
+.pri2s
  LDA mt_x
  STA R_NDX2,X
- RTS
-.mpi2m
+ JMP pr_ir
+.pri2m
  STA R_NDX2,X
-.mpi1
+.pri1
  LDA R_NDX0,X
  CMP mt_x
- BEQ mpi1s
- BCS mpi1m
-.mpi1s
+ BEQ pri1s
+ BCS pri1m
+.pri1s
  LDA mt_x
  STA R_NDX1,X
- RTS
-.mpi1m
+ JMP pr_ir
+.pri1m
  STA R_NDX1,X
  LDA mt_x
  STA R_NDX0,X
- RTS
+.pr_ir
+ JMP pr_adv             \ (patched)
+.pr_irz
+ LDY #1                 \ (Z clear, for the head it goes on to)
+ BNE pr_ir
 
-.pr_over                \ (A = the fifth: the two rightmost dropped)
- DEC R_NDN,X
- CMP R_NDX3,X
- BCS prw9
+\ pr_slow: a row (X) whose centre (Y ZC, 16-bit signed) is not on the screen
+\ (Y is not 0), A = its flags: what is left of it for the row's own code
+\ comes back in Y. Right of the screen by 256 or more, both crossings are
+\ dropped (0); left of it by more than 256, each flips the row's colour (so
+\ both do nothing, and one flips it: 1, the X+ crossing's flip), each as a
+\ 16-bit signed sum that wraps would have it; in between only one crossing
+\ can be on the screen: with the centre right of it X-, c - s (2, at A: ZC is
+\ set so that X+, after it, is dropped), and with the centre left of it X+,
+\ c + s (3, at A), X- having flipped the colour here. (The one call of a
+\ row: such rows are few.)
+
+.pr_slow
+ STA pr_t
+ CPY #1
+ BEQ psl4
+ CPY #&FF
+ BEQ psl5
+ TYA
+ BMI psl2
+ CPY #&7F               \ (c + s past 32767 wraps: X+ flips the colour)
+ BNE psl0
+ LDA ZC
+ CLC
+ ADC ZS
+ BCC psl0
+.psl1
+ LDA pr_t
+ AND #2
+ BNE psl0
+.psl1a
+ LDY #1
+ RTS
+.psl2
+ CPY #&80               \ (c - s below -32768 wraps: X- is dropped)
+ BNE psl3
+ LDA ZC
+ CMP ZS
+ BCC psl1
+.psl3
+ LDA pr_t
+ AND #3
+ BNE psl1a
+.psl0
+ LDY #0
+ RTS
+.psl4
+ LDA pr_t
+ LSR A
+ BCS psl0
+ LDA ZC                 \ (X-: on the screen if c - s < 256)
+ CMP ZS
+ BCS psl0
+ SEC
+ SBC ZS
+ LDY #&FF               \ (s > 0 here: &FF + s carries, and X+ is dropped)
+ STY ZC
+ LDY #2
+ RTS
+.psl5
+ LDA pr_t
+ LSR A
+ BCS psl6
+ PR_FLIP
+.psl6
+ LDA pr_t
+ AND #2
+ BNE psl0
+ LDA ZC                 \ (X+: on the screen if c + s >= 0)
+ CLC
+ ADC ZS
+ BCC psl1a
  LDY #3
- BRA mpi
+ RTS
 
 \ The engine's variables (bank 7: pc_circ writes the records in game
 \ context, PC_ROWS reads them in the frame, both with this bank paged)
