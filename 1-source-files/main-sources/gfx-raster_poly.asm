@@ -352,11 +352,14 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
 .s4
   DEX
   BPL sc
-  \ rows ystart..ylast
+  \ rows ystart..ylast (Y: e_sel's branch offset, 0 if the window clips
+  \ none of them, else to e_ch)
+  LDY #0
   LDA r_yminL
   CMP R_CT
   BCS y1
   LDA R_CT
+  LDY #LO(e_ch - (e_sel + 2))
 .y1
   STA r_ystart
   CMP r_ymaxL
@@ -365,15 +368,17 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   BEQ y2
   BCS r_pout
 .y2
-  LDA r_ymaxL
-  DEC A
-  CMP R_CB
+  LDX r_ymaxL
+  DEX
+  CPX R_CB
   BCC y3
-  LDA R_CB
+  LDX R_CB
+  LDY #LO(e_ch - (e_sel + 2))
 .y3
-  STA r_ylast
-  INC A
-  STA r_yend
+  STX r_ylast
+  INX
+  STX r_yend
+  STY e_sel+1
   \ chain A: forward into r_ta
   LDA #LO(r_ta)
   STA r_lsh_t+1
@@ -425,9 +430,19 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   JMP ca                  \ (its low byte patched: ca, cb or r_exr)
 .^r_exr
   RTS
-.cl                       \ y0 < ystart: out if the end row <= ystart, else
-  LDA r_ystart            \ clipped
+.e_ch                     \ an edge of a polygon whose rows the window clips (A
+  CMP r_yend              \ = y1): its end row, and its start row if it is
+  BCC e1                  \ inside
+  LDA r_yend
+.e1
+  STA RZ_T2               \ end row (exclusive)
+  LDA R_PYL,Y
   CMP RZ_T2
+  BCS r_ex                \ y0 >= end row
+  CMP r_ystart
+  BCS e2                  \ y0 >= ystart (then RZ_T2 > y0 >= ystart)
+  LDA r_ystart            \ y0 < ystart: out if the end row <= ystart, else
+  CMP RZ_T2               \ clipped
   BCS r_ex
   JMP clipped
 .ca                       \ (from the top vertex, a vertex at ymax, the
@@ -442,6 +457,7 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   LDX #0
 .ca1
   STX r_i1
+  ASSERT e_ch - (e_sel + 2) >= -128
   ASSERT HI(ca) = HI(r_exj) AND HI(cb) = HI(r_exj) AND HI(r_exr) = HI(r_exj)
 
 \ r_e8: the edge from vertex Y (i0) to vertex X (i1 = r_i1) of an 8-bit
@@ -459,16 +475,11 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   CMP R_PYL,Y
   BCC r_ex
   BEQ r_ex                \ not going down
-  CMP r_yend
-  BCC e1
-  LDA r_yend
-.e1
-  STA RZ_T2               \ end row (exclusive)
-  LDA R_PYL,Y
-  CMP RZ_T2
-  BCS r_ex                \ y0 >= end row
-  CMP r_ystart
-  BCC cl                  \ y0 < ystart (if y0 >= ystart then RZ_T2 > y0 >= ystart)
+.e_sel
+  BNE P%+2                \ (always; patched: to e_ch if the window clips the
+  STA RZ_T2               \ polygon's rows, r_pf8) the end row is y1's
+  LDA R_PYL,Y             \ (C = 1 still)
+.e2
   STA RZ_T3               \ start row (A = y0, C = 1)
   EOR #&FF
   ADC R_PYL,X             \ dy = y1 - y0; C stays 1 (y1 > y0)
@@ -577,16 +588,6 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
 .lsh0
   STZ RZ_TA               \ the error
   BRA r_lshgo
-.^r_prz                   \ the remainder is 0: X = q; a = q, or -q for dx < 0
-  CPY #&80
-  BCC rzp
-  TXA
-  EOR #&FF
-  ADC #0                  \ (C = 1: + 1)
-  TAX
-.rzp
-  STX r_lz_a+1
-  BRA r_lzgo
 .clipped                  \ starts above the window: r7_esgen's general set-up
   STA RZ_Y                \ at ystart (A)
   STA RZ_T3
@@ -657,6 +658,16 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   BCC r_lsh
   ASSERT HI(P%) = HI(r_lsh)
   JMP r_ex
+.^r_prz                   \ the remainder is 0: X = q; a = q, or -q for dx < 0
+  CPY #&80
+  BCC rzp
+  TXA
+  EOR #&FF
+  ADC #0                  \ (C = 1: + 1)
+  TAX
+.rzp
+  STX r_lz_a+1
+  BRA r_lzgo
 }
 
 \ ----------------------------------------------------------------------------

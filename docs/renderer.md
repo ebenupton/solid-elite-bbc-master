@@ -212,7 +212,10 @@ points at its own loop while its rows run.
   shared region), and its DDA loop jumps back to the chain (`r_ex`). A
   steep edge (|dx| < dy) has loops of its own (`r_sp` for dx > 0, `r_sn`
   for dx < 0): x in X, the error in A, the rows counted in Y, and x stored
-  through an operand whose low byte counts up the table.
+  through an operand whose low byte counts up the table. When the window
+  clips none of the polygon's rows, `r_pf8` points the branch at an
+  edge's head (`e_sel`) past the clipping tests (`e_ch`): the edge's rows
+  are y0 to y1 as they stand.
   Phase B fills the rows.
 * `R_LINE` draws a line. Both ends on screen take the fast loops. Any other
   line is clipped exactly to the window's sides first, with the original's
