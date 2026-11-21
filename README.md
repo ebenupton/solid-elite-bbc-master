@@ -58,21 +58,21 @@ The port's own code sits below `&3000` too, in a **glue area** before the low pa
 
 ## Speed
 
-In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 15.52 main-loop iterations per emulated second, against the original's 15.43 (the original with the comparison's six patches): 1.006 times its speed, with all the extra drawing. That is with the frame rate capped at 25 frames a second (two fields a frame): without the cap, about a tenth of the frames would be shown for a single field; with it none are, and frames that take longer than two fields are unaffected. The planets cost the most: the spinning beach ball (spinning smoothly at half the original's rate, its surface remade every frame close up and every other frame in deep space) and the crater planets' true spherical craters, which cost more than the original's polygon crater. An earlier build with plain disc planets, measured before the beach ball, ran 23% faster than the original (17.24). Every disc redraws only what changed: a changed row of the planet is written as strips between its old and new colour boundaries (up to three a row), and one-colour and emptied rows take short paths. The docked screens draw with 4.7% fewer busy cycles than before the three passes.
+In the gate's flight run (a deterministic pilot's launches, fights, station approaches and hyperspace jumps), the port runs at 16.47 main-loop iterations per emulated second, against the original's 15.43 (the original with the comparison's six patches): 1.067 times its speed, with all the extra drawing (the previous release ran at 15.52, 1.006 times). That is with the frame rate capped at 25 frames a second (two fields a frame): without the cap, about a tenth of the frames would be shown for a single field; with it none are, and frames that take longer than two fields are unaffected. The planets cost the most: the spinning beach ball (spinning smoothly at half the original's rate, its surface remade every frame close up and every other frame in deep space) and the crater planets' true spherical craters, which cost more than the original's polygon crater. An earlier build with plain disc planets, measured before the beach ball, ran 23% faster than the original (17.24). Every disc redraws only what changed: a changed row of the planet is written as strips between its old and new colour boundaries (up to three a row), and one-colour and emptied rows take short paths. The docked screens draw with 4.7% fewer busy cycles than before the three passes.
 
-The gate's run is the game's own, so its figures move whenever the game's random numbers do. `6-harness/mbench.mjs` times seven frozen scenes instead, in cycles per iteration, here for the previous release (ef0e8d3) and this build; its noise is about ±1.5%:
+The gate's run is the game's own, so its figures move whenever the game's random numbers do. `6-harness/mbench.mjs` times seven frozen scenes instead, in cycles per iteration, here for the previous release (580beac) and this build; its noise is about ±1.5%:
 
 | Scene | Previous release | This build |
 |---|---:|---:|
-| Flight | 178,763 | 174,722 |
-| Combat | 107,325 | 104,777 |
-| Beach ball | 191,781 | 190,155 |
-| Sun | 206,168 | 147,759 |
-| Docking | 348,787 | 335,773 |
-| Station's zone | 322,281 | 303,147 |
-| Rear view | 191,408 | 188,424 |
+| Flight | 174,722 | 155,260 |
+| Combat | 104,777 | 98,886 |
+| Beach ball | 190,155 | 165,947 |
+| Sun | 147,759 | 133,965 |
+| Docking | 335,773 | 302,750 |
+| Station's zone | 303,147 | 269,555 |
+| Rear view | 188,424 | 166,209 |
 
-The sun scene takes 28.3% fewer cycles, the station's zone 5.9% and docking 3.7%.
+Every scene takes 9 to 13% fewer cycles but combat, which is held by the 25 fps cap (its own work, less the wait for the flip, is 8.2% less: 95,522 to 87,671). The gains are the Acorn Electron port's findings (part 9 below).
 
 ## Testing
 
@@ -100,7 +100,7 @@ The copyright position is unchanged from Mark's repository: the original game an
 
 ## The port
 
-The port is a series of commits on top of Mark's source, in eight parts:
+The port is a series of commits on top of Mark's source, in nine parts:
 
 1. **The memory map.** The game is laid out over main RAM, sideways RAM banks 4 and 7, and HAZEL, freeing main RAM `&4000-&6FFF`, banks 5 and 6 and ANDY for a renderer. The game is still the original, iteration for iteration and pixel for pixel.
 2. **The speed-ups.** The game logic, made faster one idea per commit, still drawing the original wireframe pixel for pixel: 17.86 flight iterations per emulated second against the original's 13.97 (1.278 times).
@@ -110,6 +110,10 @@ The port is a series of commits on top of Mark's source, in eight parts:
 6. **Planets.** One circle engine for every planet's surface: the beach ball and true spherical craters; the sun drawn near the planet while the station has its slot; every disc drawn incrementally; and stars only into wholly black screen bytes. The gate's flight run gives 11.11 iterations per emulated second (0.795 times the original).
 7. **Circle costs.** The circle engine's arithmetic made faster with every frame unchanged (square roots from a table, multiplies through pointers into the quarter squares, a tighter divide, short products), then the planet spinning smoothly at half the original's rate, by half steps every iteration (in the game, and in the original the harness compares with), and its surface remade every frame close up, and every other frame in deep space, the frames between moved with the disc. The gate's flight run gives 15.21 iterations per emulated second (0.955 times the original with the same half spin, 15.93).
 8. **The CPC port's findings and the sun's slot.** Eleven speed-ups found by the Amstrad CPC port; the optional moons, rings and banded planets removed; the sun kept by the game, parked outside the ship slots while the station is near, with the same change made to the original in the comparison; and the sun's edge, the explosion clouds and `MV40` no longer taking stray random numbers or carries. In frozen scenes the sun is 28.3% faster, the station's zone 5.9% and docking 3.7%.
+
+9. **The Electron port's findings.** Speed-ups first found on the Acorn Electron port of Solid Elite, one idea per commit: the circle engine's rows, crossings and divisions with no calls; `PF_HOOK` keeping four bytes, not 23; the text steps looking only at the rows in use; a star in one byte erased by a store and a dot's two pixels set at once; LL9's scaling looked up, and its faces' and vertices' dot products in line with their logs patched in once a ship (its results bit for bit the original's); the front view's stardust in one loop, with a cache of its divide; the rasteriser's rows entered by a jump into their run with a fixed exit, and an 8-bit polygon's edges with no call, steep edges with their own loops and unclipped edges without their row tests; and the lighting's dot products in line. The frozen scenes take 9 to 13% fewer cycles, and the gate's flight run gives 16.47 iterations per emulated second (1.067 times the original with the six patches).
+
+   The rest of that port's list was here already or is the Electron's own: the projection's division (`LL60` divides by logs in line), the ship blocks' unrolled copies (`MALC`, `MALW`), and the disc rows read where they are made (this frame's boundaries are in the shared workspace, which the rasteriser reads in place). Two were left out as too small for a 2 MHz machine with a fast stack, under 0.2% each by the Electron's measurements, below the frozen scenes' noise: phase B keeping its character row between polygons (here the set-up is `r_rowset`'s few stores, not the Electron's twelve patched operands) and the painter's one-caller routines jumped to and back (the Master's painter has other routines, and a fast stack saves 6 cycles a call, not 13).
 
 Throughout, the game logic is the original's: the port's game state matches Acornsoft's release (SNG47) at every iteration, and save files are byte-identical with the original's. See [docs/README.md](docs/README.md) for the details, [docs/renderer.md](docs/renderer.md) for the renderer, [docs/speedups.md](docs/speedups.md) for the speed-ups and [docs/master-memory.md](docs/master-memory.md) for the hardware findings, and [docs/source-diff.md](docs/source-diff.md) for how far the source is from Mark's.
 

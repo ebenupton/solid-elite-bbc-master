@@ -928,8 +928,9 @@ tables.
 
 ## Speed
 
-The gate's run gives 15.52 flight iterations per emulated second, against
-15.43 for SNG47 with the comparison's six patches (1.006 times), with the
+The gate's run gives 16.47 flight iterations per emulated second (121,401
+cycles a flight iteration), against 15.43 for SNG47 with the comparison's six
+patches (1.067 times; 15.52 before the Electron port's findings), with the
 frame rate capped at 25 frames a second; without the cap about a tenth of
 the frames would be shown for a single field. With the speed-ups of the
 port's second part and the original's wireframe drawing the port was 17.86
