@@ -106,9 +106,15 @@
                                         \ (gfx-light.asm's first pass), the
                                         \ light for the next iteration's ships
 .R4_END%
+
+ ASSERT R4_END% <= STLZV               \ then STL1's divide cache's values, at
+ SKIP STLZV - P%                       \ bank 4's end (streams.py keeps the room)
+ ASSERT STLZV = &BF00
+ SKIP 256
+
 .BANK4_END%
 
- PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~R4_START%-1, ", L_SUN ", ~R4_START%, "-", ~R4_END%-1, " free ", &C000-BANK4_END%
+ PRINT "Bank 4: hot pass &8000-", ~HOT3_END%-1, ", hot data ", ~HOT3_END%, "-", ~R4_START%-1, ", L_SUN ", ~R4_START%, "-", ~R4_END%-1, " free ", STLZV-R4_END%, ", STL1's divide cache's values ", ~STLZV, "-", ~STLZV+255
  ASSERT BANK4_END% <= &C000
  SAVE "3-assembled-output/BANK4.bin", &8000, &C000, &8000
 

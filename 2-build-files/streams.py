@@ -1087,9 +1087,10 @@ def main():
                 at += bsize[n]
             return at
         conts = [["hot1", sy["LOW_END%"], 0x4000, []], ["hot2", sy["QS_RUN%"], 0x8000, []],
-                 ["hot3", 0x8000, 0xC000 - b4 - (sy["R4_END%"] - sy["R4_START%"]), []]]
+                 ["hot3", 0x8000, 0xBF00 - b4 - (sy["R4_END%"] - sy["R4_START%"]), []]]
         # (bank 4 ends with the hot data HAZEL has no room for, b4, then the
-        # renderer's game-context routine, L_SUN: elite-layout.asm)
+        # renderer's game-context routine, L_SUN, then STL1's divide cache's
+        # values, STLZV = &BF00 to &BFFF: elite-layout.asm)
         used = {c[0]: 0 for c in conts}
         cur = 0
         for u0, u1 in units:

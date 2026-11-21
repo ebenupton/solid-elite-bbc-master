@@ -3,7 +3,7 @@
 on py65 (65C02).
 
     python3 6-harness/test_stars.py REFDIR [--n 5000] [--seed 1] [--tree DIR]
-                                           [--strict]
+                                           [--strict] [--cruise]
 
 REFDIR holds a reference build's BCODE.unprot.bin, HICODE.bin, BANK4.bin,
 HZDATA.bin and symbols.txt (3-assembled-output of a build whose stardust is
@@ -31,9 +31,15 @@ records R_SX, R_SY, R_SS, and the A, X, Y and flags (N, V, Z, C) that STARS
 returns with (its caller returns at once to the main loop, whose next DORND
 takes C). The temporaries are set to different random values on the two
 builds before each call, so a read of one before STARS writes it shows up.
-With --strict the temporaries start equal and are compared as well. Exit status 0 only if every call gives the same results; prints the
+With --strict the temporaries start equal and are compared as well (but for
+widget, on a build with STL1's divide cache, whose hits do not write it). With
+--cruise the speed changes only between runs of calls (1 to 200 long), as
+in flight between presses of the speed keys, not with the steering. Exit status 0 only if every call gives the same results; prints the
 cycles a call took on each build and how often the rare paths ran (counted on
-the reference: KILL1, stl_dvs, mlqr, mlar, mlbr, MU8, mlsk and mlbk).
+the reference: KILL1, stl_dvs, mlqr, mlar, mlbr, MU8, mlsk and mlbk), and on
+a build with STL1's divide cache (STLZT) its lookups, hits, misses, misses
+that replace another speed's entry and misses that go to stl_dvs. The speed
+sometimes returns to a recent value, whose entries are still in the cache.
 """
 import os, random, sys
 
@@ -45,6 +51,7 @@ from py65.devices.mpu65c02 import MPU   # noqa: E402
 NOST = 20
 TEMPS = ('P', 'P+1', 'Q', 'R', 'S', 'T', 'T1', 'XX', 'XX+1', 'YY', 'YY+1', 'widget')
 RARE = ('KILL1', 'stl_dvs', 'mlqr', 'mlar', 'mlbr', 'MU8', 'mlsk', 'mlbk')
+CACHE = ('STL1', 'stlx', 'stl_dvs')     # (STL1's divide cache, on the build that has it)
 
 
 def addr(sy, n):
@@ -81,7 +88,10 @@ class Build:
         n = 0
         while mpu.pc != RET:
             if mpu.pc in watch:
-                watch[mpu.pc][1] += 1
+                w = watch[mpu.pc]
+                w[1] += 1
+                if len(w) > 2 and mpu.a:     # (at stlx: the entry held another speed's R)
+                    w[2] += 1
             mpu.step()
             n += 1
             if n > 200000:
@@ -123,6 +133,7 @@ def main():
     tree = opt('--tree', os.path.dirname(HERE))
     n, seed = int(opt('--n', 5000)), int(opt('--seed', 1))
     strict = '--strict' in args
+    cruise = '--cruise' in args
     src = os.path.dirname(HERE)
     A, B = Build(ref, src), Build(tree, src)
     sa, sb = A.sy, B.sy
@@ -134,8 +145,15 @@ def main():
     for nm in RARE:
         if nm in sa:
             A.watch[sa[nm]] = [nm, 0]
+    if 'STLZT' in sb:
+        for nm in CACHE:
+            B.watch[sb[nm]] = [nm, 0] + ([0] if nm == 'stlx' else [])
+    recent = [3]
     temps = {addr(sa, t) for t in TEMPS}
-    zp = [k for k in range(256) if (strict or k not in temps) and k not in (0, 1)]
+    # (--strict: all but widget on a build with the divide cache, as a hit
+    # does not write it, and nothing reads it before writing it)
+    loose = {sa['widget']} if 'STLZT' in sb else set()
+    zp = [k for k in range(256) if (k not in temps if not strict else k not in loose) and k not in (0, 1)]
     arrays = [(nm, sa[nm], 4 if nm == 'RAND' else (1 if nm in ('VIEW', 'GFORCE') else NOST + 1)) for nm in names]
     rnd = random.Random(seed)
 
@@ -200,8 +218,9 @@ def main():
                 jstx = rnd.randrange(1, 256)
                 jsty = rnd.randrange(1, 256)
             c = rnd.randrange(2)
-            if rnd.random() < 0.7:
-                delta = rnd.choice((rnd.randrange(0, 41), 40, 0, 1, rnd.randrange(30, 41)))
+            if rnd.random() < 0.7 and not (cruise and hold > 0):
+                delta = rnd.choice((rnd.randrange(0, 41), 40, 0, 1, rnd.randrange(30, 41), rnd.choice(recent)))
+                recent = (recent + [delta])[-4:]    # (back to a recent speed: its entries still hold)
         alp2, alp21, alp1, alpha = roll(jstx)
         bet2, bet21, bet1, beta = pitch(jsty, c)
         put('ALP2', alp2)
@@ -245,6 +264,13 @@ def main():
     print('STARS (front view): %d calls, seed %d: equal%s' % (n, seed, ' (strict: temporaries too)' if strict else ''))
     print('  cycles a call: reference %.1f, build %.1f' % (A.cycles / n, B.cycles / n))
     print('  rare paths on the reference: %s' % cov)
+    if B.watch:
+        w = {v[0]: v for v in B.watch.values()}
+        looks = w['STL1'][1]
+        misses = w['stlx'][1]
+        print('  divide cache on the build: %d lookups, %d hits (%.1f%%), %d misses (%d of them replacing another'
+              ' speed\'s entry), %d of the misses DELTA >= z_hi (stl_dvs, not cached)' % (
+                  looks, looks - misses, 100.0 * (looks - misses) / max(looks, 1), misses, w['stlx'][2], w['stl_dvs'][1]))
     miss = [w[0] for w in A.watch.values() if w[1] == 0]
     if miss:
         print('  (not reached: %s)' % ', '.join(miss))

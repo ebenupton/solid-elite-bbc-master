@@ -59,6 +59,9 @@
  Q% = _MAX_COMMANDER    \ Set Q% to TRUE to max out the default commander, FALSE
                         \ for the standard default commander
 
+ STLZV = &BF00          \ Port: the divide cache's values, at bank 4's end (STL1;
+                        \ its tags are STLZT, in the shared workspace, elite-gfx.asm)
+
  NOST = 20              \ The number of stardust particles in normal space (this
                         \ goes down to 3 in witchspace)
 
@@ -14118,8 +14121,8 @@ ENDIF
 
 .stlff
 
- LDA #255               \ STL1's inlined DVID4z: R = 255
- JMP stlr
+ LDA #255               \ STL1's inlined DVID4z: R = 255, cached at stlxv
+ JMP stlxv
 
 .stl_dvs
 
@@ -14142,6 +14145,16 @@ ENDIF
  LDA hstp               \ Port: and STL1's two in-line ones (PIX1's and
  STA stle               \ PIXEL2's, below) in the same way as H_STAR's: BIT #imm
  STA stlm               \ in record mode, BRA outside it
+
+ LDA DELTA              \ Port: patch DELTA + 1, the tag of the divide cache's
+ INC A                  \ entries for this speed, into STL1's CMP at stlk
+ STA stlk+1
+
+ LDX #&D0               \ Port: and the BNE after it, as a BNE, or, for DELTA =
+ CMP #1                 \ 255, whose tag would be 0, that of an empty entry, as
+ BCS P%+4               \ a BRA (&80): every lookup misses, and as DELTA >= z_hi
+ LDX #&80               \ for every z_hi, stlx divides at stl_dvs without
+ STX stlk+2             \ caching
 
  LDA ALP1               \ Port: patch the roll magnitude into MLSA and MLS2A
  LDX #0                 \ and the pitch magnitude into MLSB (STL1's in-line
@@ -14170,7 +14183,49 @@ ENDIF
                         \ These values are stored in (SX+Y SXL+Y), (SY+Y SYL+Y)
                         \ and (SZ+Y SZL+Y) respectively
 
- BRA STL1               \ Port: start the loop at STL1, past mlq9
+ BRA STL1               \ Port: start the loop at STL1, past stlx and mlq9
+
+.stlx
+
+                        \ Port: the divide cache misses (X = z_hi): DV42 inline
+                        \ (the demo port's a4317ef, w_0051): Q = z_hi and, when
+                        \ DELTA < z_hi (the common case), the quotient P is 0,
+                        \ so only DVID4's remainder conversion is needed
+                        \ (DVID4z, which does not read or write P), and the two
+                        \ LSR P / ROR A at stl_dvs are LSR A at stlr (with the
+                        \ same C). No reader of P runs before the multiply sets
+                        \ it. DELTA >= z_hi goes the old way at stl_dvs (before
+                        \ STARS1) and is not cached. Otherwise R goes into the
+                        \ cache, with the tag DELTA + 1
+
+ STX Q                  \ Set Q = z_hi, as DV42 does
+
+ LDA DELTA              \ If DELTA >= z_hi, do the full DVID4 at stl_dvs
+ CMP Q
+ BCS stl_dvs
+
+ INC A                  \ Tag z_hi's entry with DELTA + 1 (its value is stored
+ STA STLZT,X            \ below, before the cache is next read)
+ DEC A
+
+ TAX                    \ Set A = R = 256 * speed / z_hi (P = 0), as DV42,
+ BEQ stlxv              \ with DVID4z inlined (A = 0 gives R = 0)
+ LDA log,X
+ STA widget
+ LDA logL,X
+ LDX Q
+ CMP logL,X             \ C = borrow from the low bytes of log(A) - log(Q)
+ LDA widget
+ SBC log,X
+ BCS stlff              \ A >= Q in the logs: R = 255 (at stlff)
+ TAX
+ LDA alogh,X
+
+.stlxv
+
+ LDX Q                  \ Store R as z_hi's entry's value, and rejoin at stlr
+ STA STLZV,X
+ JMP stlr
 
 .mlq9
 
@@ -14191,34 +14246,28 @@ ENDIF
 
 .STL1
 
-                        \ Port: DV42 inline (the demo port's a4317ef, w_0051):
-                        \ Q = z_hi and, when DELTA < z_hi (the common case),
-                        \ the quotient P is 0, so only DVID4's remainder
-                        \ conversion is needed (DVID4z, which does not read
-                        \ or write P), and the two LSR P / ROR A below are
-                        \ LSR A (with the same C). No reader of P runs before
-                        \ the multiply sets it. DELTA >= z_hi goes the old way
-                        \ at stl_dvs (before STARS1)
+                        \ Port: R = 256 * DELTA / z_hi from the divide cache
+                        \ when it holds it: two tables indexed by z_hi, the
+                        \ tags STLZT (elite-gfx.asm) and the values STLZV (at
+                        \ bank 4's end), an entry holding R as the divide at
+                        \ stlx leaves it for the speed DELTA = tag - 1 (BEGIN
+                        \ empties it: tag 0). R depends on nothing else (the
+                        \ log tables are fixed), so a hit gives the miss's R,
+                        \ and from it the same Q and C at stlr; Q = z_hi and
+                        \ widget, which a hit does not write, are not read
+                        \ before they are next written. A miss divides at stlx
+                        \ (before STL1) and fills the entry
 
- LDA SZ,Y               \ Set Q = z_hi, as DV42 does
- STA Q
+ LDX SZ,Y               \ Set A to the tag of z_hi's entry
+ LDA STLZT,X
 
- LDA DELTA              \ If DELTA >= z_hi, do the full DVID4 at stl_dvs
- CMP Q
- BCS stl_dvs
+.stlk
 
- TAX                    \ Set A = R = 256 * speed / z_hi (P = 0), as DV42,
- BEQ stlr               \ with DVID4z inlined (A = 0 gives R = 0)
- LDA log,X
- STA widget
- LDA logL,X
- LDX Q
- CMP logL,X             \ C = borrow from the low bytes of log(A) - log(Q)
- LDA widget
- SBC log,X
- BCS stlff              \ A >= Q in the logs: R = 255 (at stlff)
- TAX
- LDA alogh,X
+ CMP #0                 \ (patched: DELTA + 1) If it is not this speed's, jump
+ BNE stlx               \ to stlx to divide and fill the entry (patched: BRA
+                        \ for DELTA = 255)
+
+ LDA STLZV,X            \ A = R, from the cache
 
 .stlr
 
@@ -38860,6 +38909,16 @@ ENDIF
 
  JSR LL21I              \ Port: make LL9's table of its orientation vectors'
                         \ scaling, LL21T
+
+ LDA #0                 \ Port: empty STL1's divide cache: its tags STLZT are 0,
+ TAX                    \ which no speed's tag matches (the loader runs where
+                        \ they are, elite-gfx.asm)
+
+.begz
+
+ STA STLZT,X
+ INX
+ BNE begz
 
  LDX #(DISK-COMC)       \ We start by zeroing all the configuration variables
                         \ between COMC and DISK, to set them to their default

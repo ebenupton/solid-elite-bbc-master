@@ -128,6 +128,10 @@ ASSERT HI(F_DSS) = HI(F_DSS + NDSTAR - 1)
 .F_SUY      SKIP 2          \ with GSUNR and GSUNON
 .FL_BEH     SKIP 1          \ bit 7: the sun is behind the planet (f_flt, for
                             \ R_FLARE's probes)
+ALIGN &100
+.STLZT      SKIP 256        \ the game's: STL1's divide cache's tags, by z_hi
+                            \ (elite-source.asm; the values are STLZV, at bank
+                            \ 4's end; BEGIN empties it, as the loader runs here)
 .WS_GAP                    \ (free to the main code)
 SKIP CODE% - P%
 .WS_END
