@@ -3,7 +3,7 @@
 \ phase A for 16-bit coordinates, r7_pf16, came from bank 7), in ANDY
 \ (ROMSEL &85: ANDY over bank 5's &8000-&8FFF; bank 5's &9000-&BFFF, the
 \ shared region gfx-raster.asm, stays visible: its arithmetic, r_div8,
-\ r_dvq, rp_mul16 and rp_div32, is there).  The frame layer's T_POLY
+\ r_pdiv, rp_mul16 and rp_div32, is there).  The frame layer's T_POLY
 \ pages it in.  R_SETBUF (shared) pages it in to patch phase B's DIRTY
 \ operands.  INCLUDE it at &8000 in an assembly of its own (ANDY), after
 \ gfx-raster.asm: it starts with phase B's rows, whose pb_ret is r_xw, the
@@ -305,9 +305,9 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
 .p16                      \ some coordinate outside 0..255: phase A (r7_pf16)
   JSR r7_pf16
   CMP #0                  \ (A = 0: nothing to draw)
-  BEQ out
+  BEQ r_pout
   JMP r_pcbd
-.out
+.^r_pout                  \ (also r_pf8's: no rows)
   RTS
 }
 
@@ -360,10 +360,10 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
 .y1
   STA r_ystart
   CMP r_ymaxL
-  BCS out
+  BCS r_pout
   CMP R_CB
   BEQ y2
-  BCS out
+  BCS r_pout
 .y2
   LDA r_ymaxL
   DEC A
@@ -381,23 +381,10 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   LDA #HI(r_ta)
   STA r_lsh_t+2
   STA r_lz_t+2
-  LDX r_top               \ (from the top vertex, a vertex at ymax, the
-.ca                       \ largest of the vertices' y, comes within n - 1
-  LDA R_PYL,X             \ edges either way: no count is needed)
-  CMP r_ymaxL
-  BEQ cad
-  STX r_i0
-  INX
-  CPX r_n
-  BCC ca1
-  LDX #0
-.ca1
-  STX r_i1
-  JSR r_e8
-  LDX r_i1
+  LDA #LO(ca)             \ (the edges' exit: ca, cb and r_exr share a page)
+  STA r_exj+1
+  LDX r_top
   BRA ca
-.out
-  RTS
 .cad
   \ chain B: backward into r_tb
   LDA #LO(r_tb)
@@ -406,22 +393,199 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   LDA #HI(r_tb)
   STA r_lsh_t+2
   STA r_lz_t+2
+  LDA #LO(cb)
+  STA r_exj+1
   LDX r_top
 .cb
   LDA R_PYL,X
   CMP r_ymaxL
   BEQ cbd
-  STX r_i0
+  TXA
+  TAY                     \ Y = i0
   DEX
   BPL cb1
   LDX r_n
   DEX
 .cb1
   STX r_i1
-  JSR r_e8
-  LDX r_i1
-  BRA cb
+  JMP r_e8
 .cbd
+  JMP r_pcbd
+.^r_ex                    \ an edge is done: on along its chain (or, for the
+  LDX r_i1                \ 16-bit path, back to r7_pf16b: r_exr)
+.^r_exj
+  JMP ca                  \ (its low byte patched: ca, cb or r_exr)
+.^r_exr
+  RTS
+.cl                       \ y0 < ystart: out if the end row <= ystart, else
+  LDA r_ystart            \ clipped
+  CMP RZ_T2
+  BCS r_ex
+  JMP clipped
+.ca                       \ (from the top vertex, a vertex at ymax, the
+  LDA R_PYL,X             \ largest of the vertices' y, comes within n - 1
+  CMP r_ymaxL             \ edges either way: no count is needed)
+  BEQ cad
+  TXA
+  TAY                     \ Y = i0
+  INX
+  CPX r_n
+  BCC ca1
+  LDX #0
+.ca1
+  STX r_i1
+  ASSERT HI(ca) = HI(r_exj) AND HI(cb) = HI(r_exj) AND HI(r_exr) = HI(r_exj)
+
+\ r_e8: the edge from vertex Y (i0) to vertex X (i1 = r_i1) of an 8-bit
+\ polygon into the chain's table, then r_ex.  Its set-up is in line in its
+\ chain (chain A falls into it, chain B jumps), the division is reached and
+\ left by jumps (r_pdiv, in the shared region; the sign of dx kept in Y's
+\ bit 7), and the DDA loops end with a jump back to the chain: an edge
+\ makes no call unless it starts above the window (r7_esgen) or has a
+\ quotient of 16 or more with a divisor under 16 (r_div8b).  There are two loops: r_lz (no remainder: x += a a row) and
+\ r_lsh (x += a, the error -= b, and on a borrow += dy, x += 1).
+.r_e8
+  LDA R_PYL,X
+  CMP R_PYL,Y
+  BCC r_ex
+  BEQ r_ex                \ not going down
+  CMP r_yend
+  BCC e1
+  LDA r_yend
+.e1
+  STA RZ_T2               \ end row (exclusive)
+  LDA R_PYL,Y
+  CMP RZ_T2
+  BCS r_ex                \ y0 >= end row
+  CMP r_ystart
+  BCC cl                  \ y0 < ystart (if y0 >= ystart then RZ_T2 > y0 >= ystart)
+  STA RZ_T3               \ start row (A = y0, C = 1)
+  EOR #&FF
+  ADC R_PYL,X             \ dy = y1 - y0; C stays 1 (y1 > y0)
+  STA RZ_T1               \ dy
+  LDA R_PXL,Y
+  STA RZ_T0               \ S = x0
+  EOR #&FF
+  ADC R_PXL,X             \ dx = x1 - x0, C = (x1 >= x0)
+  BCS pos
+  EOR #&FF
+  ADC #1                  \ |dx| (C = 0 here)
+  LDY #&80                \ (Y's bit 7: dx < 0; i0 has it clear)
+.pos
+  CMP RZ_T1
+  BCC steep
+  JMP r_pdiv              \ (the division, in the shared region: gfx-raster.asm;
+.steep                    \ it comes back at r_prnz or r_prz)
+  TAX                     \ steep: q = 0, r = |dx| (vertical: r = 0)
+  BEQ r_prz
+  LDX #0
+\ x = x0 + ceil(dx * k / dy) per row: x += a, the error -= b, and on a
+\ borrow the error += dy, x += 1, with a = floor(dx / dy), b = dx - a * dy
+.^r_prnz                  \ the remainder is not 0: X = q, A = r
+  CPY #&80
+  BCS nr
+  TAY                     \ dx > 0: a = q, b = r (the loop's operands hold
+  DEY                     \ a - 1 and b - 1)
+  STY r_lsh_b+1
+  DEX
+  STX r_lsh_a+1
+  BCC lsh0                \ (always: from the CPY)
+.nr                       \ dx < 0: a = NOT q, b = dy - r (C = 1)
+  SBC RZ_T1               \ r - dy = -b: NOT it is b - 1
+  EOR #&FF
+  STA r_lsh_b+1
+  TXA
+  EOR #&FF
+  SBC #0                  \ (C = 0: - 1)
+  STA r_lsh_a+1
+.lsh0
+  STZ RZ_TA               \ the error
+  BRA r_lshgo
+.^r_prz                   \ the remainder is 0: X = q; a = q, or -q for dx < 0
+  CPY #&80
+  BCC rzp
+  TXA
+  EOR #&FF
+  ADC #0                  \ (C = 1: + 1)
+  TAX
+.rzp
+  STX r_lz_a+1
+  BRA r_lzgo
+.clipped                  \ starts above the window: r7_esgen's general set-up
+  STA RZ_Y                \ at ystart (A)
+  STA RZ_T3
+  STZ r7_side4
+  JSR r7_esgen            \ (Y = i0, X = i1: S, t -> RZ_SA, RZ_TA; a, b, dy
+  LDA RZ_SA               \ -> r7_ea, r7_eb, r7_edy)
+  STA RZ_T0
+  LDA r7_edy
+  STA RZ_T1
+  LDA r7_ea
+  LDX r7_eb
+  BNE r_psh1
+\ b = 0: A = a  (falls into r_lz)
+.^r_pzl1
+  STA r_lz_a+1
+.r_lzgo
+  LDA RZ_T2
+  STA r_lz_e+1
+  LDY RZ_T3
+  LDA RZ_T0
+  CLC
+\ The DDA loops (Y = row, run to the patched end row)
+.^r_lz                    \ b = 0: A = x
+.^r_lz_t
+  STA &FFFF,Y
+  INY
+.^r_lz_a
+  ADC #0                  \ a (C = 0)
+.^r_lz_e
+  CPY #0
+  BCC r_lz
+  ASSERT HI(P%) = HI(r_lz)   \ (the loops cross no page)
+  JMP r_ex
+\ shallow: X = b, A = a, RZ_TA = the error
+.^r_psh1
+  DEC A
+  STA r_lsh_a+1
+  DEX
+  STX r_lsh_b+1
+.r_lshgo
+  LDA RZ_T1
+  STA r_lsh_d+1
+  LDA RZ_T2
+  STA r_lsh_e+1
+  LDY RZ_T3
+  LDA RZ_T0
+  CLC
+.^r_lsh                   \ |dx| >= dy: A = x, RZ_TA = error
+.^r_lsh_t
+  STA &FFFF,Y
+  INY
+  TAX
+  LDA RZ_TA
+.^r_lsh_b
+  SBC #0                  \ b - 1 (C = 0)
+  BCS lsh1
+.^r_lsh_d
+  ADC #0                  \ dy
+  INX
+.lsh1
+  STA RZ_TA
+  TXA
+.^r_lsh_a
+  ADC #0                  \ a - 1 (C = 1)
+.^r_lsh_e
+  CPY #0
+  BCC r_lsh
+  ASSERT HI(P%) = HI(r_lsh)
+  JMP r_ex
+}
+
+\ ----------------------------------------------------------------------------
+\ r_pcbd: both chains' tables are made (phase A): the rows, then phase B
+\ ----------------------------------------------------------------------------
+{
 .^r_pcbd
   \ which table is the left one?
   LDA r_ystart
@@ -573,157 +737,6 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   EQUW r_ta, r_tb, r_ta
 }
 
-\ r_e8: edge r_i0 -> r_i1 of an 8-bit polygon into the table at (RZ_T4)
-.r_e8
-{
-  LDY r_i0
-                          \ X = r_i1 already: both callers (1416/1445) STX r_i1 : JSR r_e8
-  LDA R_PYL,X
-  CMP R_PYL,Y
-  BCC out
-  BEQ out                 \ not going down
-  CMP r_yend
-  BCC e1
-  LDA r_yend
-.e1
-  STA RZ_T2               \ end row (exclusive)
-  LDA R_PYL,Y
-  CMP RZ_T2
-  BCS out                 \ y0 >= end row
-  CMP r_ystart
-  BCC cl                  \ y0 < ystart (if y0 >= ystart then RZ_T2 > y0 >= ystart)
-.e2
-  STA RZ_T3               \ start row (A = y0 = R_PYL,Y, C = 1 from BCC cl not taken)
-  EOR #&FF
-  ADC R_PYL,X             \ dy = y1 - y0; C stays 1 (y1 > y0)
-  STA RZ_T1               \ dy
-  LDA R_PXL,Y
-  STA RZ_T0               \ S = x0
-  EOR #&FF
-  ADC R_PXL,X             \ dx = x1 - x0, C = (x1 >= x0)
-  BCC neg
-  CMP RZ_T1
-  BCS pdiv
-  TAX                     \ steep, a = 0, b = dx (Z from TAX)
-  BEQ z0
-  LDA #0
-  JMP shallow
-.z0
-  JMP zloop               \ A = X = 0
-.cl                       \ y0 < ystart: out if end row <= ystart, else clipped
-  LDA RZ_T2
-  CMP r_ystart
-  BEQ out
-  BCC out
-  JMP clipped
-.out
-  RTS
-.pdiv
-  JSR r_dvq               \ A = r, r_m0 = q
-  TAX
-  BEQ pz
-  LDA r_m0
-  JMP shallow
-.pz
-  LDA r_m0
-  JMP zloop
-.neg
-  EOR #&FF
-  INC A                   \ adx
-  CMP RZ_T1
-  BCS ndiv
-  EOR #&FF                \ steep, a = -1, b = dy - adx
-  SEC
-  ADC RZ_T1
-  TAX
-  LDA #&FF                \ a = -1
-  JMP shallow
-.ndiv
-  JSR r_dvq
-  CMP #0
-  BNE nr
-  SEC                     \ a = -q
-  SBC r_m0
-  JMP zloop
-.nr
-  EOR #&FF                \ b = dy - r, a = NOT q
-  SEC
-  ADC RZ_T1
-  TAX
-  LDA r_m0
-  EOR #&FF
-  JMP shallow
-.clipped                  \ starts above the window: general set-up at ystart
-  LDA r_ystart            \ (bank 7: S -> RZ_T0, RZ_TA; dy -> RZ_T1; A = a, X = b)
-  STA RZ_Y
-  STA RZ_T3
-  STX RZ_T7               \ (i1; Y = i0)
-  JSR r7_e8c
-  CPX #0
-  BNE c1
-  JMP zloop1
-.c1
-  JMP shallow1
-\ b = 0: A = a  (falls into r_lz)
-.zloop
-.zloop1
-.^r_pzl1
-  STA r_lz_a+1
-  LDA RZ_T2
-  STA r_lz_e+1
-  LDY RZ_T3
-  LDA RZ_T0
-  CLC
-\ The DDA loops (Y = row, run to the patched end row)
-.^r_lz                    \ b = 0: A = x
-.^r_lz_t
-  STA &FFFF,Y
-  INY
-.^r_lz_a
-  ADC #0                  \ a (C = 0)
-.^r_lz_e
-  CPY #0
-  BCC r_lz
-  RTS
-\ shallow: X = b, A = a  (falls into r_lsh)
-.shallow
-  STZ RZ_TA
-.shallow1
-.^r_psh1
-  DEC A
-  STA r_lsh_a+1
-  DEX
-  STX r_lsh_b+1
-  LDA RZ_T1
-  STA r_lsh_d+1
-  LDA RZ_T2
-  STA r_lsh_e+1
-  LDY RZ_T3
-  LDA RZ_T0
-  CLC
-.^r_lsh                   \ |dx| >= dy: A = x, RZ_TA = error
-.^r_lsh_t
-  STA &FFFF,Y
-  INY
-  TAX
-  LDA RZ_TA
-.^r_lsh_b
-  SBC #0                  \ b - 1 (C = 0)
-  BCS lsh1
-.^r_lsh_d
-  ADC #0                  \ dy
-  INX
-.lsh1
-  STA RZ_TA
-  TXA
-.^r_lsh_a
-  ADC #0                  \ a - 1 (C = 1)
-.^r_lsh_e
-  CPY #0
-  BCC r_lsh
-  RTS
-}
-
 
 \ R_POLY's phase A for 16-bit coordinates: its variables (its 32-bit maths,
 \ rp_mul16 and rp_div32, are in the shared region, gfx-raster.asm)
@@ -738,17 +751,6 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
 .r7_i0 EQUB 0
 .r7_i1 EQUB 0
 .r7_side4 EQUB 0
-.r7_e8c                   \ bank 5's r_e8, an edge starting above the window: Y = i0,
-  LDX RZ_T7               \ RZ_T7 = i1, RZ_Y = ystart -> S in RZ_T0 (t in RZ_TA), dy
-  STZ r7_side4            \ in RZ_T1, A = a, X = b
-  JSR r7_esgen
-  LDA RZ_SA
-  STA RZ_T0
-  LDA r7_edy
-  STA RZ_T1
-  LDX r7_eb
-  LDA r7_ea
-  RTS
 
 \ ============================================================================
 \ R_POLY's phase A for polygons with some coordinate outside 0..255: chain A
@@ -898,6 +900,8 @@ r7_eb = rp_ov + 15
   LDA R_CR
   INC A
   STA r_cr1
+  LDA #LO(r_exr)          \ (the edges' exit: back here, r_exr)
+  STA r_exj+1
   LDA #LO(r_ta)
   STA r_lsh_t+1
   STA r_lz_t+1

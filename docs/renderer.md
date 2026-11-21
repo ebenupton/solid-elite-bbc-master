@@ -207,6 +207,9 @@ points at its own loop while its rows run.
 
 * `R_POLY` fills a convex polygon in a dithered colour. Phase A walks its
   edges into per-row left and right boundaries, with 8-bit or 16-bit DDAs.
+  An 8-bit polygon's edges make no call: an edge's set-up is in line in
+  its chain, its division is reached and left by jumps (`r_pdiv`, in the
+  shared region), and its DDA loop jumps back to the chain (`r_ex`).
   Phase B fills the rows.
 * `R_LINE` draws a line. Both ends on screen take the fast loops. Any other
   line is clipped exactly to the window's sides first, with the original's
