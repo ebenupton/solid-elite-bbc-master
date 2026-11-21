@@ -55,9 +55,15 @@ def addr(sy, n):
 
 class Build:
     def __init__(self, d, srcdir):
-        # (CODE% from the tree's source for both: a REFDIR holds no source,
-        # and load() would then guess it from the image's length)
+        # (CODE% is WS_END, the shared workspace's end, elite-gfx.asm, in
+        # each build's own symbols: a REFDIR holds no source, and CODE% moves)
         self.sy, self.mem = load(d, srcdir)
+        code = self.sy.get('WS_END')
+        if code is not None:
+            out = os.path.join(d, '3-assembled-output') if os.path.isdir(os.path.join(d, '3-assembled-output')) else d
+            b = list(open(os.path.join(out, 'BCODE.unprot.bin'), 'rb').read())
+            self.mem[0x0E00:0x4000] = [0] * (0x4000 - 0x0E00)
+            self.mem[code:code + len(b)] = b
         self.mpu = MPU()
         self.mpu.memory = self.mem
         self.cycles = 0
