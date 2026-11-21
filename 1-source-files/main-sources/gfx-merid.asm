@@ -100,6 +100,9 @@ PCSLOTS = PCMAX
  LDA PC_N
  CMP #PCSLOTS
  BCS pcc9
+ ASL A                  \ (its thresholds' offset in pc_tu, into pct1's ORA
+ ASL A                  \ #)
+ STA pct_o+1
  STZ pc_t
  LDX #0                 \ the magnitudes >> 2 (pf_tilt's halved vectors: the
  LDY #0                 \ beach ball's |v| >> 3), signs, non-zero flags
@@ -644,14 +647,16 @@ PCSLOTS = PCMAX
  STA pc_v
  LDA pc_v+1
  ADC pcby+1
- PHA                    \ (unclamped, into pc_tw, for pf_hold)
- TYA
- ASL A
+ PHA                    \ (unclamped, into the slot's pc_tu, for pf_hold:
+ TYA                    \ written even if there is no record, as pf_hold
+ ASL A                  \ reads only the slots below PC_N)
+.pct_o
+ ORA #0                 \ (patched: the slot's offset, 4 PC_N)
  TAX
  LDA pc_v
- STA pc_tw,X
+ STA pc_tu,X
  PLA
- STA pc_tw+1,X
+ STA pc_tu+1,X
  BMI pct2
  BNE pct3
  LDA pc_v
@@ -687,18 +692,6 @@ PCSLOTS = PCMAX
  CMP #3
  BEQ pcy9
 .pcy2
- LDA PC_N               \ (its unclamped thresholds, for pf_hold)
- ASL A
- ASL A
- TAX
- LDA pc_tw
- STA pc_tu,X
- LDA pc_tw+1
- STA pc_tu+1,X
- LDA pc_tw+2
- STA pc_tu+2,X
- LDA pc_tw+3
- STA pc_tu+3,X
  LDX PC_N               \ the record into its slot
  INC PC_N
  LDY pcb_o+1,X
@@ -2284,6 +2277,6 @@ pr_lt  = pm_P + 19      \ (2 a record: at most 6; over pm_m8)
 .pcc    EQUB 0          \ the circle's cosine (0.8) and its sign (bit 7)
 .pcneg  EQUB 0
 .pcn    EQUW 0          \ 2^24 / the axis' nominal length (>> 3)
-.pc_tw  SKIP 4          \ the record's thresholds T1, T2 before clamping (16-bit)
-.pc_tu  SKIP 4 * PCSLOTS \ and each slot's (pf_hold moves them to the disc)
+.pc_tu  SKIP 4 * PCSLOTS \ each slot's thresholds T1, T2 before clamping
+                        \ (16-bit: pf_hold moves them to the disc)
 .PCB    SKIP RSZ * PCSLOTS  \ the records: the planet's
