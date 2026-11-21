@@ -808,6 +808,31 @@ PCSLOTS = PCMAX
 \ negative), saturating at 2^32 - 1 (as when V loses all its bits). U = 0
 \ gives 0. (planet_caps.fdiv)
 
+MACRO PFN v             \ the 24-bit value at zero page v (non-zero) shifted
+ LDY #0                 \ left until bit 23 is set: A = its top byte, its
+ LDA v+2                \ next at v+1; Y = the shifts (in line, once for U
+ BNE n2                 \ and once for V: hot code, inlined on purpose)
+ LDA v+1                \ a byte at a time
+ LDY v
+ STY v+1
+ STZ v
+ LDY #8
+ CMP #0
+ BNE n2
+ LDY #16
+ LDA v+1
+ STZ v+1
+.n2
+ BMI n3
+.n1
+ INY
+ ASL v
+ ROL v+1
+ ROL A
+ BPL n1
+.n3
+ENDMACRO
+
 .pfd_e0
  JMP pfd_0
 .pfd_es
@@ -851,15 +876,13 @@ PCSLOTS = PCMAX
  ORA pm_b+1
  ORA pm_b+2
  BEQ pfd_es
- LDX #pm_b              \ normalise V: V' = (pm_b+2 pm_b+1), ev
- JSR pfd_norm
+ PFN pm_b               \ normalise V: V' = (pm_b+2 pm_b+1), ev
  STA pm_b+2
  TYA
  CLC
  ADC #5
  STA pm_eu
- LDX #pm_a              \ and U: U' = (A pm_a+1), eu; the shift 5 + ev - eu
- JSR pfd_norm
+ PFN pm_a               \ and U: U' = (A pm_a+1), eu; the shift 5 + ev - eu
  PHA
  TYA
  EOR #&FF
@@ -997,31 +1020,6 @@ PCSLOTS = PCMAX
  STA pm_p+2
  STA pm_p+3
 .pfd10
- RTS
-
-.pfd_norm               \ the 24-bit value at zero page X (non-zero) shifted
- LDY #0                 \ left until bit 23 is set: A = its top byte, its
- LDA 2,X                \ next at 1,X; Y = the shifts
- BNE pfn2
- LDA 1,X                \ a byte at a time
- LDY 0,X
- STY 1,X
- STZ 0,X
- LDY #8
- CMP #0
- BNE pfn2
- LDY #16
- LDA 1,X
- STZ 1,X
-.pfn2
- BMI pfn3
-.pfn1
- INY
- ASL 0,X
- ROL 1,X
- ROL A
- BPL pfn1
-.pfn3
  RTS
 
 \ pm_mul16: pm_p (4) = pm_a (2) * pm_b (2), unsigned, from four 8 x 8
