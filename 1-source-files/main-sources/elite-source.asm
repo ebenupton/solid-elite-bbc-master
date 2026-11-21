@@ -6443,8 +6443,8 @@ ENDIF
 
 .PIX1
 
-                        \ Set (A X) = (A P) + (S R) (Port: ADDK inlined; all
-                        \ three callers set P = 0, so the same-sign low byte
+                        \ Set (A X) = (A P) + (S R) (Port: ADDK inlined; both
+                        \ callers set P = 0, so the same-sign low byte
                         \ is X = R + 0 with C = 0, exactly as ADDK's CLC : LDA R
                         \ : ADC P : TAX, and the opposite-sign case calls MU8K,
                         \ ADDK's own tail, with T and T1 set as ADDK sets them)
@@ -6459,6 +6459,9 @@ ENDIF
 
  JSR MU8K               \ Different signs: (A X) = (A P) + (S R) via MU8K
                         \ (ADDK's tail, as PIX1 may run with ACCCON X set)
+                        \
+                        \ Port: STL1 has its own copy of this addition in
+                        \ line, with the record-mode test patched as here
 
  BRA pxst
 
@@ -14055,11 +14058,14 @@ ENDIF
 .stl_pat
 
                         \ Port: patch b = A AND 31 (MULTS multiplies by
-                        \ X AND 31) into MLSB (X = 0) or MLSA (X = MLSA -
-                        \ MLSB): b into the CPX and the QSL+b / QSH+b
-                        \ operands, QSL-b / QSH-b (both bytes, as b may be 0)
-                        \ into the others (here, before STARS1, so that the
-                        \ MLSB inlined in STL1 is within 256 bytes of MLSA)
+                        \ X AND 31) into one of STL1's three in-line MULTS
+                        \ copies, MLSA (X = 0), MLS2A (X = MLS2A - MLSA) or
+                        \ MLSB (X = MLSB - MLSA): b into the CPX and the
+                        \ QSL+b / QSH+b operands, QSL-b / QSH-b (both bytes,
+                        \ as b may be 0) into the others; Y is the operand
+                        \ of the copy's BRA to its b = 0 path (here, before
+                        \ STARS1, so that the copies are within 256 bytes of
+                        \ MLSA)
                         \
                         \ If b is already patched in (the CPX operand holds
                         \ the last b, and the assembled operands are those of
@@ -14068,44 +14074,43 @@ ENDIF
                         \ starts with LDA and CMP)
 
  AND #31
- CMP mlb1+1,X
+ CMP mla1+1,X
  BEQ stlpr
- STA mlb1+1,X
- STA mlb2+1,X
- STA mlb4+1,X
+ STA mla1+1,X
+ STA mla2+1,X
+ STA mla4+1,X
  EOR #&FF               \ A = -b, with C = 1 if and only if b = 0
  CLC
  ADC #1
- STA mlb3+1,X
- STA mlb5+1,X
+ STA mla3+1,X
+ STA mla5+1,X
  LDA #HI(QSL)-1
  ADC #0
- STA mlb3+2,X
+ STA mla3+2,X
  ADC #2                 \ (C = 0: no carry out of HI(QSL))
- STA mlb5+2,X
+ STA mla5+2,X
 
- LDY #T                 \ Port: and the first instruction of MLSB (X = 0) or
- LDA mlb1+1,X           \ MLSA: STA T when b <> 0, else BRA mlbkj or BRA mlsk,
- BNE stlw0              \ as the products are then 0 (until ALP1 or BET1
- LDY #mlbkj-MLSB-2      \ first changes, the assembled STA T stays: their own
- TXA                    \ paths, which give the same results)
- BEQ stlz
- LDY #mlsk-MLSA-2
+                        \ Port: and the copy's first instruction: STA T when
+                        \ b <> 0, else BRA to its b = 0 path (operand Y), as
+                        \ the products are then 0 (until ALP1 or BET1 first
+                        \ changes, the assembled STA T stays: their own
+                        \ paths, which give the same results)
 
-.stlz
-
+ LDA mla1+1,X
+ BNE stlw0
  LDA #&80
  BRA stlw
 
 .stlw0
 
+ LDY #T
  LDA #&85
 
 .stlw
 
- STA MLSB,X
+ STA MLSA,X
  TYA
- STA MLSB+1,X
+ STA MLSA+1,X
 
 .stlpr
 
@@ -14134,11 +14139,21 @@ ENDIF
 
  JSR pxpat              \ Port: patch the record-mode tests for this pass
 
- LDA ALP1               \ Port: patch the roll magnitude into MLSA and the
- LDX #MLSA-MLSB         \ pitch magnitude into MLSB (the multipliers of the
- JSR stl_pat            \ MLS1/MLS2 and MULTS calls below), once per frame,
- LDA BET1               \ as the demo port's MLSPT and MLSPB (f17d865 w_0319,
- LDX #0                 \ ad17570)
+ LDA hstp               \ Port: and STL1's two in-line ones (PIX1's and
+ STA stle               \ PIXEL2's, below) in the same way as H_STAR's: BIT #imm
+ STA stlm               \ in record mode, BRA outside it
+
+ LDA ALP1               \ Port: patch the roll magnitude into MLSA and MLS2A
+ LDX #0                 \ and the pitch magnitude into MLSB (STL1's in-line
+ LDY #mlsk-MLSA-2       \ MULTS copies below), once per frame, as the demo
+ JSR stl_pat            \ port's MLSPT and MLSPB (f17d865 w_0319, ad17570)
+ LDA ALP1
+ LDX #MLS2A-MLSA
+ LDY #mlsk2-MLS2A-2
+ JSR stl_pat
+ LDA BET1
+ LDX #MLSB-MLSA
+ LDY #mlbk-MLSB-2
  JSR stl_pat
 
  LDY NOSTM              \ Set Y to the current number of stardust particles, so
@@ -14155,6 +14170,25 @@ ENDIF
                         \ These values are stored in (SX+Y SXL+Y), (SY+Y SYL+Y)
                         \ and (SZ+Y SZL+Y) respectively
 
+ BRA STL1               \ Port: start the loop at STL1, past mlq9
+
+.mlq9
+
+ JSR mlqr               \ Port: the first MLU3 with |A| < q (rare): (A P) =
+ JMP mlqj               \ |A| * q with C clear at mlqr, and rejoin (here, for
+                        \ the BCC in STL1 that comes here)
+
+                        \ Port: STL1 makes no call on its common paths: the
+                        \ multiplies MLU3 (twice), MLS1 and MLS2 and the
+                        \ additions are in line, each with its operands
+                        \ patched, as are PIX1's addition and PIXEL2's
+                        \ recording of the particle (H_STAR's record-mode
+                        \ body). STL1 was their only caller of MLU3, MLS1 and
+                        \ MLS2 in this form; PIX1, PIXEL2 and H_STAR stay as
+                        \ they are for their other callers (STARS2, STARS6,
+                        \ FLIP, nWq), and outside record mode STL1 still calls
+                        \ PIXEL2 to draw
+
 .STL1
 
                         \ Port: DV42 inline (the demo port's a4317ef, w_0051):
@@ -14163,8 +14197,8 @@ ENDIF
                         \ conversion is needed (DVID4z, which does not read
                         \ or write P), and the two LSR P / ROR A below are
                         \ LSR A (with the same C). No reader of P runs before
-                        \ MLU3 sets it. DELTA >= z_hi goes the old way at
-                        \ stl_dvs (after the loop)
+                        \ the multiply sets it. DELTA >= z_hi goes the old way
+                        \ at stl_dvs (before STARS1)
 
  LDA SZ,Y               \ Set Q = z_hi, as DV42 does
  STA Q
@@ -14201,12 +14235,16 @@ ENDIF
                         \
                         \   Q = 64 * speed / z_hi
 
- STA mlq2+1             \ Port: patch q = Q into MLUQ, the |A| * Q multiply
- STA mlq4+1             \ used twice below (the demo port's per-star MLU
- EOR #&FF               \ patching, f17d865 w_0050 and c9bfb3e w_0051): q into
- INC A                  \ the QSL+q / QSH+q operands, and 256 - q (q >= 1) into
- STA mlq3+1             \ the QSL-q / QSH-q ones (MLUQ compares with Q itself,
- STA mlq5+1             \ CPX Q); C is untouched for the SBC below
+ STA mlq2+1             \ Port: patch q = Q into the two in-line copies of
+ STA mlq4+1             \ MLU3 below (the demo port's per-star MLU patching,
+ STA mlr2+1             \ f17d865 w_0050 and c9bfb3e w_0051): q into the
+ STA mlr4+1             \ QSL+q / QSH+q operands, and 256 - q (q >= 1) into
+ EOR #&FF               \ the QSL-q / QSH-q ones (they compare with Q itself,
+ INC A                  \ CPX Q); C is untouched for the SBC below
+ STA mlq3+1
+ STA mlq5+1
+ STA mlr3+1
+ STA mlr5+1
 
  LDA SZL,Y              \ We now calculate the following:
  SBC DELT4              \
@@ -14224,9 +14262,8 @@ ENDIF
                         \   z = z - DELT4(1 0)
                         \     = z - speed * 64
 
- LDA SY,Y               \ grind: MLU1 inlined, so set Y1 = y_hi and
- STA Y1                 \ call MLUQ (Port: MLU3 with Q patched in) to set:
- JSR MLUQ               \
+ LDA SY,Y               \ grind: MLU1 inlined, so set Y1 = y_hi and then
+ STA Y1                 \ (Port: MLU3 in line, with Q patched in):
                         \
                         \   Y1 = y_hi
                         \
@@ -14234,6 +14271,35 @@ ENDIF
                         \
                         \ So Y1 contains the original value of y_hi, which we
                         \ use below to remove the existing particle
+                        \
+                        \ Port: (A P) = |A| * Q with C clear, as MLU3 gives
+                        \ (MLU3 also leaves X = 0; nothing in STL1 reads X or
+                        \ T after it), with q patched in at mlq2 and mlq4 and
+                        \ 256 - q at mlq3 and mlq5 (1 <= q <= 255, so the high
+                        \ bytes are fixed). For |A| >= q the product is
+                        \ QS(|A| + q) - QS(|A| - q), exactly as MU11 computes
+                        \ it; |A| < q calls mlqr (at mlq9)
+
+ AND #%01111111         \ Set X = |A|
+ TAX
+
+ CPX Q                  \ If |A| < q, jump to mlq9 (with C = 1 otherwise, for
+ BCC mlq9               \ the SBC below)
+
+.mlq2
+
+ LDA QSL+1,X            \ (patched: QSL + q) Set (A P) = QS(|A| + q)
+.mlq3                   \                                - QS(|A| - q)
+ SBC QSL-1,X            \ (patched: QSL - q)              = |A| * q
+ STA P
+.mlq4
+ LDA QSH+1,X            \ (patched: QSH + q)
+.mlq5
+ SBC QSH-1,X            \ (patched: QSH - q)
+
+ CLC                    \ C clear, as MLU3 leaves it
+
+.mlqj
 
                         \ We now calculate:
                         \
@@ -14268,8 +14334,29 @@ ENDIF
                         \ So X1 contains the original value of x_hi, which we
                         \ use below to remove the existing particle
 
- JSR MLUQ               \ Set (A P) = |x_hi| * Q (Port: MLUQ, Q still
-                        \ patched in)
+                        \ Set (A P) = |x_hi| * Q (Port: MLU3 in line again, its
+                        \ own copy, with q patched in at mlr2 to mlr5)
+
+ AND #%01111111         \ Set X = |A|
+ TAX
+
+ CPX Q                  \ If |A| < q, jump to mlr9 (with C = 1 otherwise, for
+ BCC mlr9               \ the SBC below)
+
+.mlr2
+
+ LDA QSL+1,X            \ (patched: QSL + q) Set (A P) = QS(|A| + q)
+.mlr3                   \                                - QS(|A| - q)
+ SBC QSL-1,X            \ (patched: QSL - q)              = |A| * q
+ STA P
+.mlr4
+ LDA QSH+1,X            \ (patched: QSH + q)
+.mlr5
+ SBC QSH-1,X            \ (patched: QSH - q)
+
+ CLC                    \ C clear, as MLU3 leaves it
+
+.mlrj
 
                         \ We now calculate:
                         \
@@ -14299,17 +14386,154 @@ ENDIF
                         \ A has the opposite sign to the flipped roll angle
                         \ alpha, i.e. it gets the same sign as alpha
 
- JSR MLSA               \ Call MLSA (Port: MLS1 with ALP1 patched in) to
-                        \ calculate:
+                        \ Calculate (Port: MLS1 in line as MLSA, a MULTS with
+                        \ ALP1 patched in, then ADD):
                         \
                         \   (A P) = A * ALP1
                         \         = (x / 256) * alpha
-
-                        \ (Port: MLSA does ADD as well) ADD calculates:
+                        \
+                        \ and then:
                         \
                         \   (A X) = (A P) + (S R)
                         \         = (x / 256) * alpha + y
                         \         = y + alpha * x / 256
+                        \
+                        \ Port: MLSA, MLS2A and MLSB are MULTS with the
+                        \ multiplier b = ALP1 AND 31 or BET1 AND 31 patched in
+                        \ by stl_pat: (A P) = |A| * b with A's sign, T = A,
+                        \ P(1 0) = 0 when A = 0, Y kept, as MULTS; X = |A|
+                        \ (MULTS leaves |A| + b; STL1 reads X after none of
+                        \ them). For |A| >= b the product is QS(|A| + b) -
+                        \ QS(|A| - b), as MULTS computes it; |A| < b calls
+                        \ MULTS
+
+.MLSA
+
+ STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
+                        \ to BRA mlsk when ALP1 = 0)
+
+.mla0
+
+ AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlaz, as MULTS does
+ BEQ mlaz               \ at MU6
+ TAX                    \ Set X = |A|
+
+.mla1
+
+ CPX #0                 \ (patched: b) If |A| < b, jump to mlar
+ BCC mlar               \ (C = 1 otherwise, for the SBC below)
+
+.mla2
+
+ LDA QSL,X              \ (patched: QSL + b) Set (A P) = QS(|A| + b)
+.mla3                   \                                - QS(|A| - b)
+ SBC QSL,X              \ (patched: QSL - b)              = |A| * b
+ STA P
+.mla4
+ LDA QSH,X              \ (patched: QSH + b)
+.mla5
+ SBC QSH,X              \ (patched: QSH - b)
+
+ BIT T                  \ If the argument is negative, give A its sign at mln
+ BMI mln                \ and do the general ADD from mla6
+
+.mlp
+
+                        \ Port: argument positive, so A = |A| * b / 256 <= 15
+                        \ has bit 7 clear and ADD sets T1 = A and T = 0; A
+                        \ and S then differ in sign if and only if S is
+                        \ negative. Also reached from mlaz (A = 0)
+
+ STA T1                 \ As ADD: T1 = A, T = its sign (0)
+ STZ T
+ BIT S                  \ If S is positive, the signs agree, so finish at mlt
+ BPL mlt                \ (where ORA T is ORA 0, as before)
+
+.mlad
+
+ JSR MU8                \ Different signs: MU8 does the rest, as in ADD, and
+ BRA mlaj               \ rejoin
+
+                        \ Port: MLSA's rare paths, here where the common paths
+                        \ jump over them
+
+.mlaz
+
+ STA P+1                \ A = 0: P(1 0) = 0, as MULTS's MU6, then ADD at mlp
+ STA P                  \ (A = 0 is positive)
+ BRA mlp
+
+.mlar
+
+ LDA T                  \ |A| < b: call MULTS with X = ALP1 as before, then
+ LDX ALP1               \ ADD
+ JSR MULTS
+ BRA mla6
+
+.mlsk
+
+                        \ Port: MLSA when ALP1 = 0 (stl_pat puts BRA mlsk in
+                        \ place of its STA T): the product is 0, so when |A|
+                        \ and |S| are both non-zero, ADD gives (A X) = (S R)
+                        \ whatever the signs (the same-sign sum at mlt, or
+                        \ MU8 with |S R| > 0), and that is the result; the
+                        \ T, T1, P, C and V that MLSA would leave are not read
+                        \ before MLSB (its STA T, then P from the product, or
+                        \ at mlbz, and the C of its CPX) and PIX1's or stlb's
+                        \ ADD (T1, T, V) rewrite them (MLS2A's own STA T and
+                        \ ADD, or its mlsk2, come first). Else (|A| = 0, which
+                        \ also sets P+1 at mlaz, or |S| = 0) MLSA's own path
+
+ BIT #%01111111         \ If |A| = 0, take MLSA's path
+ BEQ mlskf
+
+ LDX S                  \ If |S| = 0 (S = 0 or &80), take MLSA's path
+ BEQ mlskf
+ CPX #%10000000
+ BEQ mlskf
+
+ TXA                    \ (A X) = (S R)
+ LDX R
+ BRA mlaj
+
+.mlskf
+
+ STA T                  \ MLSA's path: its STA T, then the rest
+ BRA mla0
+
+.mlr9
+
+ JSR mlqr               \ The second MLU3 with |A| < q (rare), the same
+ JMP mlrj
+
+.mln
+
+ ORA #%10000000         \ Give A the sign of the argument, as MULTS does
+
+.mla6
+
+                        \ Port: then ADD, inline (the demo port's bebd95c,
+                        \ 045fd29, 5952708 w_0048 inline STL1's ADDs):
+                        \
+                        \   (A X) = (A P) + (S R)
+
+ STA T1                 \ As ADD: T1 = A, T = its sign, and if A and S have
+ AND #%10000000         \ different signs, MU8 at mlad
+ STA T
+ EOR S
+ BMI mlad
+
+.mlt
+
+ CLC                    \ Same signs: X = R + P, A = (S + T1 + C) OR T
+ LDA R
+ ADC P
+ TAX
+ LDA S
+ ADC T1
+ ORA T
+
+.mlaj
 
  STA YY+1               \ Set YY(1 0) = (A X) to give:
  STX YY                 \
@@ -14324,19 +14548,124 @@ ENDIF
  EOR ALP2               \ EOR A with the correct sign of the roll angle alpha,
                         \ so A has the opposite sign to the roll angle alpha
 
- JSR MLS2A              \ Call MLS2A (Port: MLS2 with ALP1 patched in) to
-                        \ calculate:
+                        \ Calculate (Port: MLS2 in line as MLS2A, the same as
+                        \ MLSA with its own operands):
                         \
                         \   (S R) = XX(1 0)
                         \         = x
                         \
                         \   (A P) = A * ALP1
                         \         = -y / 256 * alpha
-
-                        \ (Port: MLSA does ADD as well) ADD calculates:
+                        \
+                        \ and then ADD:
                         \
                         \   (A X) = (A P) + (S R)
                         \         = -y / 256 * alpha + x
+
+ LDX XX                 \ Set (S R) = XX(1 0), as MLS2 does
+ STX R
+ LDX XX+1
+ STX S
+
+.MLS2A
+
+ STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
+                        \ to BRA mlsk2 when ALP1 = 0)
+
+.mlc0
+
+ AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlcz
+ BEQ mlcz
+ TAX                    \ Set X = |A|
+
+.mlc1
+
+ CPX #0                 \ (patched: b) If |A| < b, jump to mlcr
+ BCC mlcr
+
+.mlc2
+
+ LDA QSL,X              \ (patched: QSL + b) Set (A P) = |A| * b, as MLSA
+.mlc3
+ SBC QSL,X              \ (patched: QSL - b)
+ STA P
+.mlc4
+ LDA QSH,X              \ (patched: QSH + b)
+.mlc5
+ SBC QSH,X              \ (patched: QSH - b)
+
+ BIT T                  \ If the argument is negative, give A its sign at mlcn
+ BMI mlcn               \ and do the general ADD from mlc6
+
+.mlcp
+
+ STA T1                 \ Argument positive (or 0, from mlcz), as MLSA's mlp
+ STZ T
+ BIT S
+ BPL mlct
+
+.mlcd
+
+ JSR MU8                \ Different signs: MU8 does the rest, and rejoin
+ BRA mlcj
+
+                        \ Port: MLS2A's rare paths, as MLSA's
+
+.mlcz
+
+ STA P+1                \ A = 0: P(1 0) = 0, then ADD at mlcp
+ STA P
+ BRA mlcp
+
+.mlcr
+
+ LDA T                  \ |A| < b: call MULTS with X = ALP1, then ADD
+ LDX ALP1
+ JSR MULTS
+ BRA mlc6
+
+.mlsk2
+
+ BIT #%01111111         \ ALP1 = 0, as MLSA's mlsk: if |A| = 0 or |S| = 0,
+ BEQ mlskf2             \ take MLS2A's path, else (A X) = (S R)
+
+ LDX S
+ BEQ mlskf2
+ CPX #%10000000
+ BEQ mlskf2
+
+ TXA
+ LDX R
+ BRA mlcj
+
+.mlskf2
+
+ STA T
+ BRA mlc0
+
+.mlcn
+
+ ORA #%10000000         \ Give A the sign of the argument
+
+.mlc6
+
+ STA T1                 \ ADD, as MLSA's mla6
+ AND #%10000000
+ STA T
+ EOR S
+ BMI mlcd
+
+.mlct
+
+ CLC
+ LDA R
+ ADC P
+ TAX
+ LDA S
+ ADC T1
+ ORA T
+
+.mlcj
 
  STA S                  \ Set XX(1 0) = (A X), which gives us result 6 above:
  STX R                  \   x = x - alpha * y / 256
@@ -14367,7 +14696,7 @@ ENDIF
 .MLSB
 
  STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
-                        \ to BRA mlbkj when BET1 = 0)
+                        \ to BRA mlbk when BET1 = 0)
 
 .mlb0
  AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlbz, as MULTS does
@@ -14459,17 +14788,111 @@ ENDIF
                         \   (A P) = (-beta 0)
                         \         = -beta * 256
 
- JSR PIX1               \ Call PIX1 to calculate the following:
+                        \ Calculate the following (Port: PIX1's addition in
+                        \ line, as PIX1 does it, P being 0):
                         \
                         \   (YY+1 y_lo) = (A P) + (S R)
                         \               = -beta * 256 + y
                         \
                         \ i.e. y = y - beta * 256, which is result 8 above
+
+ STA T1                 \ Store argument A in T1
+
+ AND #%10000000         \ Extract the sign of A into T
+ STA T
+
+ EOR S                  \ If A and S have the same sign, add them at stpa
+ BPL stpa
+
+ JSR MU8K               \ Different signs: (A X) = (A P) + (S R) via MU8K, as
+ BRA stps               \ PIX1 does
+
+                        \ Port: rare paths of MLSB and PIX1, here where the
+                        \ common paths jump over them
+
+.stle9
+
+ JSR PIXEL2             \ Outside record mode, PIX1 then draws a particle at
+ BRA stle1              \ (X1, Y1) with distance ZZ, which removes the old
+                        \ stardust particle, as we set X1, Y1 and ZZ to the
+                        \ original values for this particle above (in record
+                        \ mode the renderer has no need of it)
+
+.mlbz
+
+ STA P+1                \ MLSB with A = 0: set P(1 0) = 0, as MULTS's MU6,
+ STA P                  \ and rejoin with A = 0
+ BRA mlb6
+
+.mlbr
+
+ LDA T                  \ MLSB with |A| < b: call MULTS with X = BET1 as
+ LDX BET1               \ before and rejoin
+ JSR MULTS
+ BRA mlb6
+
+.mlbk
+
+                        \ Port: MLSB when BET1 = 0 (stl_pat puts BRA mlbk in
+                        \ place of its STA T): with |A| <> 0 the product is 0
+                        \ with A's sign, so P = 0, Q = A AND &80, and then
+                        \ 2 * Q^2 = 0: join at mlbc with A = 0 and C = 0, as
+                        \ MLSB's own path arrives there (its X = 0 is rewritten
+                        \ by LDX S, its V by the ADD below or in stlb). |A| = 0
+                        \ (P+1 = 0 too, at mlbz) takes MLSB's own path
+
+ STA T                  \ T = A, as MLSB does
+ BIT #%01111111         \ If |A| = 0, take MLSB's path
+ BEQ mlb0
+ STZ P
+ AND #%10000000
+ STA Q
+ LDA #0
+ CLC
+ BRA mlbc
+
+.stlb
+
+ STA P                  \ Set (A P) = (C A), the high byte being 0 or 1
+ LDA #0
+ ROL A
+
+ JSR ADD                \ Call ADD to calculate:
                         \
-                        \ PIX1 also draws a particle at (X1, Y1) with distance
-                        \ ZZ, which will remove the old stardust particle, as we
-                        \ set X1, Y1 and ZZ to the original values for this
-                        \ particle during the calculations above
+                        \   (A X) = (A P) + (S R)
+                        \         = 2 * (beta * y / 256) ^ 2 + x
+
+ STA SX,Y               \ Store the high byte A straight in x_hi (Port: was
+                        \ XX+1, re-read after PIX1; nothing reads SX in PIX1)
+
+ TXA                    \ Store the low byte X in x_lo
+ STA SXL,Y
+ BRA stld               \ Rejoin the main path (Port: the rare ADD case
+                        \ sits here, so the common stlp case falls straight
+                        \ into stld)
+
+.stpa
+
+ LDX R                  \ X = R + P = R (P = 0, no carry)
+
+ LDA S                  \ A = S + T1 + 0, with ADD's C and V
+ CLC
+ ADC T1
+
+ ORA T                  \ Give the result the sign of argument A
+
+.stps
+
+ STA YY+1               \ Set YY+1 to A, the high byte of the result
+
+ TXA                    \ Set SYL+Y to X, the low byte of the result
+ STA SYL,Y
+
+.stle                   \ Port: patched by STARS1 as H_STAR's test: BIT #imm
+ BIT #LO(stle9-stle-2)  \ in record mode, BRA stle9 outside it (where PIX1
+                        \ falls into PIXEL2)
+
+.stle1
 
                         \ We now have our newly moved stardust particle at
                         \ x-coordinate (x_hi x_lo) and y-coordinate (YY+1 y_lo)
@@ -14500,9 +14923,81 @@ ENDIF
 
 .STC1
 
- JSR PIXEL2             \ Draw a stardust particle at (X1,Y1) with distance ZZ,
+                        \ Draw a stardust particle at (X1,Y1) with distance ZZ,
                         \ i.e. draw the newly moved particle at (x_hi, y_hi)
                         \ with distance z_hi
+                        \
+                        \ Port: in record mode, PIXEL2 and H_STAR's record-mode
+                        \ body in line (the particle's screen position into
+                        \ the renderer's R_SX, R_SY and R_SS, as H_STAR, or
+                        \ R_SS = 0 off screen, as H_STAROFF), leaving the
+                        \ registers and flags as they leave them; outside
+                        \ record mode, a call to PIXEL2 at stlm9
+
+.stlm                   \ Port: patched by STARS1 as H_STAR's test: BIT #imm
+ BIT #stlm9-stlm-2      \ in record mode, BRA stlm9 outside it
+
+ LDA X1                 \ Fetch the x-coordinate offset into A
+
+ BPL stm1               \ If the x-coordinate offset is positive, jump to stm1
+                        \ to skip the following negation
+
+ EOR #%01111111         \ The x-coordinate offset is negative, so flip all the
+ INC A                  \ bits apart from the sign bit and add 1, as PIXEL2
+
+.stm1
+
+ EOR #%10000000         \ Set X = X1 + 128
+ TAX
+
+ LDA Y1                 \ Fetch the y-coordinate offset into A
+
+ BPL stm3               \ If it is positive, A = |Y1| already, so jump to stm3
+                        \ to do the on-screen check
+
+ AND #%01111111         \ Clear the sign bit, so A = |Y1|
+
+ CMP #Y                 \ If |Y1| >= #Y then it's off the screen, so record
+ BCS stmo               \ that at stmo, as H_STAROFF
+
+ EOR #%11111111         \ Negate |Y1| (C is clear), as PIXEL2
+ ADC #1
+
+ BRA stm2               \ Jump to stm2 to convert it to a screen y-coordinate
+
+.stmo
+
+ LDA #0                 \ Off screen: R_SS = 0, as H_STAROFF in record mode,
+ STA R_SS,Y             \ with C set
+ BRA stmn
+
+.stlm9
+
+ JSR PIXEL2             \ Outside record mode, draw it with PIXEL2
+ BRA stmn
+
+.stm3
+
+ CMP #Y                 \ If Y1 >= #Y then it's off the screen, so record that
+ BCS stmo               \ at stmo
+
+.stm2
+
+ STA T                  \ Set A = #Y + 1 - Y1, as PIXEL2
+ EOR #%11111111
+ ADC #Y+1
+
+ STA R_SY,Y             \ Record star Y's position for the renderer, as H_STAR
+ TXA                    \ does in record mode (R_SS: 2 = a dash, ZZ >= 80, 3 =
+ STA R_SX,Y             \ a double-height dash), with C = (ZZ >= 80)
+ LDA #2
+ LDX ZZ
+ CPX #80
+ BCS P%+4
+ LDA #3
+ STA R_SS,Y
+
+.stmn
 
  DEY                    \ Decrement the loop counter to point to the next
                         \ stardust particle
@@ -14514,70 +15009,6 @@ ENDIF
                         \ STL1 for the next particle
 
  RTS                    \ Return from the subroutine
-
-.mlbkj
-
- JMP mlbk               \ (stl_pat's BRA from MLSB's start reaches here, as
-                        \ mlbk is out of its range)
-
-.mlbz
-
- STA P+1                \ MLSB with A = 0: set P(1 0) = 0, as MULTS's MU6,
- STA P                  \ and rejoin with A = 0
- BRA mlb6
-
-.mlbr
-
- LDA T                  \ MLSB with |A| < b: call MULTS with X = BET1 as
- LDX BET1               \ before and rejoin
- JSR MULTS
- BRA mlb6
-
-.mlbk
-
-                        \ Port: MLSB when BET1 = 0 (stl_pat puts BRA mlbkj in
-                        \ place of its STA T, through mlbkj): with |A| <> 0 the product is 0
-                        \ with A's sign, so P = 0, Q = A AND &80, and then
-                        \ 2 * Q^2 = 0: join at mlbc with A = 0 and C = 0, as
-                        \ MLSB's own path arrives there (its X = 0 is rewritten
-                        \ by LDX S, its V by the ADD in PIX1 or stlb). |A| = 0
-                        \ (P+1 = 0 too, at mlbz) takes MLSB's own path
-
- STA T                  \ T = A, as MLSB does
- BIT #%01111111         \ If |A| = 0, take MLSB's path
- BEQ mlbkf
- STZ P
- AND #%10000000
- STA Q
- LDA #0
- CLC
- JMP mlbc
-
-.mlbkf
-
- JMP mlb0
-
-.stlb
-
- STA P                  \ Set (A P) = (C A), the high byte being 0 or 1
- LDA #0
- ROL A
-
- JSR ADD                \ Call ADD to calculate:
-                        \
-                        \   (A X) = (A P) + (S R)
-                        \         = 2 * (beta * y / 256) ^ 2 + x
-
-.stla
-
- STA SX,Y               \ Store the high byte A straight in x_hi (Port: was
-                        \ XX+1, re-read after PIX1; nothing reads SX in PIX1)
-
- TXA                    \ Store the low byte X in x_lo
- STA SXL,Y
- BRA stld               \ Rejoin the main path (Port: the rare ADD case
-                        \ sits here after the loop, so the common stlp case
-                        \ falls straight into stld)
 
 .KILL1
 
@@ -14606,178 +15037,14 @@ ENDIF
  BRA STC1               \ Jump up to STC1 to draw this new particle (A need not
                         \ be set to y_hi: PIXEL2 starts by loading X1 into A)
 
-.MLS2A
-
-                        \ Port: MLS2 with ALP1 patched in: set (S R) = XX(1 0)
-                        \ and fall into MLSA
-
- LDX XX
- STX R
- LDX XX+1
- STX S
-
-                        \ Port: MLSA and MLSB are MULTS with the multiplier
-                        \ b = ALP1 AND 31 or BET1 AND 31 patched in by
-                        \ stl_pat: (A P) = |A| * b with A's sign, T = A,
-                        \ P(1 0) = 0 when A = 0, Y kept, as MULTS; X = |A|
-                        \ (MULTS leaves |A| + b; STL1 reads X after neither).
-                        \ For |A| >= b the product is QS(|A| + b) -
-                        \ QS(|A| - b), as MULTS computes it; |A| < b goes to
-                        \ MULTS
-
-.MLSA
-
- STA T                  \ Set T = A, as MULTS does (Port: patched by stl_pat
-                        \ to BRA mlsk when ALP1 = 0)
-
-.mla0
- AND #%01111111         \ If A = 0, set P(1 0) = 0 at mlaz, as MULTS does
- BEQ mlaz               \ at MU6
- TAX                    \ Set X = |A|
-
-.mla1
-
- CPX #0                 \ (patched: b) If |A| < b, jump to mlar
- BCC mlar             \ (C = 1 otherwise, for the SBC below)
-
-.mla2
-
- LDA QSL,X              \ (patched: QSL + b) Set (A P) = QS(|A| + b)
-.mla3                  \                                - QS(|A| - b)
- SBC QSL,X              \ (patched: QSL - b)              = |A| * b
- STA P
-.mla4
- LDA QSH,X              \ (patched: QSH + b)
-.mla5
- SBC QSH,X              \ (patched: QSH - b)
-
- BIT T                  \ If the argument is negative, give A its sign at mln
- BMI mln                \ and do the general ADD from mla6
-
-.mlp
-
-                        \ Port: argument positive, so A = |A| * b / 256 <= 15
-                        \ has bit 7 clear and ADD sets T1 = A and T = 0; A
-                        \ and S then differ in sign if and only if S is
-                        \ negative. Also reached from mlaz (A = 0)
-
- STA T1                 \ As ADD: T1 = A, T = its sign (0)
- STZ T
- BIT S                  \ If S is positive, the signs agree, so finish at mlt
- BPL mlt                \ (where ORA T is ORA 0, as before)
-
-.mlad
-
- JMP MU8                \ Different signs: MU8 does the rest, as in ADD
-
-.mln
-
- ORA #%10000000         \ Give A the sign of the argument, as MULTS does
-
-.mla6
-
-                        \ Port: then ADD, inline (STL1 calls MLSA only
-                        \ just before ADD; the demo port's bebd95c, 045fd29,
-                        \ 5952708 w_0048 inline STL1's ADDs):
-                        \
-                        \   (A X) = (A P) + (S R)
-
- STA T1                 \ As ADD: T1 = A, T = its sign, and if A and S have
- AND #%10000000         \ different signs, MU8 at mlad
- STA T
- EOR S
- BMI mlad
-
-.mlt
-
- CLC                    \ Same signs: X = R + P, A = (S + T1 + C) OR T
- LDA R
- ADC P
- TAX
- LDA S
- ADC T1
- ORA T
- RTS
-
-.mlaz
-
- STA P+1                \ A = 0: P(1 0) = 0, as MULTS's MU6, then ADD at mlp
- STA P                  \ (A = 0 is positive)
- BRA mlp
-
-.mlar
-
- LDA T                  \ |A| < b: call MULTS with X = ALP1 as before, then
- LDX ALP1               \ ADD
- JSR MULTS
- BRA mla6
-
-.mlsk
-
-                        \ Port: MLSA when ALP1 = 0 (stl_pat puts BRA mlsk in
-                        \ place of its STA T): the product is 0, so when |A|
-                        \ and |S| are both non-zero, ADD gives (A X) = (S R)
-                        \ whatever the signs (the same-sign sum at mlt, or
-                        \ MU8 with |S R| > 0), and that is returned here; the
-                        \ T, T1, P, C and V that MLSA would leave are not read
-                        \ before MLSB (its STA T, then P from the product, or
-                        \ at mlbz, and the C of its CPX) and PIX1's or stlb's
-                        \ ADD (T1, T, V) rewrite them. Else (|A| = 0, which
-                        \ also sets P+1 at mlaz, or |S| = 0) MLSA's own path
-
- BIT #%01111111         \ If |A| = 0, take MLSA's path
- BEQ mlskf
-
- LDX S                  \ If |S| = 0 (S = 0 or &80), take MLSA's path
- BEQ mlskf
- CPX #%10000000
- BEQ mlskf
-
- TXA                    \ (A X) = (S R)
- LDX R
- RTS
-
-.mlskf
-
- STA T                  \ MLSA's path: its STA T, then the rest
- JMP mla0
-
-.MLUQ
-
-                        \ Port: (A P) = |A| * Q with C clear, as MLU3 gives
-                        \ (it also leaves X = 0; nothing in STL1 reads X or T
-                        \ after it), with Q patched in by STL1 once per
-                        \ particle: q at mlq2 and mlq4, 256 - q at mlq3 and
-                        \ mlq5 (1 <= q <= 255, so the high bytes are fixed).
-                        \ For |A| >= q the product is QS(|A| + q) - QS(|A| - q),
-                        \ exactly as MU11 computes it; |A| < q goes to mlqr
-
- AND #%01111111         \ Set X = |A|
- TAX
-
- CPX Q                  \ If |A| < q, jump to mlqr (with C = 1 otherwise, for
- BCC mlqr               \ the SBC below)
-
-.mlq2
-
- LDA QSL+1,X            \ (patched: QSL + q) Set (A P) = QS(|A| + q)
-.mlq3                   \                                - QS(|A| - q)
- SBC QSL-1,X            \ (patched: QSL - q)              = |A| * q
- STA P
-.mlq4
- LDA QSH+1,X            \ (patched: QSH + q)
-.mlq5
- SBC QSH-1,X            \ (patched: QSH - q)
-
- CLC                    \ Return with C clear, as MLU3 does
- RTS
-
 .mlqr
 
-                        \ |A| < q (rare), with C = 0 and A = X = |A|: join MU11
-                        \ past its set-up, with the registers and P it would
-                        \ have there (T = Q - 1 is not needed past that point,
-                        \ and is dead here: MLSA rewrites it before any read)
+                        \ Port: MLU3 with |A| < q (rare), called from mlq9 and
+                        \ mlr9 with C = 0 and A = X = |A|: join MU11 past its
+                        \ set-up, with the registers and P it would have there
+                        \ (T = Q - 1 is not needed past that point, and is dead
+                        \ here: MLSA rewrites it before any read), and return
+                        \ from MU11
 
  STY mu7+1              \ Keep Y, as MU11 does
  STA P                  \ P = |A|, as MLU3 sets it
@@ -14799,10 +15066,14 @@ ENDIF
 
  ASSERT QSH = QSL + 512 AND LO(QSL) = 0
 
- ASSERT mla1 - mlb1 = MLSA - MLSB AND mla3 - mlb3 = MLSA - MLSB
- ASSERT mla5 - mlb5 = MLSA - MLSB AND mla2 - mlb2 = MLSA - MLSB
- ASSERT mla4 - mlb4 = MLSA - MLSB AND MLSA - MLSB < 256
- ASSERT mlbkj - MLSB - 2 < 128 AND mlsk - MLSA - 2 < 128   \ (stl_pat's BRAs)
+ ASSERT mla1 - MLSA = mlb1 - MLSB AND mla1 - MLSA = mlc1 - MLS2A
+ ASSERT mla2 - MLSA = mlb2 - MLSB AND mla2 - MLSA = mlc2 - MLS2A
+ ASSERT mla3 - MLSA = mlb3 - MLSB AND mla3 - MLSA = mlc3 - MLS2A
+ ASSERT mla4 - MLSA = mlb4 - MLSB AND mla4 - MLSA = mlc4 - MLS2A
+ ASSERT mla5 - MLSA = mlb5 - MLSB AND mla5 - MLSA = mlc5 - MLS2A
+ ASSERT MLSB - MLSA < 256 AND MLS2A > MLSA AND MLSB > MLS2A
+ ASSERT stle + 2 - stle9 <= 128 AND stlm9 - stlm - 2 < 128   \ (the BRAs that STARS1 patches in)
+ ASSERT mlsk - MLSA - 2 < 128 AND mlsk2 - MLS2A - 2 < 128 AND mlbk - MLSB - 2 < 128   \ (stl_pat's BRAs)
 
                         \ Port: FILLKL's variables (fkdet follows MVS5's rare
                         \ paths below)
