@@ -171,7 +171,7 @@ title screen's ship and the escape pod are one frame each (`LL9F`).
 | The shared workspace | main `&0E00-&1DED`, below the main code | the state that the rasteriser's banks, the frame layer, the game's hooks and the IRQ handler share: the per-call inputs, the dirty extents, the disc rows' boundaries, the stars, the kept solid rows' `KF`. Below `&3000`, so every bank sees it whatever ACCCON X is. `DFSST` and `DFSST2`, `DOSCLI`'s stash, are here too |
 | Bank 4's end | after the hot pass and the hot data, bank 4 paged | the renderer's routine that runs in game context, from `G_FRAME`: `L_SUN`, the light for the next iteration's ships (`gfx-light.asm`'s first pass) |
 | The glue | the glue area, main RAM below `&3000` | the shared variables with initial values (`gfx-gvars.asm`), the `T_` trampolines from the frame layer into the rasteriser (`gfx-tramp.asm`), the text and IRQ hooks (`gfx-gluehooks.asm`), the `G_` stubs that page the frame layer in from game code (`gfx-gstubs.asm`) and the hooks in Elite's drawing code (`gfx-hooks.asm`) |
-| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 65-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window (`R_LINE`'s cold part, `R_INIT` and `R_RESETBUF`) |
+| The rasteriser's shared region | bank 5 `&9000-&BFFF`, paged with either window | the boundary arrays, `R_SETBUF`, the per-x tables, the 24 row-run pages at `&A000` (variables and small routines sit in their 64-byte tails), the stars, the second disc (`R_DISC2`), and the arithmetic and cold parts of both windows that use nothing of either window (`R_LINE`'s cold part, `R_INIT` and `R_RESETBUF`) |
 | The rasteriser's polygon window | ANDY `&8000-&8FFF`, ROMSEL `&85` | `R_POLY` (8-bit and 16-bit polygons) and `R_LINE` (lines, clipped exactly) |
 | The rasteriser's disc window | bank 5 `&8000-&8FFF`, ROMSEL 5 | the disc rows (with the strip encoder's core, `gfx-raster_strips.asm`), the dirty repair |
 | The frame layer | bank 6 | `gfx-frame.asm`, the ships' faces and colours (`gfx-faces.asm`), the lighting (`gfx-light6.asm`, and `L_REC` from `gfx-light.asm`; `L_SUN` is at bank 4's end), `frame_cold`, the flare's step and the hangar's frame. Then its state: the planet's and the sun's half-widths, the ship records (`F_RP`, `F_SR`, whose room holds `F_INIT` until the first frame), the zero page `F_FRAME` keeps (`f_zsv`), the text map (`F_TM`, `F_TMR`, `F_TCH`) |
@@ -187,10 +187,23 @@ ROMSEL.
 
 ## The rasteriser
 
-The rasteriser draws spans into the back buffer. Each row of the space view
-has an unrolled run of `STA abs,Y` stores (the row-run pages), entered at the
-offset of a span's first byte and left after its last, with the row in Y.
-`R_SETBUF` patches the runs' high bytes for the back buffer.
+The rasteriser draws spans into the back buffer. Each character row of the
+space view has an unrolled run of `STA abs,Y` stores (the row-run pages),
+which stores a span's whole bytes. A run's stores are `STA B + 8m, Y`, B the
+character row's address and Y the index of the span's left end (8 times its
+column, plus the line), so the store for m writes the m-th byte right of the
+left end. A run is two parts, L (m = 32 down to 1) and H (m = 62 down to
+33), each followed by a `JMP` to one fixed exit, `r_xw` at `&8000`: a span
+whose left end is in the screen's left half enters L at the store of its
+last whole byte, one in the right half enters H there (with Y wrapped to the
+half). A row of more than 32 whole bytes enters H and, for that row, H's exit
+is pointed at a return in the window that puts it back and enters L. The
+entry comes from one subtraction and one addition of column tables, whose
+carry tells a long row. So a row makes no call. The
+exit is the first byte of both windows that run the runs: phase B's return,
+`pb_ret`, in ANDY (reached with C set from even rows, clear from odd ones),
+and in the disc window a `JMP` to `r_spc`'s right edge, which the repair
+points at its own loop while its rows run.
 
 * `R_POLY` fills a convex polygon in a dithered colour. Phase A walks its
   edges into per-row left and right boundaries, with 8-bit or 16-bit DDAs.

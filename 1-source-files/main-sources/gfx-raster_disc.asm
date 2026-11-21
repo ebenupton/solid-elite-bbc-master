@@ -8,6 +8,28 @@
 \ ============================================================================
 
 \ ============================================================================
+\ The row runs' exit, r_xw, the window's first byte: a JMP to r_spc's right
+\ edge (r_spret), or, while the repair's rows run, to their loop (r7_rowrep's
+\ fnx, k_rows' kc; r_xwr puts it back); then the long rows' returns from H
+\ (gfx-raster.asm, r_spc's header), which put H's exit back and enter L at
+\ its first store.
+\ ============================================================================
+.r_xwd
+  JMP r_spret             \ (patched: fnx, kc)
+.r_spl                    \ r_spc's long row
+  LDA #LO(r_xw)
+  STA (RZ_PP)
+  STZ r_jmp+1
+  LDA RZ_COL
+  JMP r_jmp
+.r_fgl                    \ the repair's long row (r_ftail)
+  LDA #LO(r_xw)           \ (A = 0: black)
+  STA (RZ_PP)
+  STZ r_fj+1
+  JMP r_fj
+ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
+
+\ ============================================================================
 \ R_DISCROWS
 \ ============================================================================
 .R_DISCROWS
@@ -520,29 +542,6 @@
   STA R_WL,X
 .fx
   JMP r_dmbx
-}
-
-\ rs_cols (raster_strips.asm's): X = row, A's bit 7: colour B at the left
-\ end: r_c0 and r_c1, the colours of the segment at the left end and of the
-\ next, by the row's parity (keeps X)
-.rs_cols
-{
-  ASL A                   \ (C: colour B at the left end)
-  TXA
-  AND #1
-  TAY                     \ (Y: an odd row)
-  BCS b
-  LDA R_DCE,Y
-  STA r_c0
-  LDA R_DBE,Y
-  STA r_c1
-  RTS
-.b
-  LDA R_DBE,Y
-  STA r_c0
-  LDA R_DCE,Y
-  STA r_c1
-  RTS
 }
 
 \ rs_put (raster_strips.asm's, and r_dq's): r_sw, noting the strip in r_wmin ..
@@ -1488,21 +1487,6 @@
 }
 
 
-\ r_bcols: Y = row: r_cA, r_cB = colour A, B bytes of the row (keeps X, Y; r_drg,
-\ r_dpe)
-.r_bcols
-  TYA
-  LSR A                   \ (C: an odd row)
-  LDA R_DCE
-  BCC P%+4
-  LDA R_DCO
-  STA r_cA
-  LDA R_DBE
-  BCC P%+5
-  LDA R_DBO
-  STA r_cB
-  RTS
-
 \ ============================================================================
 \ Dirty repair outside the disc rows (R_DISCROWS calls r7_crep before its row
 \ loop).  The dirty rows that are in neither this buffer's old disc rows nor
@@ -1523,6 +1507,7 @@ c_M   = &23
 c_CO  = &22
 c_BT  = &24
 c_BB  = &25
+c_T   = &27               \ (r_ftail: 3 c1)
 
 
 .r7_crep
@@ -1651,92 +1636,126 @@ c_BB  = &25
   STA fl2+2
   STA fs2+2
   STA r_kd3+2
+  LDA #LO(fnx)            \ the runs' exit to the loop (r_xw), until the end
+  STA r_xw+1
+  LDA #HI(fnx)
+  STA r_xw+2
   LDA #LO(frow-fnb-2)     \ the loop: frow, or in K mode krow (kept rows:
   BIT KMODE               \ raster_kept.asm), which hands the other rows to
   BPL k0                  \ frow's body
   LDA #LO(krow-fnb-2)
 .k0
   STA fnb+1
+  TYA
+  TAX                     \ X = the row
   BIT KMODE
-  BMI krow
+  BPL frow
+  JMP krow
 .frow                     \ fast path: extent inside columns 1..62
 .fl2
-  LDA R_DIRTYR0,Y
+  LDA R_DIRTYR0,X
   BEQ fnx
   CMP #252
   BCS slow
-  TAX
+  TAY
   ORA #3
-  STA R_WR,Y
-  LDA r_j,X             \ plant the RTS after column R DIV 4
-  STA RZ_PP
+  STA R_WR,X
+  LDA r_j,Y               \ 3 c1 (c1 = R DIV 4, the last column)
+  STA c_T
 .fl1
-  LDA R_DIRTYL0,Y
+  LDA R_DIRTYL0,X
   AND #&FC                \ L AND &FC = 0 <=> L < 4
   BEQ slow
-  STA R_WL,Y
-  TAX
-  LDA r_j-4,X           \ enter at column L DIV 4
-  STA fj+1
+  STA R_WL,X
+  TAY                     \ 4 c0 (c0 = L DIV 4, the first column)
   LDA #&FF
 .fs1
-  STA R_DIRTYL0,Y
-  TYA                     \ the run page of row Y
-  LSR A
-  LSR A
-  LSR A
-  ORA #HI(r_run0)         \ (= ADC: Y DIV 8 < 32)
-  STA fj+2
-  STA RZ_PP+1
-  LDA #&60
-  STA (RZ_PP)
-  LDA #0
+  STA R_DIRTYL0,X
 .fs2
-  STA R_DIRTYR0,Y
-.fj
-  JSR &FFFF               \ patched: straight into the row run (the run keeps Y)
-  LDA #r_opSTA
-  STA (RZ_PP)
+  STZ R_DIRTYR0,X
+\ r_ftail: black columns c0 .. c1 of row X (1 <= c0 <= c1 <= 62) through the
+\ row's run, Y = 4 c0, c_T = 3 c1; back at r_xw's target (X kept).  As
+\ r_spc's with cl = c0 - 1, n = c1 - c0 + 1: r_jm[4 c0] = 3 cl.
+.^r_ftail
+  LDA r_ypg,X             \ the run page of row X
+  LSR A
+  ORA #HI(r_run0) - &20
+  STA r_fj+2
+  CPY #4 * 33             \ cl >= 32: from the right half
+  BCS fh
+  LDA r_jm,Y              \ (C = 0) 255 - 3n, C = 0
+  SBC c_T
+  ADC #97                 \ L's store of column cl + n: 96 - 3n, C = 1 if n <= 32
+  BCC flg
+.fe
+  STA r_fj+1
+  TXA                     \ Y = 8 cl + line (AND &FF)
+  AND #7
+  ORA r_xo-4,Y
+  TAY
+  LDA #0
+.^r_fj
+  JMP &FF00               \ (the run's page)
 .fnx
-  INY
-  CPY c_YE
+  INX
+  CPX c_YE
 .fnb
   BCC frow                \ (patched: frow or krow)
-  RTS
-.slow                     \ an end in column 0 or 63: the general row code
-  JSR row1
-  BRA fnx
+  JMP r_xwr               \ (the runs' exit back to r_spc's)
+.slow                     \ an end in column 0 or 63: the general row code,
+  TXA                     \ back at fnx
+  TAY
+  BRA row1
 \ K mode (raster_kept.asm): a row kept in this buffer is left as it is,
 \ pending (KF bit 7), its old extent in DIRTY and its WL/WR as if blacked;
 \ the other rows go through frow's body
 .krow
-  LDA KF,Y
+  LDA KF,X
   AND KBIT
   BEQ frow
 .kp
-  EOR KF,Y                \ (A = KBIT) KBIT off, pending on
+  EOR KF,X                \ (A = KBIT) KBIT off, pending on
   ORA #&80
-  STA KF,Y
+  STA KF,X
   INC KREC                \ (counted for T_KFRAME)
 .^r_kd3
-  LDA R_DIRTYR0,Y         \ (patched) WL, WR as row1 would set them
+  LDA R_DIRTYR0,X         \ (patched) WL, WR as row1 would set them
   ORA #3
-  STA R_WR,Y
+  STA R_WR,X
 .^r_kd1
-  LDA R_DIRTYL0,Y         \ (patched)
+  LDA R_DIRTYL0,X         \ (patched)
   AND #&FC
-  STA R_WL,Y
-  CPY KPLO
+  STA R_WL,X
+  CPX KPLO
   BCS kp1
-  STY KPLO
+  STX KPLO
 .kp1
-  CPY KPHI
+  CPX KPHI
   BCC fnx
-  STY KPHI
+  STX KPHI
   BRA fnx
-\ row1: row Y, general (the border columns' bytes masked)
+ASSERT krow - (fnb + 2) < 128   \ (fnb's patched branch)
+.fh                       \ (C = 1) 256 - 3n, C = 0
+  LDA r_jm,Y
+  SBC c_T
+  ADC #189                \ H's store of column cl + n: 189 - 3n
+  BRA fe
+.flg                      \ (C = 0) 352 - 3n, n >= 33
+  SBC #66                 \ H's store of column cl + n: 285 - 3n
+  STA r_fj+1
+  LDA #190                \ H's exit to r_fgl, which puts it back and enters L
+  STA RZ_PP
+  LDA r_fj+2
+  STA RZ_PP+1
+  LDA #LO(r_fgl)
+  STA (RZ_PP)
+  LDA r_fj+1
+  BRA fe
+\ row1: row Y, general (the border columns' bytes masked), its end at r_xw's
+\ target with X = the row (frow's loop, or raster_kept.asm's k_rows: a
+\ pending row blacked)
 .row1
-.^r_row1                  \ (raster_kept.asm's k_rows: a pending row blacked)
+.^r_row1
 .ld2
   LDA R_DIRTYR0,Y
   STA c_R
@@ -1766,40 +1785,32 @@ c_BB  = &25
   CMP #63
   BEQ e63
 .nr1
-  INC A
+  INC A                   \ NR: the whole bytes are columns NL .. NR - 1
   CMP c_NL
   BEQ nx
   BCC nx
-  ASL A                   \ plant the RTS at column NR (r_jm at 4 NR: 3 (NR - 1))
+  ASL A
   ASL A
   TAX
-  LDA r_jm,X
-  STA RZ_PP
-  TYA                     \ the run page of row Y
-  LSR A
-  LSR A
-  LSR A
-  ORA #HI(r_run0)         \ (= ADC: Y DIV 8 < 32)
-  STA RZ_PP+1
-  STA rj+2
+  LDA r_jm,X              \ 3 c1 (c1 = NR - 1)
+  STA c_T
+  TYA
+  TAX                     \ X = the row
   LDA c_NL
   ASL A
   ASL A
-  TAX
-  LDA r_jm,X
-  STA rj+1
-  LDA #&60
-  STA (RZ_PP)
-  STY RZ_Y
-  LDA #0
-  JSR rj
-  LDA #r_opSTA
-  STA (RZ_PP)
-  LDY RZ_Y
+  TAY                     \ 4 c0 (c0 = NL)
+  JMP r_ftail
 .nx
+  TYA
+  TAX
+  JMP r_xw
+.^r_xwr                   \ r7_rowrep's end, and k_rows': the runs' exit back
+  LDA #LO(r_spret)        \ to r_spc's
+  STA r_xw+1
+  LDA #HI(r_spret)
+  STA r_xw+2
   RTS
-.rj
-  JMP &FFFF
 .e0
   STY RZ_Y
   JSR edge0

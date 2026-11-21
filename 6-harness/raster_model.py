@@ -186,7 +186,7 @@ class Machine:
         r0 = self.syms['r_run0']
         for r in range(24):
             base = r0 + 256 * r
-            if mem[base:base + 190] != snap[base:base + 190]:
+            if mem[base:base + 192] != snap[base:base + 192]:
                 raise AssertionError('%s left run %d modified' % (name, r))
 
     # memory helpers

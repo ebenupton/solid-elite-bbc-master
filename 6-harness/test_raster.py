@@ -325,11 +325,13 @@ class Machine(tr.Machine):
             a0 = max(a0, hi)
         if self.romsel & 15 != 5:              # (the meridian window: bank 7 paged)
             return
-        r0 = s['r_run0']
-        for r in range(24):
-            b = r0 + 256 * r
-            if mem[b:b + 190] != snap[b:b + 190]:
+        r0 = s['r_run0']                      # the row runs (192 bytes a page: a long
+        for r in range(24):                   # row's H exit is put back) and the disc
+            b = r0 + 256 * r                  # window's r_xw (its JMP's operand is
+            if mem[b:b + 192] != snap[b:b + 192]:   # put back), or ANDY's pb_ret
                 raise AssertionError('%s left run %d modified' % (name, r))
+        if mem[0x8000:0x8003] != snap[0x8000:0x8003]:
+            raise AssertionError('%s left r_xw modified' % name)
 
     def page(self, rs):
         """ROMSEL = rs (as a write to ROMSEL would): bank rs AND 15, ANDY if bit 7"""
@@ -1354,6 +1356,75 @@ def test_disc2(self, nframes, scenario='both'):
 
 tr.Tester.test_disc2 = test_disc2
 
+
+def test_runs(self, n):
+    """The row runs' entries (gfx-raster.asm's r_spc header): spans (R_SPAN)
+    and polygons (R_POLY: rectangles and trapezoids, so whole runs of
+    consecutive rows of either parity have the same or neighbouring counts)
+    with n = 0, 1, 2, 31, 32, 33, 34, 61 and 62 whole bytes from the left half
+    (n >= 33: a long row, H's exit pointed at L and put back) and 0, 1, 29 and
+    30 from the right half, then the dirty repair of those polygons (R_DISCROWS
+    with no disc: r7_rowrep's frow and row1, r_ftail's entries, long rows
+    too).  check_writes checks after every call that each run page is as
+    assembled and the disc window's r_xw is put back."""
+    m = self.m
+    rnd = __import__('random').Random(4242)   # (its own numbers: the others keep theirs)
+    clip = (1, 254, 1, 191)
+    self.set_clip(clip)
+    cases = [(cl, k) for k in (0, 1, 2, 31, 32, 33, 34, 61, 62) for cl in range(0, min(31, 62 - k) + 1)]
+    cases += [(cl, k) for k in (0, 1, 29, 30) for cl in range(32, 63 - k)]
+
+    def ends(cl, k):
+        cr = cl + k + 1
+        return (4 * cl + rnd.randrange(1 if cl == 0 else 0, 4),
+                4 * cr + rnd.randrange(0, 3 if cr == 63 else 4))
+    nsp = npo = 0
+    for it in range(n):
+        m.set_screen(bytes(rnd.randrange(256) for _ in range(0x3000)))
+        ref = tr.Ref(m.screen(), clip)
+        for cl, k in cases:                        # spans, every row of both parities
+            xl, xr = ends(cl, k)
+            y = rnd.randrange(0, 192)
+            ce, co = rnd.randrange(256), rnd.randrange(256)
+            self.set_col(ce, co)
+            m.wzp('R_XL', xl)
+            m.wzp('R_XR', xr)
+            m.call('R_SPAN', y=y)
+            ref.span(y, xl, xr, ce, co)
+            if m.screen() != bytes(ref.b):
+                raise AssertionError('runs: span y=%d %d..%d (column %d, %d whole bytes)' % (y, xl, xr, cl, k))
+            nsp += 1
+        for g in range(4):                         # polygons, then their repair
+            b = rnd.randrange(2)
+            ref, dirt = self.reset_state(b)
+            for cl, k in rnd.sample(cases, 24):
+                xl, xr = ends(cl, k)
+                y0 = rnd.randrange(1, 180)
+                y1 = min(191, y0 + rnd.randrange(1, 20))
+                if rnd.random() < 0.5:             # a rectangle: rows y0 .. y1 - 1
+                    verts = [(xl, y0), (xr + 1, y0), (xr + 1, y1), (xl, y1)]
+                else:                              # a trapezoid: the counts change by a byte or two
+                    d = rnd.choice((-8, -4, 4, 8))
+                    xl2 = max(1, min(xl + d, xr - 1))
+                    verts = [(xl, y0), (xr + 1, y0), (xr + 1, y1), (xl2, y1)]
+                self.poly_case(verts, ref, b, dirt)
+                npo += 1
+            m.wr('R_NDT', 0xFF)
+            m.wr('R_NDB', 0)
+            m.call('R_DISCROWS')
+            for y, (dl, dr) in enumerate(dirt):
+                if dl <= dr:                       # whole bytes, the border columns' masked
+                    ref.span(y, dl if dl < 4 else dl & 0xFC, dr if dr >= 252 else dr | 3, 0, 0)
+            if m.screen() != bytes(ref.b):
+                diff = [i for i in range(0x3000) if m.screen()[i] != ref.b[i]]
+                raise AssertionError('runs: repair, %d bytes differ, first &%04X' % (len(diff), 0x4000 + diff[0]))
+            if any(d != (255, 0) for d in self.dirty(b)):
+                raise AssertionError('runs: repair left a dirty extent')
+    return '%d spans, %d polygons' % (nsp, npo)
+
+
+tr.Tester.test_runs = test_runs
+
 tr.Tester.test_merid = test_merid
 tr.Tester.beach_rows = beach_rows
 tr.Tester.test_caps = test_caps
@@ -1379,6 +1450,8 @@ if CAPS:     # (last: they use random numbers of their own)
     tr.EXTRA += [('pmath', 'test_pmath', 400, ())]
     if 'pf_hold' in open(os.path.join(MS, 'gfx-planet7.asm')).read():
         tr.EXTRA += [('hold', 'test_hold', 100, ())]
+
+tr.EXTRA += [('runs', 'test_runs', 3, ())]   # (its own random numbers)
 
 tr.assemble = assemble
 tr.Tester.test_lines = test_lines

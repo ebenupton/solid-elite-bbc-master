@@ -22,9 +22,9 @@
 \ Nothing calls between the two windows.  INCLUDE this file at &9000 (its
 \ runs must start at a page whose number is a multiple of 32: asserted).  It
 \ references no Elite symbol; all labels start with r_ / R_ / RZ_ (and r7_
-\ for code that came from bank 7).  CPU 1 is selected.  The store runs are
-\ self-modified (an RTS is planted and removed again), so it must run from
-\ RAM.
+\ for code that came from bank 7).  CPU 1 is selected.  It modifies itself
+\ (R_SETBUF's operands, the runs' entries, and a long row's run exit, which is
+\ put back), so it must run from RAM.
 \
 \ ---------------------------------------------------------------- zero page
 \ &06-&27 are used (the caller saves/restores them around rendering).
@@ -173,7 +173,7 @@ R_DCE   = &0E
 R_DCO   = &0F
 RZ_PA   = &10           \ (lo = y AND 7, hi = row page)  bytes of columns 0..31
 RZ_PB   = &12           \ (lo = y AND 7, hi = row page+1) columns 32..63
-RZ_PP   = &14           \ RTS plant pointer / pixel pointer
+RZ_PP   = &14           \ pixel pointer / a long row's run exit (lo 190, hi the page)
 RZ_COL  = &16           \ this row's colour byte
 RZ_Y    = &17           \ current row
 RZ_SA   = &18           \ edge A: x (16)            } side 0 (offset 0)
@@ -205,8 +205,9 @@ l_b  = &20
 l_x  = &21
 l_k  = &22              \ kind (0..3)
 
-r_opSTA = &99           \ STA abs,Y (the row runs are indexed by the row, as bank 7's)
-r_opRTS = &60
+r_xw = &8000            \ every row run's exit: the first byte of both windows
+                        \ (pb_ret in ANDY, gfx-raster_poly.asm; a JMP to r_spret
+                        \ in the disc window, gfx-raster_disc.asm)
 
 
 \ (bank 5 from &9000: the rasteriser's shared region, seen with either window)
@@ -233,8 +234,8 @@ r_opRTS = &60
 .R_BDX21 SKIP 192
 .R_BDX01 SKIP 192
 ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300 AND R_BDX21 = R_BDX20 + &300
-\ Row set-up.  Y = row (0..191; kept).  Sets RZ_Y, RZ_PA, RZ_PB, the run page
-\ (RZ_PP+1 and r_jsr+2).  Clobbers A.
+\ Row set-up.  Y = row (0..191; kept).  Sets RZ_Y, RZ_PA, RZ_PB and the run
+\ page in r_jmp+2; returns A = the run page.
 .r_rowset
   STY RZ_Y
   TYA
@@ -255,8 +256,7 @@ ASSERT R_BDN1 = R_BDN0 + &300 AND R_BDX01 = R_BDX00 + &300 AND R_BDX21 = R_BDX20
   LSR A
   CLC
   ADC #HI(r_run0)
-  STA RZ_PP+1
-  STA r_jsr+2
+  STA r_jmp+2
   RTS
 \ r_dw: span A..X (A <= X) in RZ_COL on the row set up; tracks wmin/wmax
 .r_dw
@@ -430,7 +430,22 @@ r_s2r = R_S2R0
 \ ============================================================================
 \ r_spc: the span core.  Row set up (r_rowset), RZ_COL = colour byte,
 \ X = R_XL = left pixel, R_XR = right pixel, R_XL <= R_XR.  Clobbers A, X, Y,
-\ RZ_T7, RZ_PP.
+\ RZ_PP.  Called with the disc window paged (its row runs exit to r_xw, which
+\ there jumps to r_spret).
+\
+\ The row runs: a span whose ends' bytes are in columns cl < cr has n =
+\ cr - cl - 1 whole bytes, stored by its character row's run (R_RUN) with
+\ Y = 8 cl + line, A = the colour: from the left half (cl <= 31) entered at
+\ L's store of column cl + n, 96 - 3n (n = 0: L's exit itself), if n <= 32;
+\ from the right half at H's, 189 - 3n.  A row of more than 32 (the left
+\ half's only) enters H at 285 - 3n with H's exit pointed at r_spl, in the
+\ disc window, which puts it back and enters L at its first store.  With
+\ r_j,X = 3 (x DIV 4), r_jm,X = 3 (x DIV 4) - 3 (the left end's from r_j, as
+\ r_jm wraps for column 0): from the left half, r_j[xl] - r_jm[xr] with C = 0
+\ is 3 (cl - cr) + 2 = 255 - 3n, which borrows (C = 0 after), and + 97 is
+\ the entry in L with a carry exactly when n <= 32; - 67 more is the long
+\ row's entry in H; from the right half, r_jm[xl] - r_jm[xr] with C = 1 is
+\ 253 - 3n, borrowing, and + 192 the entry in H.
 \ ============================================================================
 .r_spc
 {
@@ -438,34 +453,46 @@ r_s2r = R_S2R0
   BMI lb
   EOR R_XR
   CMP #4
-  BCC one                 \ both ends in one byte
+  BCC one                 \ both ends in one byte (C = 1 on from here)
   LDY r_xo,X
   LDA (RZ_PA),Y           \ left edge, columns 0..31
   EOR RZ_COL
   AND r_lm,X
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
-.run
-  LDY R_XR
-  LDA r_j-4,Y             \ plant: column xr DIV 4
-  STA RZ_PP
-  LDA r_j,X               \ entry: column xl DIV 4 + 1 (= the plant when no
-  STA r_jsr+1             \ whole byte lies between: the JSR hits the RTS)
-  LDA #r_opRTS
-  STA (RZ_PP)
-  LDY RZ_Y                \ (the run is indexed by the row)
+  TYA                     \ Y = 8 cl + line: the run's index
+  ORA RZ_PA
+  TAY
+  LDA r_j,X               \ 255 - 3n, C = 0
+  LDX R_XR
+  CLC
+  SBC r_jm,X
+  ADC #97                 \ L's store of column cl + n: 96 - 3n, C = 1 if n <= 32
+  BCC long
+.go
+  STA r_jmp+1
   LDA RZ_COL
-.^r_jsr
-  JSR &FFFF
-  LDX R_XR                \ right edge (A = RZ_COL still; N = XR >= &80)
-  BMI rb
+.^r_jmp
+  JMP &FF00               \ (the run's page: r_rowset) back at r_spret
+.long                     \ (C = 0) A = 352 - 3n, n >= 33
+  SBC #66                 \ H's store of column cl + n: 285 - 3n
+  STA r_jmp+1
+  LDA #190                \ H's exit (its operand's low byte) to r_spl, which puts
+  STA RZ_PP               \ it back and enters L
+  LDA r_jmp+2
+  STA RZ_PP+1
+  LDA #LO(r_spl)
+  STA (RZ_PP)
+  LDA RZ_COL
+  BRA r_jmp
+.^r_spret                 \ (r_xw's JMP) right edge: A = RZ_COL, X = R_XR
+  CPX #&80
+  BCS rb
   LDY r_xo,X
   EOR (RZ_PA),Y
   AND r_rm,X
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
-  LDA #r_opSTA
-  STA (RZ_PP)
   RTS
 .rb
   LDY r_xo,X
@@ -473,20 +500,25 @@ r_s2r = R_S2R0
   AND r_rm,X
   EOR (RZ_PB),Y
   STA (RZ_PB),Y
-  LDA #r_opSTA
-  STA (RZ_PP)
   RTS
 .lb                       \ xl >= &80 (A = xl)
   EOR R_XR
   CMP #4
-  BCC one                 \ both ends in one byte
+  BCC one                 \ both ends in one byte (C = 1 on from here)
   LDY r_xo,X
   LDA (RZ_PB),Y           \ left edge, columns 32..63
   EOR RZ_COL
   AND r_lm,X
   EOR (RZ_PB),Y
   STA (RZ_PB),Y
-  BRA run
+  TYA                     \ Y = 8 (cl - 32) + line
+  ORA RZ_PA
+  TAY
+  LDA r_jm,X              \ (C = 1) 253 - 3n, C = 0
+  LDX R_XR
+  SBC r_jm,X
+  ADC #192                \ H's store of column cl + n: 189 - 3n (C = 1)
+  BRA go
 .one
   LDY r_xo,X
   CPX #&80                \ XL, XR differ only in bits 0-1 (XL EOR XR < 4)
@@ -715,15 +747,11 @@ SKIP r_start + &C00 - P%
 FOR x, 0, 255
   EQUB (x * 2) AND &F8
 NEXT
-.r_jm                   \ 3 * (x DIV 4) - 3 = r_j[x - 4]: run plant offset (column x DIV 4)
-FOR x, 0, 255           \ (read as r_j-4,Y with Y = xr >= 4: page-aligned, no crossing)
-  IF x < 4
-    EQUB &F8              \ (what r_j-4,Y read here before: r_xo[252..255])
-  ELSE
-    EQUB 3 * (x DIV 4) - 3
-  ENDIF
+.r_jm                   \ (3 * (x DIV 4) - 3) AND &FF: the runs' entries (r_spc)
+FOR x, 0, 255
+  EQUB (3 * (x DIV 4) - 3) AND &FF
 NEXT
-r_j = r_jm + 4          \ r_j,X = 3 * (x DIV 4) for X = xl <= 251 (never crosses the page)
+r_j = r_jm + 4          \ r_j,X = 3 * (x DIV 4) for X <= 251 (never crosses the page)
 .r_lm                   \ pixels (x AND 3)..3 of a byte
 FOR x, 0, 255
   EQUB ((&F0 >> (x AND 3)) AND &F0) OR (&0F >> (x AND 3))
@@ -734,16 +762,26 @@ FOR x, 0, 255
 NEXT
 
 \ ============================================================================
-\ The store runs: one page per character row r (24), STA &4000+&200r+8c-8r,Y (Y =
-\ the row: the same form as bank 7's r7_rrun) for
-\ c = 1..63 then RTS (190 bytes).  The 66 bytes after each run hold variables.
+\ The row runs: one page per character row r (24), B = &4000 + &200 r (its
+\ column 0, line 0), each store STA B + 8 m, Y with Y = 8 cl + line (cl the
+\ left end's column; 8 (cl - 32) + line from the right half), so the store
+\ for m writes column cl + m (r_spc's header has the entries):
+\   offset 0:   L, m = 32 down to 1 (96 bytes)
+\   offset 96:  JMP r_xw
+\   offset 99:  H, m = 62 down to 33 (90 bytes)
+\   offset 189: JMP r_xw (a long row points it at L for the row: the low byte
+\               at offset 190)
+\ 192 bytes.  The 64 bytes after each run hold variables and code.
 \ ============================================================================
 MACRO R_RUN r
-  FOR c, 1, 63
-    STA &4000 + r * &200 + c * 8 - r * 8, Y
+  FOR m, 32, 1, -1
+    STA &4000 + r * &200 + m * 8, Y
   NEXT
-  RTS
-  EQUB 0                  \ spare: the 'nothing planted' target (offset 190)
+  JMP r_xw
+  FOR m, 62, 33, -1
+    STA &4000 + r * &200 + m * 8, Y
+  NEXT
+  JMP r_xw
 ENDMACRO
 
 MACRO R_ENDPAGE r
@@ -1122,6 +1160,20 @@ ASSERT LO(r_s0k) = LO(r_s1k)
 ASSERT LO(r_s0r) = LO(r_s1r)
 .r_sbh_s0b EQUB HI(r_s0b), HI(r_s1b)
 ASSERT LO(r_s0b) = LO(r_s1b)
+\ r_bcols: Y = row: r_cA, r_cB = colour A, B bytes of the row (keeps X, Y; r_drg,
+\ r_dpe)
+.r_bcols
+  TYA
+  LSR A                   \ (C: an odd row)
+  LDA R_DCE
+  BCC P%+4
+  LDA R_DCO
+  STA r_cA
+  LDA R_DBE
+  BCC P%+5
+  LDA R_DBO
+  STA r_cB
+  RTS
 R_ENDPAGE 20
 .r_run21 R_RUN 21
 .r_dp1
@@ -1201,8 +1253,31 @@ R_ENDPAGE 22
   STA R_PRWB
 .c5
   RTS
+\ rs_cols (raster_strips.asm's): X = row, A's bit 7: colour B at the left
+\ end: r_c0 and r_c1, the colours of the segment at the left end and of the
+\ next, by the row's parity (keeps X)
+.rs_cols
+{
+  ASL A                   \ (C: colour B at the left end)
+  TXA
+  AND #1
+  TAY                     \ (Y: an odd row)
+  BCS b
+  LDA R_DCE,Y
+  STA r_c0
+  LDA R_DBE,Y
+  STA r_c1
+  RTS
+.b
+  LDA R_DBE,Y
+  STA r_c0
+  LDA R_DCE,Y
+  STA r_c1
+  RTS
+}
 R_ENDPAGE 23
-ASSERT (HI(r_run0) AND 31) = 0   \ (the repair: the row's run page is Y DIV 8 OR HI(r_run0))
+ASSERT HI(r_run0) = &A0   \ (the repair: the row's run page is r_ypg[y] / 2 OR &80)
+ASSERT LO(r_xw) = 0 AND HI(r_xw) = &80
 
 
 \ ============================================================================
@@ -1594,10 +1669,6 @@ NEXT
   SBC R_XL
   CMP #16                 \ (16 pixels or more: the run, 5 cycles a byte and
   BCS span                \ about 90 to set up, against 26 a byte here)
-  LDA RZ_PP               \ (RZ_PP holds a planted RTS's address: keep it)
-  PHA
-  LDA RZ_PP+1
-  PHA
   LDA r_xo,X
   ORA RZ_PA
   STA RZ_PP
@@ -1648,10 +1719,6 @@ NEXT
   AND r_rm,X
   EOR (RZ_PP)
   STA (RZ_PP)
-  PLA
-  STA RZ_PP+1
-  PLA
-  STA RZ_PP
   RTS
 .span
   LDY RZ_Y                \ a span (r_rowset for the run page)

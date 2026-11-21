@@ -6,8 +6,274 @@
 \ r_dvq, rp_mul16 and rp_div32, is there).  The frame layer's T_POLY
 \ pages it in.  R_SETBUF (shared) pages it in to patch phase B's DIRTY
 \ operands.  INCLUDE it at &8000 in an assembly of its own (ANDY), after
-\ gfx-raster.asm.
+\ gfx-raster.asm: it starts with phase B's rows, whose pb_ret is r_xw, the
+\ row runs' exit.
 \ ============================================================================
+
+\ ----------------------------------------------------------------------------
+\ Phase B: rows RZ_Y.., to the end row (pb_ye); left table r_pbl1, right
+\ (exclusive) r_pbr1/r_pbr2.  Row pointers, the run page (pb_j_e+2,
+\ pb_j_o+2, RZ_PP+1; RZ_PP = 190), RZ_CE/RZ_CO (this row pair's colours) and
+\ RZ_XE/RZ_XO set.  Even rows take RZ_CE, odd rows RZ_CO; at each even row
+\ (a new pair) pb_tg toggles both to the other pair (a 4-row dither).  A
+\ row's whole bytes are stored by its character row's run, entered by a JMP
+\ (r_spc's header has the entries) and left by its fixed exit, r_xw, which
+\ is pb_ret here: a row makes no call.  The even rows' code reaches pb_ret
+\ with C = 1, the odd rows' with C = 0.  pb_ret is the window's first byte.
+\ ----------------------------------------------------------------------------
+.pb_ret                   \ (= r_xw) back from the run: A = the row's colour,
+  BIT R_XR                \ X = R_XR; N = (XR >= &80)
+  BMI pb_rbx
+  LDY r_xo,X              \ right edge
+  EOR (RZ_PA),Y
+  AND r_rm,X
+  EOR (RZ_PA),Y
+  STA (RZ_PA),Y
+  BCC pb_skip_o
+.pb_skip_e
+  LDY RZ_Y
+  INY
+.pb_ye_e
+  CPY #0                  \ (patched: the end row)
+  BEQ pb_end_j
+.pb_c_e
+  STY RZ_Y
+  INC RZ_PA
+  INC RZ_PB
+.r_pbx_o
+.r_pbl1_o
+  LDA &FFFF,Y
+.r_pbr1_o
+  CMP &FFFF,Y
+  BCS pb_skip_o+2         \ empty row: Y = RZ_Y already, skip the LDY RZ_Y
+  TAX
+.r_pt410 CMP r_dl,Y
+  BCS pb_d1_o
+.r_pt411 STA r_dl,Y
+.pb_d1_o
+.r_pbr2_o
+  LDA &FFFF,Y
+  DEC A
+  STA R_XR
+.r_pt412 CMP r_dr,Y
+  BCC pb_d2_o
+.r_pt413 STA r_dr,Y
+.pb_d2_o
+  TXA
+  EOR R_XR
+  CMP #4
+  BCC pb_one_o
+  LDY r_xo,X
+  CPX #&80
+  BCS pb_lb_o
+  LDA (RZ_PA),Y           \ left edge (C = 0 on)
+  EOR RZ_CO
+  AND r_lm,X
+  EOR (RZ_PA),Y
+  STA (RZ_PA),Y
+  TYA                     \ Y = 8 cl + line: the run's index
+  ORA RZ_PA
+  TAY
+  LDA r_j,X               \ (C = 0) 255 - 3n, C = 0
+  LDX R_XR
+  SBC r_jm,X
+  ADC #97                 \ L's store of column cl + n: 96 - 3n, C = 1 if n <= 32
+  BCC pb_lng_o
+.pb_go_o
+  STA pb_j_o+1
+  LDA RZ_CO
+  CLC                     \ (pb_ret: an odd row)
+.pb_j_o
+  JMP &FF00               \ (the run's page) back at pb_ret
+.pb_rbx                   \ right edge, columns 32..63 (C kept)
+  LDY r_xo,X
+  EOR (RZ_PB),Y
+  AND r_rm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  BCS pb_skip_e
+.pb_skip_o
+  LDY RZ_Y
+  INY
+.pb_ye_o
+  CPY #0                  \ (patched: the end row)
+.pb_end_j                 \ (also BEQ pb_end_j from the even half: Z = 1)
+  BEQ pb_end
+.pb_c_o
+  STY RZ_Y
+  TYA                     \ RZ_PA/RZ_PB lo = row AND 7
+  AND #7
+  BEQ pb_cr               \ (pb_cr zeroes them itself)
+  STA RZ_PA
+  STA RZ_PB
+  JMP pb_tg
+.pb_end
+  RTS
+.pb_one_o
+  LDY r_xo,X
+  CPX #&80                \ XL, XR differ only in bits 0-1 (XL EOR XR < 4)
+  BCS pb_ob_o
+  LDA (RZ_PA),Y
+  EOR RZ_CO
+  AND r_lm,X
+  LDX R_XR
+  AND r_rm,X
+  EOR (RZ_PA),Y
+  STA (RZ_PA),Y
+  BRA pb_skip_o
+.pb_ob_o
+  LDA (RZ_PB),Y
+  EOR RZ_CO
+  AND r_lm,X
+  LDX R_XR
+  AND r_rm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  BRA pb_skip_o
+.pb_lb_o                  \ left edge, columns 32..63 (C = 1)
+  LDA (RZ_PB),Y
+  EOR RZ_CO
+  AND r_lm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  TYA                     \ Y = 8 (cl - 32) + line
+  ORA RZ_PA
+  TAY
+  LDA r_jm,X              \ (C = 1) 253 - 3n, C = 0
+  LDX R_XR
+  SBC r_jm,X
+  ADC #192                \ H's store of column cl + n: 189 - 3n (C = 1)
+  BRA pb_go_o
+.pb_lng_o                 \ (C = 0) A = 352 - 3n, n >= 33
+  SBC #66                 \ H's store of column cl + n: 285 - 3n
+  STA pb_j_o+1
+  LDA #LO(pb_lx_o)        \ H's exit to pb_lx_o, which puts it back and enters L
+  STA (RZ_PP)
+  LDA RZ_CO
+  CLC
+  BRA pb_j_o
+.pb_lx_o
+  LDA #LO(r_xw)
+  STA (RZ_PP)
+  STZ pb_j_o+1
+  LDA RZ_CO
+  JMP pb_j_o
+.pb_lx_e
+  LDA #LO(r_xw)
+  STA (RZ_PP)
+  STZ pb_j_e+1
+  LDA RZ_CE
+  JMP pb_j_e
+.pb_cr
+  STZ RZ_PA               \ next character row: its run page
+  STZ RZ_PB
+  LDA RZ_PA+1
+  CLC
+  ADC #2
+  STA RZ_PA+1
+  INC A
+  STA RZ_PB+1
+  INC RZ_PP+1
+  INC pb_j_e+2
+  INC pb_j_o+2            \ (Y = RZ_Y still)
+.pb_tg                    \ (Y = RZ_Y) the next row pair's colours
+  LDA RZ_CE
+  EOR RZ_XE
+  STA RZ_CE
+  LDA RZ_CO
+  EOR RZ_XO
+  STA RZ_CO
+.r_pbx_e
+.r_pbl1_e
+  LDA &FFFF,Y
+.r_pbr1_e
+  CMP &FFFF,Y
+  BCS pb_emp_e            \ empty row
+  TAX
+.r_pt60 CMP r_dl,Y
+  BCS pb_d1_e
+.r_pt61 STA r_dl,Y
+.pb_d1_e
+.r_pbr2_e
+  LDA &FFFF,Y
+  DEC A
+  STA R_XR
+.r_pt62 CMP r_dr,Y
+  BCC pb_d2_e
+.r_pt63 STA r_dr,Y
+.pb_d2_e
+  TXA
+  EOR R_XR
+  CMP #4
+  BCC pb_one_e
+  LDY r_xo,X
+  CPX #&80
+  BCS pb_lb_e
+  LDA (RZ_PA),Y           \ left edge (C = 0 on)
+  EOR RZ_CE
+  AND r_lm,X
+  EOR (RZ_PA),Y
+  STA (RZ_PA),Y
+  TYA                     \ Y = 8 cl + line: the run's index
+  ORA RZ_PA
+  TAY
+  LDA r_j,X               \ (C = 0) 255 - 3n, C = 0
+  LDX R_XR
+  SBC r_jm,X
+  ADC #97                 \ L's store of column cl + n: 96 - 3n, C = 1 if n <= 32
+  BCC pb_lng_e
+.pb_go_e
+  STA pb_j_e+1
+  LDA RZ_CE
+.pb_j_e
+  JMP &FF00               \ (the run's page) back at pb_ret, C = 1: an even row
+.pb_lng_e                 \ (C = 0) A = 352 - 3n, n >= 33
+  SBC #66                 \ H's store of column cl + n: 285 - 3n (C = 1)
+  STA pb_j_e+1
+  LDA #LO(pb_lx_e)        \ H's exit to pb_lx_e, which puts it back and enters L
+  STA (RZ_PP)
+  LDA RZ_CE
+  BRA pb_j_e
+.pb_lb_e                  \ left edge, columns 32..63 (C = 1)
+  LDA (RZ_PB),Y
+  EOR RZ_CE
+  AND r_lm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  TYA                     \ Y = 8 (cl - 32) + line
+  ORA RZ_PA
+  TAY
+  LDA r_jm,X              \ (C = 1) 253 - 3n, C = 0
+  LDX R_XR
+  SBC r_jm,X
+  ADC #192                \ H's store of column cl + n: 189 - 3n (C = 1)
+  BRA pb_go_e
+.pb_emp_e
+  JMP pb_skip_e+2         \ (Y = RZ_Y already: past the LDY RZ_Y)
+.pb_one_e
+  LDY r_xo,X
+  LDA r_lm,X
+  LDX R_XR
+  AND r_rm,X
+  STA RZ_T7
+  CPX #&80
+  BCS pb_ob_e
+  LDA (RZ_PA),Y
+  EOR RZ_CE
+  AND RZ_T7
+  EOR (RZ_PA),Y
+  STA (RZ_PA),Y
+  JMP pb_skip_e
+.pb_ob_e
+  LDA (RZ_PB),Y
+  EOR RZ_CE
+  AND RZ_T7
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  JMP pb_skip_e
+ASSERT pb_ret = r_xw
+ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exit:
+                          \ its low byte changed)
 
 \ ============================================================================
 \ R_POLY
@@ -50,8 +316,8 @@
 \ Phase A walks both chains from the top vertex, running each edge's exact
 \ DDA (x = x0 + ceil(dx*k/dy)) down a per-row table: chain A (forward) into
 \ r_ta, chain B (backward) into r_tb.  Phase B fills each row from the left
-\ table to the right one (exclusive), keeping the RTS planted in the current
-\ character row's store run until its position changes.
+\ table to the right one (exclusive), its whole bytes through the character
+\ row's run.
 \ ============================================================================
 .r_pf8
 {
@@ -270,15 +536,15 @@
 .d3
   \ phase B set-up
   LDY r_ystart
-  JSR r_rowset
-  LDA RZ_PP+1
-  STA r_jsr2_e+2
-  STA r_jsr2_o+2
+  JSR r_rowset            \ (A = the run page)
+  STA pb_j_e+2
+  STA pb_j_o+2
+  STA RZ_PP+1             \ RZ_PP: the run's H exit operand, for a long row
+  LDA #190
+  STA RZ_PP
   LDA r_yend
   STA pb_ye_e+1
   STA pb_ye_o+1
-  LDA #190                \ nothing planted
-  STA RZ_PP
   LDA R_COLE              \ rows 4k, 4k+1 take COLE, COLO; rows 4k+2, 4k+3
   EOR R_COL2              \ COL2, COL3: RZ_CE/RZ_CO = this row pair's, toggled
   STA RZ_XE               \ by RZ_XE/RZ_XO at each pair
@@ -457,261 +723,6 @@
   BCC r_lsh
   RTS
 }
-
-
-\ ----------------------------------------------------------------------------
-\ Phase B: rows RZ_Y.., RZ_SA of them; left table r_pbl1, right (exclusive)
-\ r_pbr1/r_pbr2.  Row pointers, run page (RZ_PP+1, r_jsr2+2), RZ_CE/RZ_CO
-\ (this row pair's colours) and RZ_XE/RZ_XO set; RZ_PP = the planted RTS
-\ (190: none).  Even rows take RZ_CE, odd rows RZ_CO; at each even row
-\ (a new pair) pb_tg toggles both to the other pair (a 4-row dither).
-\ ----------------------------------------------------------------------------
-
-.pb_one_e
-  LDY r_xo,X
-  LDA r_lm,X
-  LDX R_XR
-  AND r_rm,X
-  STA RZ_T7
-  CPX #&80
-  BCS pb_ob_e
-  LDA (RZ_PA),Y
-  EOR RZ_CE
-  AND RZ_T7
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-  JMP pb_skip_e
-.pb_ob_e
-  LDA (RZ_PB),Y
-  EOR RZ_CE
-  AND RZ_T7
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  JMP pb_skip_e
-.pb_plant_e
-  TAY
-  LDA #r_opSTA
-  STA (RZ_PP)
-  STY RZ_PP
-  LDA #r_opRTS
-  STA (RZ_PP)
-  JMP pb_go_e
-.pb_lb_e
-  LDA (RZ_PB),Y
-  EOR RZ_CE
-  AND r_lm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  JMP pb_l2_e
-.pb_rb_e
-  LDY r_xo,X
-  LDA (RZ_PB),Y
-  EOR RZ_CE
-  AND r_rm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  JMP pb_skip_e
-.r_pbx_e
-.r_pbl1_e
-  LDA &FFFF,Y
-.r_pbr1_e
-  CMP &FFFF,Y
-  BCS pb_skip_e+2         \ empty row: Y = RZ_Y already, skip the LDY RZ_Y
-  TAX
-.r_pt60 CMP r_dl,Y
-  BCS pb_d1_e
-.r_pt61 STA r_dl,Y
-.pb_d1_e
-.r_pbr2_e
-  LDA &FFFF,Y
-  DEC A
-  STA R_XR
-.r_pt62 CMP r_dr,Y
-  BCC pb_d2_e
-.r_pt63 STA r_dr,Y
-.pb_d2_e
-  TXA
-  EOR R_XR
-  CMP #4
-  BCC pb_one_e
-  LDY r_xo,X
-  CPX #&80
-  BCS pb_lb_e
-  LDA (RZ_PA),Y
-  EOR RZ_CE
-  AND r_lm,X
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-.pb_l2_e
-  LDY R_XR                \ (no empty-run test: when no whole byte lies
-  LDA r_j-4,Y             \ between the ends, the entry is the plant and the
-  LDY r_j,X               \ JSR hits the RTS, as r_spc's)
-  STY r_jsr2_e+1
-  CMP RZ_PP
-  BNE pb_plant_e
-.pb_go_e
-  LDY RZ_Y                \ (the run is indexed by the row)
-  LDA RZ_CE
-.r_jsr2_e
-  JSR &FFFF
-.pb_norun_e
-  LDX R_XR                \ N = (XR >= &80)
-  BMI pb_rb_e
-  LDY r_xo,X
-  LDA (RZ_PA),Y
-  EOR RZ_CE
-  AND r_rm,X
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-.pb_skip_e
-  LDY RZ_Y
-  INY
-.pb_ye_e
-  CPY #0                  \ (patched: the end row)
-  BEQ pb_end_j
-.pb_c_e
-  STY RZ_Y
-  INC RZ_PA
-  INC RZ_PB
-.r_pbx_o
-.r_pbl1_o
-  LDA &FFFF,Y
-.r_pbr1_o
-  CMP &FFFF,Y
-  BCS pb_skip_o+2         \ empty row: Y = RZ_Y already, skip the LDY RZ_Y
-  TAX
-.r_pt410 CMP r_dl,Y
-  BCS pb_d1_o
-.r_pt411 STA r_dl,Y
-.pb_d1_o
-.r_pbr2_o
-  LDA &FFFF,Y
-  DEC A
-  STA R_XR
-.r_pt412 CMP r_dr,Y
-  BCC pb_d2_o
-.r_pt413 STA r_dr,Y
-.pb_d2_o
-  TXA
-  EOR R_XR
-  CMP #4
-  BCC pb_one_o
-  LDY r_xo,X
-  CPX #&80
-  BCS pb_lb_o
-  LDA (RZ_PA),Y
-  EOR RZ_CO
-  AND r_lm,X
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-.pb_l2_o
-  LDY R_XR                \ (no empty-run test: when no whole byte lies
-  LDA r_j-4,Y             \ between the ends, the entry is the plant and the
-  LDY r_j,X               \ JSR hits the RTS, as r_spc's)
-  STY r_jsr2_o+1
-  CMP RZ_PP
-  BNE pb_plant_o
-.pb_go_o
-  LDY RZ_Y                \ (the run is indexed by the row)
-  LDA RZ_CO
-.r_jsr2_o
-  JSR &FFFF
-.pb_norun_o
-  LDX R_XR                \ N = (XR >= &80)
-  BMI pb_rb_o
-  LDY r_xo,X
-  LDA (RZ_PA),Y
-  EOR RZ_CO
-  AND r_rm,X
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-.pb_skip_o
-  LDY RZ_Y
-  INY
-.pb_ye_o
-  CPY #0                  \ (patched: the end row)
-.pb_end_j                 \ (also BEQ pb_end_j from the even half: Z = 1)
-  BEQ pb_end
-.pb_c_o
-  STY RZ_Y
-  TYA                     \ RZ_PA/RZ_PB lo = row AND 7
-  AND #7
-  BEQ pb_cr               \ (pb_cr zeroes them itself)
-  STA RZ_PA
-  STA RZ_PB
-  JMP pb_tg
-.pb_one_o
-  LDY r_xo,X
-  CPX #&80                \ XL, XR differ only in bits 0-1 (XL EOR XR < 4)
-  BCS pb_ob_o
-  LDA (RZ_PA),Y
-  EOR RZ_CO
-  AND r_lm,X
-  LDX R_XR
-  AND r_rm,X
-  EOR (RZ_PA),Y
-  STA (RZ_PA),Y
-  BRA pb_skip_o
-.pb_ob_o
-  LDA (RZ_PB),Y
-  EOR RZ_CO
-  AND r_lm,X
-  LDX R_XR
-  AND r_rm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  BRA pb_skip_o
-.pb_lb_o
-  LDA (RZ_PB),Y
-  EOR RZ_CO
-  AND r_lm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  BRA pb_l2_o
-.pb_rb_o
-  LDY r_xo,X
-  LDA (RZ_PB),Y
-  EOR RZ_CO
-  AND r_rm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  BRA pb_skip_o
-.pb_plant_o
-  TAY
-  LDA #r_opSTA
-  STA (RZ_PP)
-  STY RZ_PP
-  LDA #r_opRTS
-  STA (RZ_PP)
-  JMP pb_go_o
-.pb_end
-  LDA #r_opSTA            \ take the RTS out again
-  STA (RZ_PP)
-  RTS
-.pb_cr
-  LDA #r_opSTA            \ next character row: new run page
-  STA (RZ_PP)
-  LDA #190
-  STA RZ_PP
-  STZ RZ_PA
-  STZ RZ_PB
-  LDA RZ_PA+1
-  CLC
-  ADC #2
-  STA RZ_PA+1
-  INC A
-  STA RZ_PB+1
-  INC RZ_PP+1
-  INC r_jsr2_e+2
-  INC r_jsr2_o+2         \ (Y = RZ_Y still)
-.pb_tg                    \ (Y = RZ_Y) the next row pair's colours
-  LDA RZ_CE
-  EOR RZ_XE
-  STA RZ_CE
-  LDA RZ_CO
-  EOR RZ_XO
-  STA RZ_CO
-  JMP r_pbx_e
 
 
 \ R_POLY's phase A for 16-bit coordinates: its variables (its 32-bit maths,

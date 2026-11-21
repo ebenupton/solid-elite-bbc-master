@@ -23,46 +23,48 @@
 
 \ k_rows: rows A .. X (A <= X, both in 0..191): a pending row's old extent is
 \ blacked (row1, as the repair would have), then KF AND k_mask is kept
-\ (k_mask: &7F, or &7F AND KBITN to forget the rows' kept state too)
+\ (k_mask: &7F, or &7F AND KBITN to forget the rows' kept state too).  The
+\ row runs' exit (r_xw) comes back to the loop while it runs.
 .k_rows
 {
   STA k_lo
   STX k_hi
-  LDY k_lo
+  LDA #LO(kc)
+  STA r_xw+1
+  LDA #HI(kc)
+  STA r_xw+2
+  LDX k_lo
 .lp
-  LDA KF,Y
+  LDA KF,X
   BEQ nx
   BPL m1
-  JSR r_row1              \ (keeps Y)
-  LDA KF,Y
+  TXA
+  TAY
+  JMP r_row1              \ (back at kc, X = the row)
+.kc
+  LDA KF,X
 .m1
   AND k_mask
-  STA KF,Y
+  STA KF,X
 .nx
-  CPY k_hi
-  INY
+  CPX k_hi
+  INX
   BCC lp
-  RTS
+  JMP r_xwr               \ (the runs' exit back to r_spc's)
 }
 
 \ k_commit: after the ships, black every row still pending (KPLO..KPHI)
 .k_commit
 {
-  LDY KPLO
-  CPY KPHI
-  BEQ lp
+  LDA #&7F                \ (k_rows, which leaves the rows not pending as
+  STA k_mask              \ they are)
+  LDA KPLO
+  CMP KPHI
+  BEQ go
   BCS none
-.lp
-  LDA KF,Y
-  BPL nx
-  JSR r_row1              \ (keeps Y)
-  LDA KF,Y
-  AND #&7F
-  STA KF,Y
-.nx
-  CPY KPHI
-  INY
-  BCC lp
+.go
+  LDX KPHI
+  JSR k_rows
 .none
   LDA #&FF
   STA KPLO
