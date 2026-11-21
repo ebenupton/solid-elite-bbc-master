@@ -38554,6 +38554,9 @@ ENDIF
 
  JSR T1SYNC             \ Port: start timer 1 in step with vsync for the split
 
+ JSR LL21I              \ Port: make LL9's table of its orientation vectors'
+                        \ scaling, LL21T
+
  LDX #(DISK-COMC)       \ We start by zeroing all the configuration variables
                         \ between COMC and DISK, to set them to their default
                         \ values, so set a counter in X for DISK - COMC bytes
@@ -43261,6 +43264,49 @@ ENDMACRO
 
 \ ******************************************************************************
 \
+\       Name: LL21I
+\       Type: Subroutine
+\   Category: Drawing ships
+\    Summary: Make LL21T, the table of LL9's scaling of the orientation
+\             vectors
+\
+\ ------------------------------------------------------------------------------
+\
+\ Port: LL9's part 3 scales each of a ship's nine orientation vector
+\ coordinates by 256 / 197, which it did with a call of LL28 each (LL21). The
+\ divisor is always 197, so the quotient is looked up instead: LL21T holds
+\ LL28's result R = 256 * A / 197 for each A, made once, here, by LL28 itself
+\ (so it is the division's own results, whatever the log tables give).
+\ BEGIN calls this when the game starts.
+\
+\ ******************************************************************************
+
+.LL21I
+
+ LDA #197               \ Set Q = 197, the divisor
+ STA Q
+
+ LDY #0                 \ Set Y = 0, to count through every value of A
+
+.ll21i1
+
+ TYA                    \ Set R = 256 * Y / 197 (LL28 keeps Y)
+ JSR LL28
+
+ LDA R                  \ Store the result in LL21T + Y
+ STA LL21T,Y
+
+ INY                    \ Loop back until we have done all 256 values
+ BNE ll21i1
+
+ RTS                    \ Return from the subroutine
+
+.LL21T
+
+ SKIP 256               \ LL28's R = 256 * A / 197, for A = 0 to 255
+
+\ ******************************************************************************
+\
 \       Name: LL9 (Part 1 of 12)
 \       Type: Subroutine
 \   Category: Drawing ships
@@ -43603,9 +43649,6 @@ ENDMACRO
                         \   * XX16(15 14) = nosev_y
                         \   * XX16(17 16) = nosev_z
 
- LDA #197               \ Set Q = 197
- STA Q
-
  LDY #16                \ Set Y to be a counter that counts down by 2 each time,
                         \ starting with 16, then 14, 12 and so on. We use this
                         \ to work through each of the coordinates in each of the
@@ -43625,17 +43668,22 @@ ENDMACRO
                         \ contains the original high byte, doubled, and without
                         \ a sign bit, e.g. A = |nosev_z_hi| * 2
 
- JSR LL28               \ Call LL28 to calculate:
+ TAX                    \ Port: look up LL28's result for this A and a divisor
+ LDA LL21T,X            \ of 197 in LL21T (LL21I made it with LL28), in place
+                        \ of the original's JSR LL28 with Q = 197:
                         \
-                        \   R = 256 * A / Q
+                        \   A = 256 * A / 197
                         \
                         \ so, for nosev, this would be:
                         \
-                        \   R = 256 * |nosev_z_hi| * 2 / 197
+                        \   A = 256 * |nosev_z_hi| * 2 / 197
                         \     = 2.6 * |nosev_z_hi|
+                        \
+                        \ (Q and R are not set: part 5 sets them before it
+                        \ reads them)
 
- LDX R                  \ Store R in the low byte's location, so we can keep the
- STX XX16,Y             \ old, unscaled high byte intact for the sign
+ STA XX16,Y             \ Store it in the low byte's location, so we can keep
+                        \ the old, unscaled high byte intact for the sign
 
  DEY                    \ Decrement the loop counter twice
  DEY
