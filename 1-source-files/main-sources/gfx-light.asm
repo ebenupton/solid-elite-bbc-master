@@ -436,6 +436,10 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  STA lr_b,X
  DEX
  BPL lr0
+ LDA #&24               \ the axes' dot products go through the faces' code
+ STA l3s                \ in line below, entered by a jump: the BMI at l3s
+ LDA #&4C               \ made a BIT zp (no sign test) and the BIT at l3m a
+ STA l3m                \ JMP back to lr2r
  LDY #2                 \ axis: 2 nosev, 1 roofv, 0 sidev
 .lr1
  STY l7_s
@@ -456,12 +460,16 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  INY
  CPY #3
  BCC lr2
- JSR l_dot              \ Ls = (h . LLT + 16) >> 5
- JSR l_r32
+ JMP l_dot              \ Ls = (h . LLT + 16) >> 5 (l_dot, then l_r32, which
+.lr2r                   \ comes back here)
  LDY l7_s
  STA lr_c,Y
  DEY
  BPL lr1
+ LDA #&30               \ the BMI at l3s and the BIT at l3m again, for the
+ STA l3s                \ faces
+ LDA #&2C
+ STA l3m
  LDX #2                 \ lr_b = Ls
 .lr3
  LDA lr_c,X
@@ -486,47 +494,10 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  STA lrn+2
  STA lrf+2
  LDX #0
-.lf1
- STX lr_f
-.lrv
- LDA &FFFF,X            \ (patched) XX2: 0 hidden
- BEQ lf9
- STA lr_r
- LDY #3                 \ the face's unit normal (bytes 1..3 of its entry)
-.lf2
-.lrf
- LDA &FFFF,Y            \ (patched)
- STA lr_a-1,Y
- DEY
- BNE lf2
- JSR l_dot
- LDA #0
- BIT lr_sh
- BMI lf4                \ n . Ls < 0: level 0
- JSR l_r32              \ d
- STA lr_c
- LSR A                  \ d + d / 16 + 2 (<= 136)
- LSR A
- LSR A
- LSR A
- SEC
- ADC lr_c
- INC A
- LSR A
- LSR A
- CMP #32
- BCC lf4
- LDA #31
-.lf4
- ORA #&80               \ visible
- LDY lr_r
- INY
- BNE P%+5
- ORA GHAND              \ XX2 = 255: cull by winding (bit 6), and bit 5 if
-                        \ the ship is mirrored (GHAND, set by S_SHIP)
- LDX lr_f
-.lrw
- STA &FFFF,X            \ (patched)
+ BRA lf1
+.lfd
+ LDY lr_y
+ RTS
 .lf9
 .lrn
  LDA &FFFF              \ (patched) the next face entry: n + 4 bytes on
@@ -543,12 +514,23 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  LDX lr_f
  INX
  CPX GNF
- BCC lf1
- LDY lr_y
- RTS
-
-\ l_dot: (lr_sh lr_sl) = lr_a . lr_b (signed bytes, |a +/- b| < 128)
-
+ BCS lfd
+.lf1
+ STX lr_f
+.lrv
+ LDA &FFFF,X            \ (patched) XX2: 0 hidden
+ BEQ lf9
+ STA lr_r
+ LDY #3                 \ the face's unit normal (bytes 1..3 of its entry)
+.lf2
+.lrf
+ LDA &FFFF,Y            \ (patched)
+ STA lr_a-1,Y
+ DEY
+ BNE lf2
+\ l_dot, in line: (lr_sh lr_sl) = lr_a . lr_b (signed bytes, |a +/- b| <
+\ 128), for the face here, and for each axis above (entered by its JMP,
+\ with no call: l3s's and l3m's patches)
 .l_dot
  STZ lr_sl
  STZ lr_sh
@@ -584,10 +566,11 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  STA lr_sh
  DEX
  BPL ld1
- RTS
-
-\ l_r32: A = (lr_sh lr_sl + 16) >> 5 (the low byte of it; it fits a signed byte)
-
+ LDA lr_sh
+.l3s
+ BMI lfz                \ n . Ls < 0: level 0 (patched: BIT zp, for an axis)
+\ l_r32, in line: A = (lr_sh lr_sl + 16) >> 5 (the low byte of it; it fits a
+\ signed byte), d
 .l_r32
  LDA lr_sl
  CLC
@@ -601,7 +584,36 @@ IF LIGHTPASS = 6        \ (elite-gfx.asm: bank 6, with the frame layer)
  ROL A
  ASL lr_sl
  ROL A
- RTS
+.l3m
+ BIT lr2r               \ (patched: JMP lr2r, for an axis)
+ STA lr_c
+ LSR A                  \ d + d / 16 + 2 (<= 136)
+ LSR A
+ LSR A
+ LSR A
+ SEC
+ ADC lr_c
+ INC A
+ LSR A
+ LSR A
+ CMP #32
+ BCC lf4
+ LDA #31
+.lf4
+ ORA #&80               \ visible
+ LDY lr_r
+ INY
+ BNE P%+5
+ ORA GHAND              \ XX2 = 255: cull by winding (bit 6), and bit 5 if
+                        \ the ship is mirrored (GHAND, set by S_SHIP)
+ LDX lr_f
+.lrw
+ STA &FFFF,X            \ (patched)
+ JMP lf9                \ (the next face: lf9 is above, out of a branch's
+                        \ reach once l_dot and l_r32 are in line)
+.lfz
+ LDA #0
+ BRA lf4
 
 
 \ L_REC's variables (renderer state, not game state)
