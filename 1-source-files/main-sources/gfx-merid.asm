@@ -809,7 +809,9 @@ ENDMACRO
 \ times) and its top 16 bits taken, U' and V'; q = floor(U' 2^11 / V')
 \ (12 steps: 2^10 <= q < 2^12) is shifted left by 5 + ev - eu (right if
 \ negative), saturating at 2^32 - 1 (as when V loses all its bits). U = 0
-\ gives 0. (planet_caps.fdiv)
+\ gives 0. (planet_caps.fdiv) V' is patched into the division's compares
+\ and subtractions: written and read within one call (pm_fdiv runs in game
+\ context only, from pc_circ, and calls nothing; no interrupt reaches it)
 
 MACRO PFN v             \ the 24-bit value at zero page v (non-zero) shifted
  LDY #0                 \ left until bit 23 is set: A = its top byte, its
@@ -879,82 +881,79 @@ ENDMACRO
  ORA pm_b+1
  ORA pm_b+2
  BEQ pfd_es
- PFN pm_b               \ normalise V: V' = (pm_b+2 pm_b+1), ev
- STA pm_b+2
+ PFN pm_b               \ normalise V: V' = (A pm_b+1), ev; V' into the
+ STA pfdh1+1            \ division's compares and subtractions
+ STA pfdh2+1
+ LDX pm_b+1
+ STX pfdl1+1
+ STX pfdl2+1
  TYA
  CLC
  ADC #5
  STA pm_eu
  PFN pm_a               \ and U: U' = (A pm_a+1), eu; the shift 5 + ev - eu
- PHA
+ TAX
  TYA
  EOR #&FF
  SEC
  ADC pm_eu
  STA pm_eu
- PLA
- STZ pm_p+1             \ q = floor(U' 2^11 / V'), its top 4 bits into
- LDX #4                 \ pm_p+1, then 8 into pm_p, R = U' (A pm_a+1, its
- CLC                    \ bit 16 in C)
+ TXA
+ LDX #%00010000         \ q = floor(U' 2^11 / V'), its top 4 bits into
+ STX pm_p               \ pm_p+1, then 8 into pm_p: R = U' (A pm_a+1, its
+ LDX #2                 \ bit 16 in C), and the bits caught in pm_p, whose
+ CLC                    \ set bit falls out with a pass's last (two passes,
+ BRA pfd5               \ X; no shift before the first step)
+.pfd4
+ ASL pm_a+1             \ R <<= 1
+ ROL A
 .pfd5
  BCS pfd6               \ R >= 2^16 > V': subtract
- CMP pm_b+2
+.pfdh1
+ CMP #0                 \ (patched: V' high)
  BCC pfd7
  BNE pfd6
  LDY pm_a+1
- CPY pm_b+1
+.pfdl1
+ CPY #0                 \ (patched: V' low)
  BCC pfd7
 .pfd6
  TAY
  LDA pm_a+1
- SBC pm_b+1
+.pfdl2
+ SBC #0                 \ (patched: V' low)
  STA pm_a+1
  TYA
- SBC pm_b+2
+.pfdh2
+ SBC #0                 \ (patched: V' high)
  SEC
 .pfd7
- ROL pm_p+1             \ the quotient bit (C)
- ASL pm_a+1             \ R <<= 1
- ROL A
- DEX
- BNE pfd5
- LDX #8
-.pfd5b
- BCS pfd6b
- CMP pm_b+2
- BCC pfd7b
- BNE pfd6b
- LDY pm_a+1
- CPY pm_b+1
- BCC pfd7b
-.pfd6b
- TAY
- LDA pm_a+1
- SBC pm_b+1
- STA pm_a+1
- TYA
- SBC pm_b+2
- SEC
-.pfd7b
- ROL pm_p
- ASL pm_a+1
- ROL A
- DEX
- BNE pfd5b
+ ROL pm_p               \ the quotient bit (C)
+ BCC pfd4
+ DEX                    \ a pass's last bit: the first pass's four bits
+ BEQ pfd7d              \ are pm_p+1, and eight more follow
+ LDY pm_p
+ STY pm_p+1
+ LDY #1
+ STY pm_p
+ BRA pfd4
+.pfd7d
  STZ pm_p+2
  STZ pm_p+3
  LDY pm_eu              \ shift q
  BMI pfdr
- TYA                    \ left: by bits (into pm_p+2), then by bytes
+ TYA                    \ left: by bits (into pm_p+2, in A), then by bytes
  AND #7
  BEQ pfd9
  TAX
+ LDA #0
 .pfd8
  ASL pm_p
  ROL pm_p+1
- ROL pm_p+2
+ ROL A
  DEX
  BNE pfd8
+ STA pm_p+2
 .pfd9
  TYA
  LSR A
