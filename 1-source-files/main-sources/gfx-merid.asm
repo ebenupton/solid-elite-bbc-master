@@ -85,6 +85,13 @@ RSZ   = 24
 PCMAX = 3               \ the planet's records (slots 0-2)
 PCSLOTS = PCMAX
 
+MACRO PMQH              \ PMQ's pointers' high bytes (pm_mul16's header)
+ LDA #HI(QSL)
+ STA pm_ql+1
+ LDA #HI(QSH)
+ STA pm_qh+1
+ENDMACRO
+
 \ ******************************************************************************
 \
 \ pc_circ: one circle's record into the next slot (PC_N), from the axis pcv,
@@ -103,6 +110,8 @@ PCSLOTS = PCMAX
  ASL A                  \ (its thresholds' offset in pc_tu, into pct1's ORA
  ASL A                  \ #)
  STA pct_o+1
+ PMQH                   \ (PMQ's pointers' high bytes, for every product the
+                        \ circle takes)
  STZ pc_t
  LDX #0                 \ the magnitudes >> 2 (pf_tilt's halved vectors: the
  LDY #0                 \ beach ball's |v| >> 3), signs, non-zero flags
@@ -1028,6 +1037,9 @@ ENDMACRO
 \ squared, from two squares and one product. Each product is PMQ's: the
 \ multiplier b's byte is the low byte of the pointers pm_ql and pm_qh (QSL + b
 \ and QSH + b: the tables are page aligned), so that (pm_ql),Y is QS(Y + b)
+\ The pointers' high bytes are set once a circle, at pc_circ's entry (PMQH),
+\ not on every call: nothing else in pc_circ writes them, and only pc_circ
+\ (and pc_mul, pc_sq in it) calls these
 
 MACRO PMQ               \ (pm_t8 A) = Y * b, Y kept: QS(Y + b) - QS(|Y - b|)
  TYA
@@ -1050,13 +1062,6 @@ MACRO PMQB b            \ b, a byte at zero page address b, as the multiplier
  LDA b
  STA pm_ql
  STA pm_qh
-ENDMACRO
-
-MACRO PMQH              \ the pointers' high bytes
- LDA #HI(QSL)
- STA pm_ql+1
- LDA #HI(QSH)
- STA pm_qh+1
 ENDMACRO
 
 .pmb0                   \ b < 256: al bl + ah bl << 8
@@ -1090,7 +1095,6 @@ ENDMACRO
  STA pm_b+1
                         \ (falls into pm_mul16)
 .pm_mul16
- PMQH
  PMQB pm_b              \ al bl
  LDY pm_a
  PMQ
@@ -1157,7 +1161,6 @@ ENDMACRO
  STA pm_a+1
                         \ (falls into pm_sq16)
 .pm_sq16
- PMQH
  PMQB pm_a              \ al^2 = QS(2 al)
  LDY pm_a
  LDA (pm_ql),Y          \ (bankcheck: ok: game context)
@@ -1531,9 +1534,9 @@ ENDMACRO
 \ PR_PUT: a crossing at A (0..255) on row X: at or left of the span's left
 \ end it flips the row's colour (fl), right of the span it is dropped,
 \ inside it is the row's first (R_NDX0), or is inserted in order (pr_ins,
-\ which the four share: it goes on at pr_ir's JMP, set to nx); then nx, or,
-\ for the row's first, the code that follows. In line for each side's X-
-\ and X+ (the loop's four crossings).
+\ which the four share, called: JSR and RTS keep the flags it leaves for
+\ nx); then nx, or, for the row's first, the code that follows. In line for
+\ each side's X- and X+ (the loop's four crossings).
 
 MACRO PR_PUT fl, nx
  CMP R_NDISCL,X
@@ -1547,11 +1550,7 @@ MACRO PR_PUT fl, nx
  CPY #&80
  BEQ p0
  STA mt_x
- LDA #LO(nx)
- STA pr_ir+1
- LDA #HI(nx)
- STA pr_ir+2
- JMP pr_ins
+ JSR pr_ins
 .j9
  JMP nx
 .p0
@@ -2070,7 +2069,7 @@ ASSERT pra1 = pra0 + 7 AND pra3 = pra0 + 21 AND prk1 = prk0 + 7 AND prk3 = prk0 
 
 \ pr_ins: mt_x inserted in order into row X's R_NDX0.. (Y = R_NDN: 1 to 4
 \ there, and the colour); with a fifth the two rightmost are dropped. Then
-\ on, through pr_ir (PR_PUT sets it)
+\ back to PR_PUT, which goes on to its next code
 
 .pr_ins
  INC R_NDN,X
@@ -2094,7 +2093,7 @@ ASSERT pra1 = pra0 + 7 AND pra3 = pra0 + 21 AND prk1 = prk0 + 7 AND prk3 = prk0 
 .pri3s
  LDA mt_x
  STA R_NDX3,X
- JMP pr_ir
+ RTS
 .pri3m
  STA R_NDX3,X
 .pri2
@@ -2105,7 +2104,7 @@ ASSERT pra1 = pra0 + 7 AND pra3 = pra0 + 21 AND prk1 = prk0 + 7 AND prk3 = prk0 
 .pri2s
  LDA mt_x
  STA R_NDX2,X
- JMP pr_ir
+ RTS
 .pri2m
  STA R_NDX2,X
 .pri1
@@ -2116,13 +2115,13 @@ ASSERT pra1 = pra0 + 7 AND pra3 = pra0 + 21 AND prk1 = prk0 + 7 AND prk3 = prk0 
 .pri1s
  LDA mt_x
  STA R_NDX1,X
- JMP pr_ir
+ RTS
 .pri1m
  STA R_NDX1,X
  LDA mt_x
  STA R_NDX0,X
 .pr_ir
- JMP pr_adv             \ (patched)
+ RTS
 .pr_irz
  LDY #1                 \ (Z clear, for the head it goes on to)
  BNE pr_ir

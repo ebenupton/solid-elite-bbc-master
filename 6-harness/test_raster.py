@@ -704,7 +704,8 @@ def test_pmath(self, n):
             if got != PCM.fdiv(u, v):
                 raise AssertionError('pm_fdiv(%d, %d) = %d, want %d' % (u, v, got, PCM.fdiv(u, v)))
         self.stat('pm_fdiv', sum(cy) / len(cy))
-        cy = []
+        mem[0x1D], mem[0x1F] = MG['QSL'] >> 8, MG['QSH'] >> 8  # (pc_circ sets the
+        cy = []                                                  # pointers' high bytes)
         for i in range(40 * n):
             u, v = rb(rnd.randrange(17)), rb(rnd.randrange(17))
             mem[0x10], mem[0x11], mem[0x14], mem[0x15] = u & 255, u >> 8, v & 255, v >> 8
