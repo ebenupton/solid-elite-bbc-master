@@ -552,13 +552,76 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
   JMP r_sw
 
 \ r_sw: pixels X .. Y (X <= Y) of the row (RZ_PA/RZ_PB set) in colour A.
-\ Clobbers A, X, Y, RZ_COL, RZ_SA, RZ_SA+1, RZ_T7.
-\ (.cross sits before the entry so that BMI hx lies in the same page as hx.)
+\ Clobbers A, X, Y, RZ_COL, RZ_SA, R_XR, RZ_PP, r_jmp.  The whole bytes
+\ between the masked ends go through the row's run (gfx-raster.asm, r_spc's
+\ header: 5 cycles a byte), entered by r_swj with Y = 8 cl + line at the
+\ store of the last whole byte's column and left at r_xw, whose r_spret
+\ writes the last byte (X = the last pixel); one whole byte or none is
+\ written in line.  A span across the halves is r_spc's.
+\ (The right half's code is before the entry, for BMI hx's range.)
 {
 .cross
-  STX RZ_SB
-  STY RZ_TA+1
-  JMP r_lput2
+  STY R_XR                \ X in columns 0..31, Y in 32..63: r_spc
+  LDA RZ_PA+1             \ (the row's run page)
+  LSR A
+  ORA #HI(r_run0) - &20
+  STA r_jmp+2
+  JMP r_spc
+.ob
+  LDY r_xo,X              \ one byte, columns 32..63
+  LDA RZ_COL
+  EOR (RZ_PB),Y
+  AND r_lm,X
+  LDX RZ_SA
+  AND r_rm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  RTS
+.hx
+  EOR RZ_SA
+  CMP #4
+  BCC ob                  \ one byte, columns 32..63
+.mb
+  LDY r_xo,X              \ both in columns 32..63: the first byte
+  LDA RZ_COL
+  EOR (RZ_PB),Y
+  AND r_lm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  LDA r_jm,X              \ (C = 1) 253 - 3n, C = 0
+  LDX RZ_SA               \ X = the last pixel from here
+  SBC r_jm,X
+  ADC #192                \ H's store of column cl + n: 189 - 3n (C = 1)
+  CMP #186
+  BCC run                 \ n >= 2
+  BNE l0b                 \ n = 0
+  TYA                     \ n = 1: in line
+  ADC #7                  \ (C = 1: + 8)
+  TAY
+  LDA RZ_COL
+  STA (RZ_PB),Y
+  BRA lsb
+.l0b
+  LDA RZ_COL
+.lsb
+  LDY r_xo,X              \ the last byte
+  EOR (RZ_PB),Y
+  AND r_rm,X
+  EOR (RZ_PB),Y
+  STA (RZ_PB),Y
+  RTS
+.run                      \ A = the entry in the row's run
+  STA r_swj+1
+  TYA                     \ Y = 8 cl + line (8 (cl - 32) + line on the right)
+  ORA RZ_PA
+  TAY
+  LDA RZ_PA+1             \ the row's run page
+  LSR A
+  ORA #HI(r_run0) - &20
+  STA r_swj+2
+  LDA RZ_COL
+.r_swj
+  JMP &FF00               \ (patched) back at r_xw: r_spret, the last byte
 .^r_sw
   STA RZ_COL
   STY RZ_SA
@@ -570,78 +633,34 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
   BCC oa                  \ one byte, columns 0..31 (the rarer case: the
                           \ commoner multi-byte case falls through)
 .ma
-  LDA r_xo,Y              \ both in columns 0..31
-  STA RZ_SA+1
-  LDY r_xo,X
+  LDY r_xo,X              \ both in columns 0..31: the first byte
   LDA RZ_COL
   EOR (RZ_PA),Y
   AND r_lm,X
-  LDX RZ_COL              \ X = colour from here to .lsa (C kept)
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
-  TYA
-  ADC #7                  \ (C = 1 from the CMP: + 8)
+  LDA r_j,X               \ n whole bytes between: 255 - 3n, C = 0
+  LDX RZ_SA               \ X = the last pixel from here
+  CLC
+  SBC r_jm,X
+  ADC #97                 \ L's store of column cl + n: 96 - 3n (C = 1)
+  CMP #93
+  BCC run                 \ n >= 2
+  BNE l0a                 \ n = 0
+  TYA                     \ n = 1: in line
+  ADC #7                  \ (C = 1: + 8)
   TAY
-  TXA                     \ A = colour (C kept)
-  CPY RZ_SA+1
-  BCS lsa
-.la
+  LDA RZ_COL
   STA (RZ_PA),Y
-  TYA
-  ADC #8                  \ (C = 0 from the CPY)
-  TAY
-  TXA
-  CPY RZ_SA+1
-  BCC la
+  BRA lsa
+.l0a
+  LDA RZ_COL
 .lsa
-  LDX RZ_SA
+  LDY r_xo,X              \ the last byte
   EOR (RZ_PA),Y
   AND r_rm,X
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
-  RTS
-.hx
-  EOR RZ_SA
-  CMP #4
-  BCC ob                  \ one byte, columns 32..63
-.mb
-  LDA r_xo,Y              \ both in columns 32..63
-  STA RZ_SA+1
-  LDY r_xo,X
-  LDA RZ_COL
-  EOR (RZ_PB),Y
-  AND r_lm,X
-  LDX RZ_COL              \ X = colour from here to .lsb (C kept)
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
-  TYA
-  ADC #7                  \ (C = 1 from the CMP: + 8)
-  TAY
-  CPY RZ_SA+1
-  BCS lsb
-.lb                       \ (unrolled twice: saves a taken branch per pair; .la
-                          \ is not unrolled, as BCC oa would go out of range)
-  TXA
-  STA (RZ_PB),Y
-  TYA
-  ADC #8                  \ (C = 0 from the CPY)
-  TAY
-  CPY RZ_SA+1
-  BCS lsb
-  TXA
-  STA (RZ_PB),Y
-  TYA
-  ADC #8                  \ (C = 0 from the CPY)
-  TAY
-  CPY RZ_SA+1
-  BCC lb
-.lsb
-  TXA
-  LDX RZ_SA
-  EOR (RZ_PB),Y
-  AND r_rm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
   RTS
 .oa
   LDY r_xo,X              \ one byte, columns 0..31
@@ -652,16 +671,6 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
   AND r_rm,X
   EOR (RZ_PA),Y
   STA (RZ_PA),Y
-  RTS
-.ob
-  LDY r_xo,X              \ one byte, columns 32..63
-  LDA RZ_COL
-  EOR (RZ_PB),Y
-  AND r_lm,X
-  LDX RZ_SA
-  AND r_rm,X
-  EOR (RZ_PB),Y
-  STA (RZ_PB),Y
   RTS
 }
 

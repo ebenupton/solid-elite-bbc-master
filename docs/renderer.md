@@ -754,8 +754,15 @@ again; the old span is blacked and the new one drawn whole only when they
 are apart, one is empty or the colour changed. Its writes are masked to
 their pixels and go into the written extents, not the dirty ones, so the
 next frame does not repair them. `f_disc2` calls `T_DISCROWS` with C set,
-which `R_DISCROWS` sends to `R_DISC2`. `r_lput2` hands spans of 16 pixels or
-more to the row run.
+which `R_DISCROWS` sends to `R_DISC2`.
+
+The disc window's masked writes (`r_sw`: the strips of the disc layer and
+the second disc's pieces) store a span's whole bytes through the row's run
+too (5 cycles a byte): the span's first byte masked, then a `JMP` (`r_swj`,
+its operand patched to the run's page and the store of the last whole
+byte's column, with Y the first byte's index), and back at `r_xw`, whose
+`r_spret` writes the last byte; one whole byte or none is written in line,
+and a span across the screen's halves is `r_spc`'s.
 
 A frame with the second disc costs it 2,500 cycles (held still) to 17,600
 (rising); in the front view the lens flare costs most, as anywhere. Moving
