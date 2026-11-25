@@ -30,7 +30,12 @@
 //              none), two ships
 //   rear       the beach ball in the rear view, with ships
 //
-// node 6-harness/mbench.mjs [--disc d] [--syms s] [--scene a,b] [--n 128] [--warm 8] [--out file.json]
+// node 6-harness/mbench.mjs [--disc d] [--syms s] [--scene a,b] [--n 128] [--warm 8] [--out file.json] [--pin]
+// --pin also puts in, at the pose, the stardust (a fixed pseudo-random field)
+// and RAND, and poses only at an MLOOP with buffer 1 on show (GFRONT), so that
+// nothing the boot and launch left behind, which moves with the build's speed,
+// is carried into the scenes; run one scene a process (--scene) for figures
+// that do not depend on the scenes before it either.
 // Prints "scene: cycles/iteration it/s work" per scene.
 import { MachineSession } from "/Users/ebenupton/.npm/_npx/e76f2a7d329553db/node_modules/jsbeeb/src/machine-session.js";
 import { BBC } from "/Users/ebenupton/.npm/_npx/e76f2a7d329553db/node_modules/jsbeeb/src/utils.js";
@@ -38,7 +43,7 @@ import { loadSyms, ROOT, regionsFor, pinRtc } from "./mlib.mjs";
 import { writeFileSync } from "fs";
 import { parseArgs } from "./args.mjs";
 
-const a = parseArgs({ disc: "value", syms: "value", scene: "value", n: "value", warm: "value", out: "value" });
+const a = parseArgs({ disc: "value", syms: "value", scene: "value", n: "value", warm: "value", out: "value", pin: "flag" });
 const SYMS = a.syms || `${ROOT}3-assembled-output/symbols.txt`, DISC = a.disc || `${ROOT}5-compiled-game-discs/elite-master-sng47.ssd`;
 const sy = loadSyms(SYMS);
 const N = +(a.n || 128), WARM = +(a.warm || 8), M = 32;
@@ -103,6 +108,12 @@ function pose(sc) {
     for (const [t, d] of sc.ships) { heap -= HEAP[t]; put(n++, t, blockBytes({ ...d, heap })); ram[sy.MANY + t]++; }
     ram[sy.SLSP] = heap & 255; ram[sy.SLSP + 1] = heap >> 8;
     ram[sy.VIEW] = sc.view; ram[sy.DELTA] = sc.delta; ram[sy.ALPHA] = sc.alpha; ram[sy.BETA] = sc.beta;
+    if (a.pin) {                                    // --pin: the stardust and RAND put in too
+        let q = 12345; const r8 = () => (q = (q * 1103515245 + 12345) & 0x7fffffff, (q >> 16) & 255);
+        for (let i = 0; i < sy.SXL - sy.SX; i++) { ram[sy.SX + i] = r8(); ram[sy.SXL + i] = r8(); ram[sy.SY + i] = r8();
+            ram[sy.SYL + i] = r8(); ram[sy.SZ + i] = r8() | 17; ram[sy.SZL + i] = r8(); }
+        [0x49, 0x53, 0x7A, 0x2E].forEach((v, i) => { ram[sy.RAND + i] = v; });
+    }
     ram[sy.ENERGY] = 255; ram[sy.FSH] = 255; ram[sy.ASH] = 255; ram[sy.MCNT] = 1;
 }
 
@@ -115,7 +126,7 @@ for (const name of which) {
         lastPc = pc;
         if (!at(pc, "MLOOP") || done) return false;
         k++;
-        if (!posed) { pose(sc); posed = true; k = 0; return false; }
+        if (!posed) { if (a.pin && ram[sy.GFRONT] !== 1) return false; pose(sc); posed = true; k = 0; return false; }
         if (k === WARM) { snap = regions.map(([b, n]) => Array.from(ram.subarray(b, b + n))); rand = Array.from(ram.subarray(sy.RAND, sy.RAND + 4));
             many = Array.from(ram.subarray(sy.MANY, sy.MANY + 34)); slsp = [ram[sy.SLSP], ram[sy.SLSP + 1]]; }
         if (snap) {
