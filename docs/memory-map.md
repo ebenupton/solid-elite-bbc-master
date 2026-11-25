@@ -372,6 +372,13 @@ The code moved, so the page crossings moved too. `6-harness/profile.mjs
 --pagex` counts 1,108 cycles a flight iteration in page crossings, against
 1,140 before the three passes, and 1,421 off flight, against 1,697. No
 alignment pass has been made: nothing is padded to save a crossing.
+The most sensitive place is the circle engine's rows' loop, `PC_ROWS`,
+which moves with everything in the meridian window before it (the window
+starts where the cold pass ends). Its taken branches' crossings cost from 0
+to about 170 cycles an iteration in the planet scenes depending on where it
+falls in its page: at this build its first branch is at `&11` in its page,
+about 60 cycles an iteration, where `&60`-`&63` would give about 2. A skip
+to a fixed offset before `.PC_ROWS` would keep it in place.
 
 ## The loader
 

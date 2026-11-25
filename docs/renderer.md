@@ -928,9 +928,9 @@ tables.
 
 ## Speed
 
-The gate's run gives 16.47 flight iterations per emulated second (121,401
+The gate's run gives 16.50 flight iterations per emulated second (121,179
 cycles a flight iteration), against 15.43 for SNG47 with the comparison's six
-patches (1.067 times; 15.52 before the Electron port's findings), with the
+patches (1.069 times; 15.52 before the Electron port's findings), with the
 frame rate capped at 25 frames a second; without the cap about a tenth of
 the frames would be shown for a single field. With the speed-ups of the
 port's second part and the original's wireframe drawing the port was 17.86
@@ -990,3 +990,13 @@ within 80 cycles in every scene. `mbench.mjs` also prints the work (the
 cycles less the frame layer's wait for the flip, which only combat has),
 which does not take this out: a routine's own cost is best timed within
 the scene.
+
+Part of that movement is the start: the scenes are put in after a boot and
+launch timed in emulated seconds, so a faster or slower build flies a
+different number of launch iterations first and leaves a different
+stardust, `RAND` and front buffer, which the scenes keep (a change to the
+planet's rows moved the flight scene's star cycles by 2,900). `mbench.mjs
+--pin` puts a fixed stardust field and `RAND` in with the scene and poses
+only with buffer 1 on show, and run one scene at a time (`--scene`) its
+figures move only with the work and the code's page crossings: the Model B
+port's findings (part 9 of the README) were measured so.
