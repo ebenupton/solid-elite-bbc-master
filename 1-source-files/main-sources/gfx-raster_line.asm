@@ -342,8 +342,7 @@
   SBC #0
 .xk
   STA rp_ma+1
-  BPL P%+5                \ K < 0: never inside
-  JMP none
+  BMI none                \ K < 0: never inside
   LDA rp_ma               \ K >= a: inside to the end on the minor axis
   CMP rl_a
   LDA rp_ma+1

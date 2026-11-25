@@ -34,8 +34,7 @@
   DEY
   CPY #&FF
   BNE b1
-.done
-  JMP r7_reset1
+.done                     \ (on into r7_reset1, which follows)
 }
 \ r7_reset1: buffer X's scalars (keeps X)
 .r7_reset1

@@ -300,8 +300,7 @@ ASSERT HI(pb_lx_e) = HI(r_xw) AND HI(pb_lx_o) = HI(r_xw)   \ (a long row's H exi
   DEX
   BPL hl
   TAX
-  BNE p16
-  JMP r_pf8
+  BEQ r_pf8
 .p16                      \ some coordinate outside 0..255: phase A (r7_pf16)
   JSR r7_pf16
   CMP #0                  \ (A = 0: nothing to draw)
@@ -1020,8 +1019,7 @@ r7_eb = r7_er
   RTS
 .inw
   BIT RZ_T4
-  BMI sw
-  JMP st
+  BPL st
 .sw                       \ inside for good: the 8-bit DDA from row Y
   STA RZ_T0
   STY RZ_T3

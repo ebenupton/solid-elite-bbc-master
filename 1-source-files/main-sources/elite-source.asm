@@ -32766,10 +32766,10 @@ ENDIF
 
  STA COMC               \ Store the compass colour in COMC
 
- JMP cpdot              \ Jump to DOT to draw the dot on the compass and return
-                        \ from the subroutine using a tail call (Port: through
-                        \ cpdot, which first removes the old dot, or does
-                        \ neither when the dot has not changed)
+                        \ Fall through into DOT to draw the dot on the compass
+                        \ and return from the subroutine (Port: into cpdot,
+                        \ which follows, which first removes the old dot, or
+                        \ does neither when the dot has not changed)
 
 \ ******************************************************************************
 \

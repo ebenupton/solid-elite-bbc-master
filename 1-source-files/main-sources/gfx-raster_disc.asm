@@ -145,8 +145,7 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
   LDX R_PRBUF               \ boundaries this frame or last time: r_dbm
   LDA R_NDF
   ORA R_PRBMODE,X
-  BEQ plain
-  JMP r_dbm
+  BNE r_dbm
 .plain
   \ split lo..hi at the dirty rows: A-loop (no dirty) / B-loop
   LDA R_PRDYZ
@@ -195,8 +194,7 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
 {
   LDX R_PRBUF               \ the boundary arrays' operands: patched only here
   CPX r_sbbdb             \ (two-colour discs only)
-  BNE pp
-  JMP pt
+  BEQ pt
 .pp
   STX r_sbbdb
   LDA r_sbh_bdn,X          \ group r_bdn
@@ -711,8 +709,7 @@ ASSERT r_xwd = r_xw AND HI(r_spl) = HI(r_xw) AND HI(r_fgl) = HI(r_xw)
   STX RZ_Y
   LDA R_NDN,X             \ the count and the colour (bit 7), new and old
 .^r_pt154 CMP r_bdn,X
-  BEQ sm
-  JMP df
+  BNE df
 .sm
   ASL A                   \ the same (A = 2 count, C = the colour): no
   BNE sc                  \ boundaries: a one-colour row, which r_dp2 does
@@ -1616,8 +1613,7 @@ c_T   = &27               \ (r_ftail: 3 c1)
   CPY R_PRWT
   BCS r1
   STY R_PRWT
-.r1
-  JMP r7_rowrep
+.r1                       \ (on into r7_rowrep, which follows)
 }
 
 \ r7_rowrep: rows Y .. c_YE - 1 (see above)
@@ -1649,8 +1645,7 @@ c_T   = &27               \ (r_ftail: 3 c1)
   TYA
   TAX                     \ X = the row
   BIT KMODE
-  BPL frow
-  JMP krow
+  BMI krow
 .frow                     \ fast path: extent inside columns 1..62
 .fl2
   LDA R_DIRTYR0,X

@@ -38,12 +38,10 @@
  AND #1
  STA PF_CLS
  LDA K+1                \ the detail only below a radius of 256, as PL9 has
- BNE pfh8               \ it, and from 6 up, as its meridians
+ BNE pfh9               \ it, and from 6 up, as its meridians
  LDA K
  CMP #6
- BCS P%+5
-.pfh8
- JMP pfh9
+ BCC pfh9
  STA pcr
  STA pf_r
  LDA XC                 \ (the engine's workspace is Elite's &10-&26: these
@@ -64,8 +62,7 @@
  STA pcby+1
  STZ pc_inv
  JSR pf_hold            \ (the last records, moved with the disc)
- BCC P%+5
- JMP pfh3h
+ BCS pfh3h
  LDA PF_CLS
  BNE pfh2
  INC pc_inv             \ (the beach ball: base 1)

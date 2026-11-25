@@ -1114,8 +1114,7 @@ ASSERT LO(R_DISCL0) = LO(R_DISCL1) AND LO(R_DISCR0) = LO(R_DISCR1)
  STA fpr_ld2+1
  LDA #HI(F_HW)
  STA fpr_ld+2
- STA fpr_ld2+2
- JMP f_discspans
+ STA fpr_ld2+2       \ (and on into f_discspans, which follows)
 
 \ f_discspans: the disc's rows, as fdk_build makes them, or those it made
 \ last time when nothing they depend on has changed: the same disc (its
@@ -2124,8 +2123,7 @@ ASSERT fsd_zl = RZ_T0 AND fsd_x = RZ_T5
 .fsh_face
  LDY f_f
  CPY f_nf
- BCC P%+5
- JMP fsh_done
+ BCS fsh_done
  LDA (fz_dl),Y          \ visibility
  BEQ fsh_skip
  STA fz_t
@@ -3148,7 +3146,10 @@ FC_PLLE = &5F : FC_PLLO = &AF
 
 .f_behind
  LDA F_PLON             \ the planet's disc, if any
- BEQ fbh0
+ BNE fbhg
+ CLC
+ RTS
+.fbhg
  LDX #4
 .fbhp
  LDA F_PLX,X            \ (F_PLX, F_PLY, F_PLR)
@@ -3160,11 +3161,7 @@ FC_PLLE = &5F : FC_PLLO = &AF
  LDA F_PLZL
  STA fb_zl
  LDA #LO(F_HW)
- LDX #HI(F_HW)
- JMP f_bdisc
-.fbh0
- CLC
- RTS
+ LDX #HI(F_HW)          \ (and on into f_bdisc, which follows)
 
 \ f_bdisc: is ship f_si behind the disc fb_x, fb_y, fb_r (half-widths at
 \ (A, X)), z fb_zh/fb_zl, with the first vertex of its first visible face
