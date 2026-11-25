@@ -431,6 +431,36 @@ frames with the station filling the screen. Flight elsewhere is unchanged.
 `test_raster.py`'s `kept` test drives multi-frame sequences through K mode
 against the model.
 
+## Inside the station
+
+The game docks only once the station's centre is within 127 of us on every
+axis (main flight loop part 8, then `ISDK`), but the face with the docking
+slot is 160 from a Coriolis station's centre along its nose (196 for the
+Dodo). So for the last two or three iterations of every docking we are past
+the plane of that face, inside the station's hull, and part 5 of `LL9` finds
+every face turned away: the station draws nothing at all, and the stars, the
+sun and the lens flare beyond it showed through (the original shows the
+stars there too: its wireframe station vanishes the same way). The frame now
+shows the black of the slot instead.
+
+`F_SHIP` tests for it as it records the station (`TYPE` is `SST` for both
+stations): if none of its faces is visible, it sets the star count at
+`ff_stars` to 0, so the frame plots no stars, and this buffer's old ones are
+erased as ever at the frame's start, leaving its star records empty. The
+station is recorded before the sun, which is parked while the station holds
+slot 1 and runs after the ship slots (`SUNSC`), so `F_PLANET` takes `GSUNON`
+from the same byte: 0, no sun, so its disc goes as a disc that has left the
+screen does (`f_discs`, incrementally, in both buffers in turn) and there is
+no flare. `f_reset` puts the count back after every frame. As the station is
+convex, a station with no face visible is one we are inside; anywhere else
+some face is visible, so other views, other ships and the approach are as
+before, pixel for pixel. It costs `F_SHIP` up to 11 cycles a face when it
+records a station (it stops at the first face visible), and `f_reset` 6
+cycles a frame: the seven frozen scenes (`mbench.mjs --pin`, one a process)
+move by -94 to +26 cycles an iteration, within 0.06%, with the code's moves.
+`6-harness/mdockview.mjs` flies the scene: a docking run into the slot, and
+a station we sit inside and then leave.
+
 ## Lighting
 
 The sun is the light source in flight. `L_SUN`, once per frame, keeps the

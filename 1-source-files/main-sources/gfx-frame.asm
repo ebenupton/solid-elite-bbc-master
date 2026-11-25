@@ -528,6 +528,15 @@ RPN = 4
  LDA TYPE               \ the faces' type: the station's slot holds the
  CMP #SST               \ Coriolis or the Dodo (NWSPS), whose faces are
  BNE fsh0               \ type DOD's
+ LDY GNF                \ the station with none of its faces visible: we are
+.fsi1                   \ inside it, past the plane of its slot's face, in the
+ LDA XX2-1,Y            \ last iterations before docking (docking needs |x|,
+ BNE fsi8               \ |y| and z under 128; the slot's face is 160 out, the
+ DEY                    \ Dodo's 196), and it draws nothing: then the frame
+ BNE fsi1               \ plots no stars (the count at ff_stars, which f_reset
+ STA ff_stars+1         \ puts back) and draws no sun (fpl1, as the station is
+.fsi8                   \ recorded before the sun, parked after the ship slots)
+ LDA #SST
  LDY XX0
  CPY #LO(SHIP_DODO)
  BNE fsh0
@@ -664,8 +673,8 @@ ASSERT XX0 = XX16 + 18
  STA F_SUY+1
  LDA K
  STA GSUNR
- LDA #&FF
- STA GSUNON
+ LDA ff_stars+1         \ (none inside the station, F_SHIP: its disc goes as a
+ STA GSUNON             \ disc that has left the screen does, and no flare)
  RTS
 
 \ ------------------------------------------------------------------------------
@@ -748,7 +757,7 @@ ASSERT XX0 = XX16 + 18
  JSR f_lasers           \ our laser beams and the sights
  JSR f_flt              \ the lens flare (gfx-flare6.asm), then the text on top
  JSR f_sight2           \ and the sights
-.ff_stars
+.ff_stars               \ (the count is 0 inside the station: F_SHIP)
  LDA #NOST+1            \ stardust, on black only (last: erasing it next
  STA R_SN               \ time restores black, so it needs no WL/WR): stars
  LDA F_SLV+16           \ 1..NOST (NOSTM is only ever NOST = 20), recorded by
@@ -791,6 +800,8 @@ ASSERT XX0 = XX16 + 18
 .f_reset
  LDA #&80               \ no docking slot (f_poly2 records one, f_slot uses it)
  STA F_SLV+16
+ LDA #NOST+1            \ and not inside the station (F_SHIP)
+ STA ff_stars+1
 .f_lists                \ (F_DIRECT: 6-harness/mfbcmp.mjs counts frames at f_reset)
  LDA #0                 \ empty the per-frame lists
  STA GLASV              \ (Master port: the beams show for one frame per LASLI)
