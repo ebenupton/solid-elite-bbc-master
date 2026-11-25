@@ -149,7 +149,7 @@ ENDMACRO
 
 \ pms_core (in line: its one call): from the magnitudes and signs in pv_m,
 \ pm_sg and pm_nz, the circle's orientation terms: pm_sx, pm_sy, pm_inv,
-\ t (pm_tq), v (pm_v), a (pm_a32) and K2 (pm_K2)
+\ t (pm_tq), v (pm_v), a (pm_a32) and K2 (pm_K2), these two in the record
 
  LDA pm_sg              \ sx = sign(mx), sy = sign(my') = -sign(my)
  STA pm_sx
@@ -316,12 +316,6 @@ ENDMACRO
  BNE pms8
  INC pm_K2+3
 .pms8
- LDX #7                 \ (a, K2 into the record)
-.pcl2
- LDA pm_a32,X
- STA wr+R_A,X
- DEX
- BPL pcl2
  LDA pcn+1              \ (pcn / 2: the unit axis from the magnitudes >> 2)
  LSR A
  STA pv_cn+1
@@ -2231,8 +2225,6 @@ O_RC = pv_rc - pv
 .pm_sy  EQUB 0          \ bit 7: my' < 0
 .pm_inv EQUB 0          \ 1 if m was negated
 .pm_ulo EQUW 0
-.pm_a32 SKIP 4          \ a, 16.16 signed } (in this order: the record's
-.pm_K2  SKIP 4          \ K2, 16.16       } first eight bytes)
 .pm_P                   \ 4-byte operands
 .pm_X2  SKIP 4
 .pm_Y2  SKIP 4
@@ -2254,6 +2246,8 @@ O_RC = pv_rc - pv
 .pc_s9  SKIP 3          \ } pixels
 .pc_n   SKIP 6
 .wr     SKIP RSZ        \ the record being made
+pm_a32 = wr + R_A       \ (a, 16.16 signed, and K2, 16.16: pms_core makes
+pm_K2 = wr + R_K2       \ them in the record)
  EQUB &80, &80          \ (pr_tm's last two)
 
 \ The frame's (PC_ROWS'), over the game context's (pc_circ's) work variables
