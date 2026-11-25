@@ -376,8 +376,8 @@ The most sensitive place is the circle engine's rows' loop, `PC_ROWS`,
 which moves with everything in the meridian window before it (the window
 starts where the cold pass ends). Its taken branches' crossings cost from 0
 to about 170 cycles an iteration in the planet scenes depending on where it
-falls in its page: at this build its first branch is at `&11` in its page,
-about 60 cycles an iteration, where `&60`-`&63` would give about 2. A skip
+falls in its page: at this build its first branch is at `&02` in its page,
+about 115 cycles an iteration, where `&60`-`&63` would give about 2. A skip
 to a fixed offset before `.PC_ROWS` would keep it in place.
 
 ## The loader
